@@ -1,0 +1,14 @@
+.env*
+!.env.example
+deployment-private/
+secrets/
+**/*service-account*.json
+**/*firebase-adminsdk*.json
+*.pem
+.next/
+node_modules/
+coverage/
+*.tsbuildinfo
+*.log
+run_admin.bat
+start_admin.bat

@@ -1,0 +1,46 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { BALETE_BARANGAYS } from "../src/lib/barangay-geofence.ts";
+import { buildPhonePush } from "../src/lib/phone-push.ts";
+
+const record = { title: "Collection update", message: "Collection starts tomorrow at 8 AM.", type: "schedule", recipients: "All Barangays" };
+
+test("background Android delivery includes a notification payload and the actual phone channel", () => {
+  const message = buildPhonePush("notice-1", record, BALETE_BARANGAYS);
+  assert.deepEqual(message.notification, { title: record.title, body: record.message });
+  assert.equal(message.topic, "trashtrack_residents_v1");
+  assert.equal(message.android.priority, "high");
+  assert.equal(message.android.notification.channelId, "trashtrack_updates");
+  assert.equal(message.android.notification.icon, "ic_notification");
+  assert.equal(message.android.notification.sound, "default");
+  assert.equal(message.android.notification.tag, "trashtrack:notice-1");
+  assert.deepEqual(message.data, { notificationId: "notice-1", openNotifications: "true", type: "schedule" });
+});
+
+test("each of the 13 barangays targets its own subscription, including San Sebastian", () => {
+  const topics = BALETE_BARANGAYS.map(recipients => buildPhonePush("notice-2", { ...record, recipients }, BALETE_BARANGAYS).topic);
+  assert.equal(new Set(topics).size, 13);
+  assert.ok(topics.every(topic => /^trashtrack_barangay_[a-z_]+_v1$/.test(topic)));
+  assert.equal(topics.at(-1), "trashtrack_barangay_san_sebastian_v1");
+});
+
+test("unknown destinations are rejected instead of broadcasting to everybody", () => {
+  for (const recipients of ["Kinalaglagan", "all", "", 123, {}, "Sala OR Poblacion"]) {
+    assert.throws(() => buildPhonePush("notice-3", { ...record, recipients }, BALETE_BARANGAYS), /valid Balete barangay/);
+  }
+});
+
+test("blank, oversized and malformed content is rejected before Firebase delivery", () => {
+  for (const overrides of [{ title: " " }, { message: "" }, { title: "x".repeat(101) },
+    { message: "x".repeat(501) }, { title: 1 }, { message: null }]) {
+    assert.throws(() => buildPhonePush("notice-4", { ...record, ...overrides }, BALETE_BARANGAYS), /required/);
+  }
+});
+
+test("a retry uses the same Android tag and notification ID instead of creating another tray item", () => {
+  const first = buildPhonePush("stable-notice", record, BALETE_BARANGAYS);
+  const retry = buildPhonePush("stable-notice", record, BALETE_BARANGAYS);
+  assert.equal(first.android.notification.tag, retry.android.notification.tag);
+  assert.equal(first.data.notificationId, retry.data.notificationId);
+  assert.notEqual(first.android.notification.tag, buildPhonePush("another-notice", record, BALETE_BARANGAYS).android.notification.tag);
+});
