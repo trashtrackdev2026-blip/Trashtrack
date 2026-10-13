@@ -62,11 +62,16 @@ Add production variables before the first production build. Preview builds also 
 ## Verification and rollout
 
 ```sh
+npm run check:runtime
 npm run check:deployment -- --verify-services
 npm test
 npm run build
 npm run check:bundle
 ```
+
+The install command must allow lifecycle scripts. `postinstall` applies a narrowly checked loader patch to `jwks-rsa` 4.1.0: its two CommonJS entry points load ESM-only JOSE with `import()` instead of `require()`. This fixes `ERR_REQUIRE_ESM` in Vercel's instrumented function runtime while retaining JOSE 6, Firebase token verification and all approval checks. The patch validates the original source hashes and fails installation if upstream code changes unexpectedly. Remove it only after testing an upstream runtime fix.
+
+`check:runtime` is also part of `build:vercel`. It loads the Firebase Admin modules with synchronous `require(ESM)` disabled, retrieves an RSA signing key, validates a real signature, rejects a forged signature and an unknown key, and checks the Passport callback. This catches the production startup failure that an ordinary Node 24 build could miss. Empty or non-JSON API failures now show a readable error and an HTTP error reference on sign-in.
 
 The Firebase check reads Auth configuration, one Firestore record and the active ruleset. It prints no user records/credentials and performs no writes. The bundle check requires the template, script font and license in both certificate traces and rejects private configuration in server traces.
 

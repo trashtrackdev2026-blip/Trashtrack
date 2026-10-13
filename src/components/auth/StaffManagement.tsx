@@ -19,7 +19,7 @@ export function StaffManagement() {
   const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
     setLoading(true);
-    try { setData(await staffRequest("/api/staff/manage")); setError(""); }
+    try { setData(await staffRequest<Management>("/api/staff/manage")); setError(""); }
     catch (failure) { setError(failure instanceof Error ? failure.message : "Could not load staff."); }
     finally { setLoading(false); }
   }, []);

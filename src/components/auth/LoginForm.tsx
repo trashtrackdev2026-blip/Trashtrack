@@ -8,6 +8,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { signInError } from "@/lib/sign-in-errors";
 import { staffRole } from "@/lib/staff-access";
+import { readApiResponse } from "@/lib/api-response";
 import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, getMultiFactorResolver, TotpMultiFactorGenerator, type MultiFactorError, type MultiFactorResolver, type User } from "firebase/auth";
 
 export function LoginForm() {
@@ -24,8 +25,8 @@ export function LoginForm() {
   async function complete(user: User) {
     setPassword(""); setCode("");
     const response = await fetch("/api/staff/account", { headers: { Authorization: "Bearer " + await user.getIdToken() }, cache: "no-store", signal: AbortSignal.timeout(30000) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Your account could not be verified.");
+    const data = await readApiResponse<{ problem: string | null; profile: { role?: string } }>(response, "Your account could not be verified.");
+    if (!data.profile || typeof data.profile !== "object") throw new Error("The server could not verify your account. Please try again.");
     router.replace(data.problem ? "/staff-account" : staffRole(data.profile.role) === "admin" ? "/" : "/reports");
   }
   async function submit(event: React.FormEvent) {

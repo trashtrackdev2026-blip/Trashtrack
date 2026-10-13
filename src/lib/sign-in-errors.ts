@@ -1,7 +1,7 @@
 export function signInError(failure: unknown) {
   const rawCode = failure && typeof failure === "object" && "code" in failure ? failure.code : null;
   // Expose only an error identifier, never Firebase response bodies or tokens.
-  const reference = typeof rawCode === "string" && /^auth\/[a-z0-9-]+$/.test(rawCode) ? rawCode : "";
+  const reference = typeof rawCode === "string" && /^(auth|api)\/[a-z0-9-]+$/.test(rawCode) ? rawCode : "";
   let message: string;
   switch (reference) {
     case "auth/invalid-credential":
@@ -46,7 +46,8 @@ export function signInError(failure: unknown) {
       message = "This password no longer meets the account policy. Use Forgot your password to choose a new password.";
       break;
     default:
-      message = reference ? "Sign-in could not be completed. Contact MENRO with the error reference below." :
+      message = reference.startsWith("api/") && failure instanceof Error ? failure.message :
+        reference ? "Sign-in could not be completed. Contact MENRO with the error reference below." :
         failure instanceof Error && failure.name === "TimeoutError" ? "The account check timed out. Check your internet connection and try again." :
         failure instanceof Error ? failure.message : "Sign-in failed. Try again.";
   }

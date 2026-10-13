@@ -1,4 +1,5 @@
 import { auth } from "./firebase";
+import { readApiResponse } from "./api-response";
 
 export async function eventRequest(path: string, body: Record<string, unknown>) {
   const user = auth.currentUser;
@@ -8,8 +9,7 @@ export async function eventRequest(path: string, body: Record<string, unknown>) 
     body: JSON.stringify(body), signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || "The request failed. Please try again.");
+    await readApiResponse(response, "The request failed. Please try again.");
   }
   return response;
 }

@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { eventRequest } from "@/lib/event-client";
+import { readApiResponse } from "@/lib/api-response";
 
 export function AttendanceQr({ eventId, method }: { eventId: string; method?: string }) {
   const [qr, setQr] = useState<{ payload: string; open: boolean } | null>(null);
@@ -15,7 +16,7 @@ export function AttendanceQr({ eventId, method }: { eventId: string; method?: st
     if (method === "manual") return;
     let active = true;
     eventRequest("/api/events/attendance-qr", { eventId, action: "get" })
-      .then(response => response.json()).then(data => { if (active) setQr(data); })
+      .then(response => readApiResponse<{ payload: string; open: boolean }>(response)).then(data => { if (active) setQr(data); })
       .catch(failure => { if (active) setError(failure instanceof Error ? failure.message : "QR could not be loaded."); });
     return () => { active = false; };
   }, [eventId, method, attempt]);
@@ -37,7 +38,7 @@ export function AttendanceQr({ eventId, method }: { eventId: string; method?: st
     setBusy(true); setError("");
     try {
       const response = await eventRequest("/api/events/attendance-qr", { eventId, action: "setOpen", open: !qr.open });
-      setQr(await response.json());
+      setQr(await readApiResponse<{ payload: string; open: boolean }>(response));
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Attendance status could not be saved."); }
     finally { setBusy(false); }
   };

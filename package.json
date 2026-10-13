@@ -6,9 +6,11 @@
     "node": "24.x"
   },
   "scripts": {
+    "postinstall": "node scripts/patch-jwks-rsa.mjs",
     "dev": "next dev -H 0.0.0.0 --webpack",
     "build": "next build --webpack",
-    "build:vercel": "npm run check:deployment -- --vercel && npm run build && npm run check:bundle",
+    "build:vercel": "npm run check:runtime && npm run check:deployment -- --vercel && npm run build && npm run check:bundle",
+    "check:runtime": "node --test tests/firebase-runtime.test.mjs",
     "check:deployment": "node scripts/check-deployment.mjs",
     "prepare:vercel": "node scripts/prepare-vercel-env.mjs",
     "check:bundle": "node scripts/check-deployment-bundle.mjs",
@@ -60,6 +62,7 @@
     "typescript": "^5"
   },
   "overrides": {
+    "jwks-rsa": "4.1.0",
     "@grpc/grpc-js": "1.14.6",
     "gaxios@6": {
       "uuid": "11.1.1"

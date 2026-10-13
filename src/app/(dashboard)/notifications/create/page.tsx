@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
+import { readApiResponse } from "@/lib/api-response";
 
 export default function CreateNotificationPage() {
   const router = useRouter();
@@ -52,8 +53,8 @@ export default function CreateNotificationPage() {
           method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ notificationId }), signal: AbortSignal.timeout(20_000),
         });
-        const result = await response.json();
-        if (!response.ok || result.queued !== true) throw new Error(result.error || "Phone delivery could not be queued.");
+        const result = await readApiResponse(response, "Phone delivery could not be queued.");
+        if (result.queued !== true) throw new Error("Phone delivery could not be queued.");
       }
       alert(form.push ? "Notification saved and queued for phones." : "Notification saved in the app's notification history.");
       router.push("/notifications");

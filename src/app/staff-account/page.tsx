@@ -28,8 +28,8 @@ export default function StaffAccountPage() {
       await currentUser.reload();
       await currentUser.getIdToken(true);
       const [details, state] = await Promise.all([
-        staffRequest("/api/staff/account?setup=1") as Promise<Account>,
-        staffRequest("/api/staff/requests"),
+        staffRequest<Account>("/api/staff/account?setup=1"),
+        staffRequest<{ request: AccessRequest | null }>("/api/staff/requests"),
       ]);
       setAccount({ ...details, userId: currentUser.uid }); setRequest(state.request);
       setName(String(details.profile.name || "")); setBarangay(String(details.profile.barangay || ""));
@@ -44,8 +44,8 @@ export default function StaffAccountPage() {
     void (async () => {
       try {
         const [details, state] = await Promise.all([
-          staffRequest("/api/staff/account?setup=1") as Promise<Account>,
-          staffRequest("/api/staff/requests"),
+          staffRequest<Account>("/api/staff/account?setup=1"),
+          staffRequest<{ request: AccessRequest | null }>("/api/staff/requests"),
         ]);
         if (cancelled) return;
         setAccount({ ...details, userId: user.uid }); setRequest(state.request);
