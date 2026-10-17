@@ -16,6 +16,7 @@ export interface CommunityReport {
   latitude?: number;
   longitude?: number;
   imageUrl: string;
+  attachments: { url: string; type: "image" | "video" }[];
   status: string;
   date: string;
   reporterName: string;
@@ -53,6 +54,8 @@ export function useReports() {
               id: doc.id, userId: data.userId || "", type: data.type || "Unknown",
               description: data.description || "", location: data.location || "",
               latitude: data.latitude, longitude: data.longitude, imageUrl: data.imageUrl || "",
+              attachments: Array.isArray(data.attachments) ? data.attachments.filter((item: { url?: unknown; type?: unknown }) =>
+                typeof item?.url === "string" && item.url.startsWith("https://") && ["image", "video"].includes(String(item.type))) : [],
               status: reportWorkflowStatus(data), date: data.date || "",
               reporterName: data.reporterName || names.get(data.userId) || "Unknown User",
               remarks: data.remarks || "",

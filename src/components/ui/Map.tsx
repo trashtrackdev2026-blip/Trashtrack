@@ -102,7 +102,7 @@ export default function Map({ barangayStats = [], selectedBarangay = "all-barang
   );
 
   return (
-    <div className="w-full h-full relative overflow-hidden rounded-xl">
+    <div className="w-full h-full relative isolate overflow-hidden rounded-xl">
       <MapContainer center={[14.0, 121.07]} zoom={12} style={{ height: "100%", width: "100%", zIndex: 0 }}>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19}
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Boundaries: NAMRIA/PSA via <a href="https://data.humdata.org/dataset/cod-ab-phl">OCHA</a>' />

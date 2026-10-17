@@ -1,4 +1,5 @@
 "use client";
+import { ReportEvidence } from "@/components/reports/ReportEvidence";
 
 import { useState } from "react";
 import { Search, FileText, Clock, CheckCircle2, AlertTriangle, ImageIcon, Check, Send } from "lucide-react";
@@ -276,28 +277,8 @@ export default function ReportsPage() {
 
                 {/* Evidence */}
                 <div>
-                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-3">Evidence Photo</h4>
-                  {activeReport.imageUrl ? (
-                    <div 
-                      className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 cursor-zoom-in group"
-                      onClick={() => setFullPhotoUrl(activeReport.imageUrl)}
-                    >
-                      <Image 
-                        src={activeReport.imageUrl} 
-                        alt="Evidence" 
-                        fill 
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                        <Search className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-full h-32 bg-slate-100 rounded-lg flex flex-col items-center justify-center border border-slate-200 border-dashed">
-                      <ImageIcon className="w-6 h-6 text-slate-400 mb-2" />
-                      <span className="text-xs text-slate-500 font-medium">No photo uploaded</span>
-                    </div>
-                  )}
+                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-3">Evidence photos and videos</h4>
+                  <ReportEvidence report={activeReport} />
                 </div>
 
                 {activeReport.remarks && <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">

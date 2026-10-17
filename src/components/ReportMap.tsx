@@ -70,11 +70,11 @@ export default function ReportMap({ latitude, longitude, label = "Report Locatio
   });
 
   return (
-    <div className="w-full h-full relative overflow-hidden rounded-xl border border-slate-200">
+    <div className="w-full h-full relative isolate overflow-hidden rounded-xl border border-slate-200">
       <MapContainer
         center={[latitude, longitude]}
         zoom={16}
-        style={{ height: "100%", width: "100%", zIndex: 10 }}
+        style={{ height: "100%", width: "100%", zIndex: 0 }}
         zoomControl={false}
       >
         <TileLayer

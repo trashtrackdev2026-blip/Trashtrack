@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { learningResourceType, publicLearningUrl } from "@/lib/learning-resource";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -35,79 +36,41 @@ export default function CreateEducationResourcePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
 
-  const getFileType = (url: string, fileName?: string) => {
-    const target = (url || form.videoUrl || fileName || "").toLowerCase();
-    if (!target && form.type !== "Video") return "none";
-    
-    if (target.match(/\.(pdf|doc|docx|txt)$/)) {
-      return "document";
-    }
-    if (
-      target.match(/\.(mp4|webm|mov|avi|mkv)$/) ||
-      target.includes("youtube.com") ||
-      target.includes("youtu.be") ||
-      target.includes("vimeo.com") ||
-      (form.type === "Video" && !target.match(/\.(jpg|jpeg|png|gif|webp)$/))
-    ) {
-      return "video";
-    }
-    return "image";
-  };
+  const getFileType = (url: string, fileName = "") => learningResourceType(url, fileName, form.type);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    setUploadError("");
+    const document = /\.(pdf|docx?|pptx?|txt)$/i.test(file.name);
+    const limit = (document ? 25 : 50) * 1024 * 1024;
+    if (file.size > limit) { setUploadError(`Choose a file smaller than ${document ? 25 : 50} MB.`); return; }
     setIsUploading(true);
     try {
       const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
       const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-      if (cloudName && uploadPreset) {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", uploadPreset);
-
-        // Auto endpoint handles images, videos, and raw document files
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await res.json();
-        if (data.secure_url) {
-          setForm(prev => ({ 
-            ...prev, 
-            image: data.secure_url,
-            fileName: file.name
-          }));
-        } else {
-          // Fallback to local data URL preview
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setForm(prev => ({ ...prev, image: reader.result as string, fileName: file.name }));
-          };
-          reader.readAsDataURL(file);
-        }
-      } else {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setForm(prev => ({ ...prev, image: reader.result as string, fileName: file.name }));
-        };
-        reader.readAsDataURL(file);
+      if (!cloudName || !uploadPreset) throw new Error("Media uploads are not configured. Ask MENRO to configure Cloudinary, or paste a public link.");
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", uploadPreset);
+      // Raw documents preserve the original file and extension for the resident reader.
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${document ? "raw" : "auto"}/upload`, {
+        method: "POST", body: formData, signal: AbortSignal.timeout(120_000),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.secure_url) throw new Error(data.error?.message || "Upload failed. Check Cloudinary upload settings and retry.");
+      const url = publicLearningUrl(data.secure_url);
+      if (document) {
+        const delivery = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(20_000) });
+        if (!delivery.ok) throw new Error("The file uploaded but cannot be downloaded. In Cloudinary Security settings, enable PDF delivery and verify the upload preset allows documents. Then upload again, or use a public PDF link.");
       }
+      setForm(prev => ({ ...prev, image: url, videoUrl: "", fileName: file.name }));
     } catch (error) {
-      console.error("Error uploading file:", error);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm(prev => ({ ...prev, image: reader.result as string, fileName: file.name }));
-      };
-      reader.readAsDataURL(file);
-    } finally {
-      setIsUploading(false);
-    }
+      setUploadError(error instanceof Error ? error.message : "Upload failed. Try again.");
+    } finally { setIsUploading(false); e.target.value = ""; }
   };
 
   const handlePublish = async () => {
@@ -116,10 +79,13 @@ export default function CreateEducationResourcePage() {
       return;
     }
     
+    if (isUploading) return;
+    setUploadError("");
     setIsSubmitting(true);
     try {
-      const detectedFileType = getFileType(form.image, form.fileName);
-      const finalImage = form.image || (form.type === "Guide" ? "/images/bins-guide.jpg" : "");
+      const source = publicLearningUrl(form.image || form.videoUrl);
+      const detectedFileType = getFileType(source, form.fileName);
+      const finalImage = detectedFileType === "image" ? source : "";
 
       await addDoc(collection(db, "educational_resources"), {
         title: form.title,
@@ -128,7 +94,8 @@ export default function CreateEducationResourcePage() {
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         status: "Published",
         image: finalImage,
-        videoUrl: form.videoUrl || (detectedFileType === "video" ? form.image : ""),
+        videoUrl: detectedFileType === "video" ? source : "",
+        fileUrl: source,
         fileType: detectedFileType,
         fileName: form.fileName || "",
         description: form.description,
@@ -137,7 +104,7 @@ export default function CreateEducationResourcePage() {
       setIsSuccess(true);
     } catch (e) {
       console.error("Error publishing resource:", e);
-      alert("Failed to publish resource");
+      setUploadError(e instanceof Error ? e.message : "Failed to publish resource. Try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -254,7 +221,7 @@ export default function CreateEducationResourcePage() {
                       <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
                         {form.type === "Video" ? "Video File, Stream URL, or Cover" : "Cover Image, Video or Document"}
                       </label>
-                      {form.type === "Video" && (
+                      {(
                         <div className="flex gap-2 text-xs">
                           <button
                             type="button"
@@ -268,28 +235,28 @@ export default function CreateEducationResourcePage() {
                             onClick={() => setUploadMode("url")}
                             className={`px-3 py-1 rounded-lg font-semibold transition-colors ${uploadMode === "url" ? "bg-[#1B5E20] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
                           >
-                            Paste Video Link
+                            Paste Link
                           </button>
                         </div>
                       )}
                     </div>
 
-                    {uploadMode === "url" && form.type === "Video" ? (
+                    {uploadMode === "url" ? (
                       <div className="space-y-2">
                         <Input
                           value={form.videoUrl}
-                          onChange={(e) => setForm({ ...form, videoUrl: e.target.value, image: e.target.value })}
-                          placeholder="https://www.youtube.com/watch?v=... or direct MP4 link"
+                          onChange={(e) => setForm({ ...form, videoUrl: e.target.value, image: e.target.value, fileName: "" })}
+                          placeholder="https://... public PDF, article or video link"
                           className="h-11 bg-white border-slate-200"
                         />
-                        <p className="text-[11px] text-slate-500">Provide a direct MP4 URL or YouTube link for resident playback.</p>
+                        <p className="text-[11px] text-slate-500">Use a public link that residents can open without signing in. Choose Article for web pages; use a direct file link for PDFs.</p>
                       </div>
                     ) : (
                       <label className="w-full min-h-[160px] border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-center hover:bg-slate-50 cursor-pointer transition-colors relative overflow-hidden p-4">
                         <input 
                           type="file" 
                           className="hidden" 
-                          accept="image/*,video/*,.pdf,.doc,.docx,.txt" 
+                          accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.txt"
                           onChange={handleFileUpload} 
                           disabled={isUploading} 
                         />
@@ -348,7 +315,7 @@ export default function CreateEducationResourcePage() {
                             <span className="text-[11px] text-slate-400 max-w-xs">
                               {form.type === "Video" 
                                 ? "MP4, WEBM, MOV, JPG, PNG (Max 50MB)" 
-                                : "PDF, DOCX, JPG, PNG, MP4 (Max 50MB)"}
+                                : "PDF, DOCX, PPTX, TXT (Max 25MB); images and video (Max 50MB)"}
                             </span>
                           </div>
                         )}
@@ -357,13 +324,14 @@ export default function CreateEducationResourcePage() {
                   </div>
                 </div>
 
+                {uploadError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{uploadError}</p>}
                 <div className="mt-10 flex items-center justify-end gap-3 pt-6 border-t border-slate-100 max-w-2xl">
                   <Link href="/education">
                     <Button variant="outline" className="px-6 h-11 border-slate-200 text-slate-600 font-semibold rounded-xl">
                       Cancel
                     </Button>
                   </Link>
-                  <Button disabled={isSubmitting} onClick={handlePublish} className="px-6 h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm">
+                  <Button disabled={isSubmitting || isUploading} onClick={handlePublish} className="px-6 h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm">
                     <Send className="w-4 h-4 mr-2" /> {isSubmitting ? "Publishing..." : "Publish Resource"}
                   </Button>
                 </div>

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import dynamic from "next/dynamic";
+import { createPortal } from "react-dom";
 
 import { useState, useEffect, useMemo } from "react";
 import { collection, getCountFromServer, getDocs, type DocumentData } from "firebase/firestore";
@@ -370,7 +371,7 @@ export default function AnalyticsPage() {
               </Select>
             </div>
 
-            <div className="relative w-full h-[350px] p-2 bg-slate-50 border-b border-slate-100">
+            <div className="relative isolate w-full h-[350px] p-2 bg-slate-50 border-b border-slate-100">
                <MapComponent barangayStats={mapStats} selectedBarangay={selectedBarangay} />
 
                {/* Legend */}
@@ -483,8 +484,8 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Expanded GIS Map Modal */}
-      {isMapExpanded && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 lg:p-8 animate-in fade-in zoom-in duration-200">
+      {isMapExpanded && createPortal(
+        <div role="dialog" aria-modal="true" aria-label="Expanded GIS map" className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 lg:p-8 animate-in fade-in zoom-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full h-full flex flex-col overflow-hidden relative">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white z-10">
               <h3 className="font-bold text-slate-900 flex items-center gap-2">
@@ -499,7 +500,7 @@ export default function AnalyticsPage() {
                 <X className="w-5 h-5" />
               </Button>
             </div>
-            <div className="flex-1 w-full relative bg-slate-50">
+            <div className="flex-1 w-full relative isolate bg-slate-50">
               <MapComponent barangayStats={mapStats} selectedBarangay={selectedBarangay} />
               
               {/* Floating Legend for Expanded Map */}
@@ -522,7 +523,7 @@ export default function AnalyticsPage() {
                </div>
             </div>
           </div>
-        </div>
+        </div>, document.body
       )}
     </>
   );

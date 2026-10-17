@@ -1,5 +1,6 @@
 "use client";
 
+import { learningResourceType } from "@/lib/learning-resource";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,10 @@ interface ResourceData {
   date: string;
   status: string;
   image: string;
+  fileUrl?: string;
+  videoUrl?: string;
+  fileName?: string;
+  fileType?: string;
 }
 
 export default function EducationPage() {
@@ -362,26 +367,17 @@ export default function EducationPage() {
               <h3 className="font-bold text-slate-900 mb-6 pr-8">Resource Details</h3>
               
               <div className="w-full aspect-video rounded-xl bg-slate-100 mb-6 relative overflow-hidden flex flex-col justify-between p-3">
-                {activeResource.type?.toLowerCase() === 'video' ? (
-                  activeResource.image && activeResource.image.match(/\.(mp4|webm|mov)$/i) ? (
-                    <video src={activeResource.image} controls className="absolute inset-0 w-full h-full object-cover" />
-                  ) : (
-                    <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-white p-4">
-                      <PlayCircle className="w-12 h-12 text-blue-400 mb-2" />
-                      <span className="text-xs font-semibold text-slate-300">Video Content</span>
-                    </div>
-                  )
-                ) : activeResource.image && (activeResource.image.endsWith('.pdf') || activeResource.image.endsWith('.doc') || activeResource.image.endsWith('.docx')) ? (
-                  <div className="absolute inset-0 bg-emerald-50 flex flex-col items-center justify-center text-slate-700 p-4">
-                    <FileText className="w-12 h-12 text-[#2E7D32] mb-2" />
-                    <span className="text-xs font-bold text-slate-800">Document Attached</span>
-                    <a href={activeResource.image} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline mt-2">
-                      View Document
-                    </a>
-                  </div>
-                ) : (
-                  <img src={activeResource.image || '/images/bins-guide.jpg'} alt={activeResource.title} className="absolute inset-0 w-full h-full object-cover" />
-                )}
+                {(() => {
+                  const source = activeResource.fileUrl || activeResource.videoUrl || activeResource.image || "";
+                  const kind = learningResourceType(source, activeResource.fileName, activeResource.type);
+                  return kind === "image" ? <img src={source} alt={activeResource.title} className="absolute inset-0 h-full w-full object-cover" /> :
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-emerald-50 p-4 text-slate-700">
+                      {kind === "video" ? <PlayCircle className="h-10 w-10 text-green-800" /> : <FileText className="h-10 w-10 text-green-800" />}
+                      <span className="max-w-full truncate text-xs font-semibold">{activeResource.fileName || activeResource.title}</span>
+                      {source ? <a href={source} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-green-800 underline">{kind === "article" ? "Read article" : kind === "video" ? "Watch video" : "View document"}</a>
+                        : <span className="text-xs">No file or link available</span>}
+                    </div>;
+                })()}
                 
                 <div className="relative z-10 flex justify-end">
                   <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm ${activeResource.type?.toLowerCase() === 'video' ? 'bg-blue-50 text-blue-600' : 'bg-white text-[#2E7D32]'}`}>{activeResource.type}</span>

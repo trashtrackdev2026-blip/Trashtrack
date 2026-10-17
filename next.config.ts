@@ -10,6 +10,7 @@ const localAddresses = Object.values(networkInterfaces()).flatMap((addresses) =>
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   outputFileTracingIncludes: {
+    "/api/reports/submit": ["./public/geojson/balete_barangays.json"],
     "/api/certificates": ["./assets/certificates/**/*"],
     "/api/certificates/preview": ["./assets/certificates/**/*"],
   },

@@ -45,6 +45,15 @@ export function StaffManagement() {
     {loading && <p role="status" className="text-sm text-slate-500">Loading staff requests and access…</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {message && <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-800">{message}</p>}
+    <div className="rounded-xl border bg-slate-50 p-4">
+      <h3 className="font-semibold">Barangay account coverage</h3>
+      <p className="mt-1 text-sm text-slate-600">Each official can register using the barangay staff registration page, verify their email, then submit an access request. Approve each verified official below. Multiple accounts may serve the same barangay.</p>
+      <button type="button" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}/signup`).then(() => setMessage("Staff registration link copied. Share it with the barangay officials."), () => setMessage(`Staff registration: ${window.location.origin}/signup`)); }} className="mt-3 text-sm font-semibold text-green-800 underline">Copy staff registration link</button>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{STAFF_BARANGAYS.map(name => {
+        const count = data?.staff.filter(item => staffRole(item.role) === "semi-admin" && item.barangay === name && item.accessStatus === "active").length;
+        return <p key={name} className="flex justify-between gap-2 rounded-lg border bg-white p-2 text-sm"><span>{name}</span><span className={count ? "text-green-800" : "text-amber-700"}>{count === undefined ? "Loading…" : count ? `${count} active` : "Needs account"}</span></p>;
+      })}</div>
+    </div>
     <div className="space-y-3"><h3 className="font-semibold">Pending requests</h3>
       {data?.requests.filter(item => item.status === "pending").length === 0 && <p className="text-sm text-slate-500">No pending staff requests.</p>}
       {data?.requests.filter(item => item.status === "pending").map(item => <div key={item.id} className="flex flex-wrap justify-between gap-4 rounded-xl border p-4">
