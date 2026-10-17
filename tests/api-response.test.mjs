@@ -32,3 +32,13 @@ test("valid structured success and safe server denial messages are preserved", a
     await assert.rejects(readApiResponse(new Response(body)), /response|completed/);
   }
 });
+
+test("Only a specific 401 response can request in-place staff confirmation", async () => {
+  for (const [status, code, expected] of [[401, "staff/recent-sign-in-required", true], [403, "staff/recent-sign-in-required", false], [401, "other-error", false]]) {
+    await assert.rejects(readApiResponse(Response.json({ error: "Approval blocked", code }, { status })), error => {
+      assert.equal(error.requiresRecentSignIn, expected);
+      assert.equal(error.code, `api/request-failed-${status}`);
+      return true;
+    });
+  }
+});

@@ -3,12 +3,14 @@ export const STAFF_BARANGAYS = [
   "Palsara", "Poblacion", "Sala", "Sampalocan", "Solis", "San Sebastian",
 ] as const;
 export const STAFF_SESSION_SECONDS = 8 * 60 * 60;
+export const STAFF_RECENT_SECONDS = 5 * 60;
 export const STAFF_IDLE_MS = 15 * 60 * 1000;
 export type StaffRole = "admin" | "semi-admin";
 
 export class StaffAccessError extends Error {
   status: number;
-  constructor(message: string, status = 403) { super(message); this.status = status; }
+  code?: string;
+  constructor(message: string, status = 403, code?: string) { super(message); this.status = status; this.code = code; }
 }
 export function staffRole(value: unknown): StaffRole | null {
   const role = typeof value === "string" ? value.trim().toLowerCase() : "";

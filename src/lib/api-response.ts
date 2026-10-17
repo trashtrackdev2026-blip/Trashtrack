@@ -1,11 +1,13 @@
 export class ApiResponseError extends Error {
   readonly code: string;
   readonly status: number;
-  constructor(message: string, status: number, reason: string) {
+  readonly requiresRecentSignIn: boolean;
+  constructor(message: string, status: number, reason: string, requiresRecentSignIn = false) {
     super(message);
     this.name = "ApiResponseError";
     this.status = status;
     this.code = `api/${reason}-${status}`;
+    this.requiresRecentSignIn = requiresRecentSignIn;
   }
 }
 
@@ -33,7 +35,8 @@ export async function readApiResponse<T = Record<string, unknown>>(
   }
   if (!response.ok) {
     const detail = (data as Record<string, unknown>).error;
-    throw new ApiResponseError(typeof detail === "string" && detail.trim() ? detail : problem, response.status, "request-failed");
+    throw new ApiResponseError(typeof detail === "string" && detail.trim() ? detail : problem, response.status, "request-failed",
+      response.status === 401 && (data as Record<string, unknown>).code === "staff/recent-sign-in-required");
   }
   return data as T;
 }
