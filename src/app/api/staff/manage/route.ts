@@ -2,18 +2,48 @@ import { randomUUID } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
-import { StaffAccessError, validStaffBarangay, staffAccessProblem, staffAssignmentFields, staffRole } from "@/lib/staff-access";
+import { StaffAccessError, validStaffBarangay, staffAccessProblem, staffAssignmentFields, staffRole, requestFields } from "@/lib/staff-access";
 
 export async function GET(request: Request) {
   try {
-    const { db } = await authenticatedStaff(request, true);
+    const { app, db } = await authenticatedStaff(request, true);
     await requireStaffSecurity();
+    const auth = getAuth(app);
+    const email = new URL(request.url).searchParams.get("email");
+    if (email !== null) {
+      if (!email.trim() || email.length > 254) throw new StaffAccessError("Enter the registered official's email.", 400);
+      const account = await auth.getUserByEmail(email.trim()).catch(error => {
+        if (error.code === "auth/user-not-found") throw new StaffAccessError("No registered account uses that email. Ask the official to register first.", 404);
+        if (error.code === "auth/invalid-email") throw new StaffAccessError("Enter a valid email address.", 400);
+        throw error;
+      });
+      const [profileSnap, requestSnap] = await Promise.all([
+        db.collection("users").doc(account.uid).get(), db.collection("staff_requests").doc(account.uid).get(),
+      ]);
+      const profile = profileSnap.data() || {};
+      return Response.json({ account: { id: account.uid, email: account.email || email.trim(), emailVerified: account.emailVerified,
+        disabled: account.disabled, name: profile.name || account.displayName || "", barangay: profile.barangay || "",
+        contact: profile.contact || "", position: profile.position || "", role: profile.role || "Resident",
+        accessStatus: profile.accessStatus || "needs-review", requestStatus: requestSnap.data()?.status || null } },
+      { headers: { "Cache-Control": "private, no-store" } });
+    }
     const [requests, users, logs] = await Promise.all([
       db.collection("staff_requests").get(), db.collection("users").where("role", "in", ["Admin", "Semi-Admin", "admin", "semi-admin"]).get(),
       db.collection("audit_logs").orderBy("at", "desc").limit(40).get(),
     ]);
+    // Read verification from Auth rather than the original registration token.
+    // Verification can happen in another tab without the official signing in again.
+    const pending = requests.docs.filter(doc => doc.data().status === "pending");
+    const batches = [];
+    for (let index = 0; index < pending.length; index += 100) batches.push(auth.getUsers(pending.slice(index, index + 100).map(doc => ({ uid: doc.id }))));
+    const accounts = new Map((await Promise.all(batches)).flatMap(batch => batch.users).map(account => [account.uid, account]));
     return Response.json({
-      requests: requests.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      requests: requests.docs.map(doc => {
+        const record = doc.data();
+        const account = accounts.get(doc.id);
+        return { ...record, id: doc.id, ...(record.status === "pending" ? { email: account?.email || record.email || "",
+          emailVerified: account?.emailVerified === true, accountUnavailable: !account || account.disabled } : {}) };
+      }),
       staff: users.docs.filter(doc => ["admin", "semi-admin"].includes(String(doc.data().role).toLowerCase())).map(doc => ({
         id: doc.id, name: doc.data().name, email: doc.data().email || "", role: doc.data().role,
         barangay: doc.data().barangay || "", accessStatus: doc.data().accessStatus || "needs-review",
@@ -29,13 +59,14 @@ export async function POST(request: Request) {
     const { app, db, identity } = await authenticatedStaff(request, true, true);
     await requireStaffSecurity();
     const body = await request.json().catch(() => null);
-    if (!body || !["approve", "assign", "reject", "suspend", "reactivate"].includes(body.action) || typeof body.userId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(body.userId)) throw new StaffAccessError("Choose a valid staff action.", 400);
+    if (!body || !["approve", "assign", "recover", "reject", "suspend", "reactivate"].includes(body.action) || typeof body.userId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(body.userId)) throw new StaffAccessError("Choose a valid staff action.", 400);
     if (body.userId === identity.uid) throw new StaffAccessError("You cannot change your own staff access.", 409);
     const assignment = ["approve", "assign"].includes(body.action) ? staffAssignmentFields(body) : null;
+    const recovery = body.action === "recover" ? requestFields(body) : null;
     if (body.action === "assign" && body.role === undefined) throw new StaffAccessError("Choose the account's access role.", 400);
     const auth = getAuth(app);
     const targetAuth = await auth.getUser(body.userId);
-    if (["approve", "assign", "reactivate"].includes(body.action) && (!targetAuth.emailVerified || !targetAuth.email)) throw new StaffAccessError("The official must verify their email first.", 409);
+    if (["approve", "assign", "recover", "reactivate"].includes(body.action) && (!targetAuth.emailVerified || !targetAuth.email)) throw new StaffAccessError("The official must verify their email first.", 409);
     const targetRef = db.collection("users").doc(body.userId);
     const requestRef = db.collection("staff_requests").doc(body.userId);
     const operation = randomUUID();
@@ -47,10 +78,23 @@ export async function POST(request: Request) {
       ]);
       if (staffRole(actorSnap.data()?.role) !== "admin" || staffAccessProblem(actorSnap.data() || {}, identity as unknown as Record<string, unknown>)) throw new StaffAccessError("Your access changed. Sign in again.");
       const current = targetSnap.data();
+      if (body.action === "recover") {
+        if (targetAuth.disabled || ["suspended", "disabled", "activating"].includes(String(current?.accessStatus))) throw new StaffAccessError("Resolve this account's existing staff access before adding a request.", 409);
+        if (staffRole(current?.role) === "admin" || (staffRole(current?.role) && current?.accessStatus === "active")) throw new StaffAccessError("This account already has staff access. Use Change access instead.", 409);
+        if (requestSnap.data()?.status === "pending") throw new StaffAccessError("This official already appears in pending requests. Refresh the list.", 409);
+        if (!current) tx.set(targetRef, { name: recovery!.name, email: targetAuth.email, contact: recovery!.contact,
+          barangay: recovery!.barangay, role: "Resident", points: 0, createdAt: FieldValue.serverTimestamp() });
+        tx.set(requestRef, { ...recovery!, userId: body.userId, email: targetAuth.email, status: "pending",
+          submittedBy: identity.uid, submittedAt: FieldValue.serverTimestamp() });
+        tx.create(db.collection("audit_logs").doc(), { action: "staff.request.recovered", actor: identity.uid,
+          target: body.userId, barangay: recovery!.barangay, at: FieldValue.serverTimestamp() });
+        return current;
+      }
       if (body.action === "approve") {
         if (requestSnap.data()?.status !== "pending" || staffRole(current?.role) === "admin") throw new StaffAccessError("This account has no pending staff request.", 409);
-        const approved = { ...assignment!, name: requestSnap.data()!.name,
-          email: targetAuth.email, contact: requestSnap.data()!.contact, mfaRequired: current?.mfaRequired === true || actorSnap.data()?.mfaRequired === true };
+        const details = requestFields({ ...requestSnap.data(), ...(typeof body.position === "string" ? { position: body.position } : {}) });
+        const approved = { ...assignment!, name: details.name, position: details.position,
+          email: targetAuth.email, contact: details.contact, mfaRequired: current?.mfaRequired === true || actorSnap.data()?.mfaRequired === true };
         tx.set(targetRef, { ...approved, accessStatus: "activating", pendingAccessOperation: operation }, { merge: true });
         return approved;
       }
@@ -89,7 +133,7 @@ export async function POST(request: Request) {
         if (staffRole(actor.data()?.role) !== "admin" || staffAccessProblem(actor.data() || {}, identity as unknown as Record<string, unknown>) || latest.data()?.pendingAccessOperation !== operation || latest.data()?.accessStatus !== "activating") throw new StaffAccessError("Access changed during approval. Refresh and try again.", 409);
         tx.update(targetRef, { accessStatus: "active", staffValidAfter: Math.floor(Date.now() / 1000), pendingAccessOperation: FieldValue.delete(),
           approvedBy: identity.uid, approvedAt: FieldValue.serverTimestamp() });
-        if (body.action === "approve") tx.update(requestRef, { status: "approved", approvedRole: target!.role, approvedBarangay: target!.barangay, reviewedBy: identity.uid, reviewedAt: FieldValue.serverTimestamp() });
+        if (body.action === "approve") tx.update(requestRef, { status: "approved", position: target!.position, needsOfficialDetails: false, approvedRole: target!.role, approvedBarangay: target!.barangay, reviewedBy: identity.uid, reviewedAt: FieldValue.serverTimestamp() });
         tx.create(db.collection("audit_logs").doc(), { action: "staff." + body.action, actor: identity.uid,
           target: body.userId, role: target!.role, barangay: target!.barangay || "", at: FieldValue.serverTimestamp() });
       });

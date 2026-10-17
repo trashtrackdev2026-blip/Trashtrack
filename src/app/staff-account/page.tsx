@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { staffRequest } from "@/lib/staff-client";
 import { STAFF_BARANGAYS, staffRole } from "@/lib/staff-access";
 type Account = { profile: Record<string, unknown>; problem: string | null; totpEnabled: boolean };
-type AccessRequest = { status: string; approvedBarangay?: string; approvedRole?: string };
+type AccessRequest = { status: string; approvedBarangay?: string; approvedRole?: string; position?: string };
 export default function StaffAccountPage() {
   const { user, signOut, retry } = useAuth();
   const [loadedAccount, setAccount] = useState<(Account & { userId: string }) | null>(null);
@@ -31,9 +31,11 @@ export default function StaffAccountPage() {
         staffRequest<Account>("/api/staff/account?setup=1"),
         staffRequest<{ request: AccessRequest | null }>("/api/staff/requests"),
       ]);
+      if (auth.currentUser?.uid !== currentUser.uid) return;
       setAccount({ ...details, userId: currentUser.uid }); setRequest(state.request);
       setName(String(details.profile.name || "")); setBarangay(String(details.profile.barangay || ""));
-      setContact(String(details.profile.contact || ""));
+      setContact(String(details.profile.contact || "")); setPosition(value => value || state.request?.position || "");
+      setError("");
       retry();
     } finally { setAccountLoading(false); }
   }, [retry]);
@@ -43,19 +45,31 @@ export default function StaffAccountPage() {
     let cancelled = false;
     void (async () => {
       try {
+        await user.reload();
+        await user.getIdToken(true);
         const [details, state] = await Promise.all([
           staffRequest<Account>("/api/staff/account?setup=1"),
           staffRequest<{ request: AccessRequest | null }>("/api/staff/requests"),
         ]);
-        if (cancelled) return;
+        if (cancelled || auth.currentUser?.uid !== user.uid) return;
         setAccount({ ...details, userId: user.uid }); setRequest(state.request);
         setName(String(details.profile.name || "")); setBarangay(String(details.profile.barangay || ""));
-        setContact(String(details.profile.contact || ""));
+        setContact(String(details.profile.contact || "")); setPosition(state.request?.position || "");
       } catch (failure) { if (!cancelled) setError(failure instanceof Error ? failure.message : "Unable to load your account."); }
       finally { if (!cancelled) setAccountLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [user]);
+  useEffect(() => {
+    // Do not replace unsent form edits when a verified applicant returns to
+    // this tab. Automatic refresh is for verification and queued requests.
+    if (!user || (user.emailVerified && request?.status !== "pending")) return;
+    const update = () => {
+      if (!busy && document.visibilityState === "visible") void refresh().catch(failure => setError(failure instanceof Error ? failure.message : "Unable to refresh your account."));
+    };
+    window.addEventListener("focus", update); document.addEventListener("visibilitychange", update);
+    return () => { window.removeEventListener("focus", update); document.removeEventListener("visibilitychange", update); };
+  }, [user, busy, refresh, request?.status]);
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setMessage("");
     try { await action(); } catch (failure) { setError(failure instanceof Error ? failure.message : "Try again."); }
@@ -78,11 +92,11 @@ export default function StaffAccountPage() {
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         {message && <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-800">{message}</p>}
         {account?.problem && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{account.problem}</p>}
-        {!user.emailVerified && <div className="space-y-3"><p className="text-sm">Open the verification link sent to your email before submitting a request.</p>
+        {!user.emailVerified && <div className="space-y-3"><p className="text-sm">{request?.status === "pending" ? "Your request is saved in MENRO's pending list. Open the verification link in your email so MENRO can approve it." : "Open the verification link in your email, then complete your official details below to request MENRO approval."}</p>
           <button disabled={busy} onClick={() => void run(async () => { await sendEmailVerification(user); setMessage("Verification link sent. Check your inbox and spam folder."); })} className="rounded-xl bg-green-800 px-4 py-3 text-sm text-white disabled:opacity-50">Send verification email</button>
         </div>}
         <button disabled={busy} onClick={() => void run(refresh)} className="text-sm font-semibold text-green-800 underline">Refresh account status</button>
-        {account && request && <p className="text-sm"><strong>Request status:</strong> {request.status}{request.approvedRole ? " · " + request.approvedRole : ""}{request.approvedBarangay ? " · " + request.approvedBarangay : ""}</p>}
+        {account && request && <p className="text-sm"><strong>Request status:</strong> {request.status === "pending" ? user.emailVerified ? "Pending MENRO approval" : "Waiting for email verification" : request.status}{request.approvedRole ? " · " + request.approvedRole : ""}{request.approvedBarangay ? " · " + request.approvedBarangay : ""}</p>}
         {approved && <div className="space-y-4 rounded-xl border border-green-200 bg-green-50 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-green-950">{assignedRole === "admin" ? "MENRO Admin" : "Barangay Semi-Admin"}</h2>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-green-800">{account?.problem ? "Sign-in needs attention" : "Active access"}</span></div>
@@ -94,6 +108,7 @@ export default function StaffAccountPage() {
         </div>}
         {account && !accountLoading && user.emailVerified && !approved && request?.status !== "pending" && <form onSubmit={submit} className="space-y-4 border-t pt-5">
           <h2 className="text-lg font-semibold">Request barangay access</h2>
+          {!request && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Your email is verified, but no approval request has been submitted. Complete these details to appear in MENRO&apos;s pending requests.</p>}
           <label className="block text-sm font-medium">Full name<input className={field} value={name} onChange={e => setName(e.target.value)} required maxLength={120} /></label>
           <label className="block text-sm font-medium">Official position<input className={field} value={position} onChange={e => setPosition(e.target.value)} required maxLength={120} placeholder="Barangay official / designated staff" /></label>
           <label className="block text-sm font-medium">Barangay<select className={field} value={barangay} onChange={e => setBarangay(e.target.value)} required><option value="">Select barangay</option>{STAFF_BARANGAYS.map(value => <option key={value}>{value}</option>)}</select></label>

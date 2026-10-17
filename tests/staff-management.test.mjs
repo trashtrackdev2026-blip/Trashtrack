@@ -15,20 +15,26 @@ function fixture(options = {}) {
   const records = new Map([
     ["users/menro", { role: "Admin", accessStatus: "active", mfaRequired: false }],
     ["users/official", { role: "Resident", barangay: "Sala", ...options.profile }],
-    ["staff_requests/official", { status: "pending", name: "Test Official", contact: "09000000000" }],
+    ["staff_requests/official", { status: "pending", name: "Test Official", contact: "09000000000", position: "Barangay staff", barangay: "Sala", ...options.request }],
   ]);
-  const account = { email: "official@example.invalid", emailVerified: true, disabled: false, customClaims: { retained: true }, ...options.account };
+  if (options.noRequest) records.delete("staff_requests/official");
+  if (options.noProfile) records.delete("users/official");
+  for (const [path, data] of options.extraRecords || []) records.set(path, data);
+  const account = { uid: "official", email: "official@example.invalid", emailVerified: true, disabled: false, customClaims: { retained: true }, ...options.account };
   const identity = { uid: "menro", staffRole: "admin", email_verified: true, auth_time: now, ...options.identity };
   let sequence = 0;
-  const ref = path => ({ path });
+  const ref = path => ({ path, get: async () => snapshot(records, { path }) });
+  const query = target => ({ ...target, get: async () => snapshot(records, target), limit: () => query(target) });
   const collection = name => ({
     doc: id => ref(name + "/" + (id || "audit-" + ++sequence)),
-    where: (field, operator, value) => ({ collection: name, field, operator, value }),
+    get: async () => snapshot(records, { collection: name }),
+    where: (field, operator, value) => query({ collection: name, field, operator, value }),
+    orderBy: () => query({ collection: name }),
   });
   function snapshot(data, target) {
     if (target.path) return { data: () => data.has(target.path) ? structuredClone(data.get(target.path)) : undefined };
     return { docs: [...data].filter(([key, value]) => key.startsWith(target.collection + "/") &&
-      (target.operator === "in" ? target.value.includes(value[target.field]) : value[target.field] === target.value))
+      (!target.field || (target.operator === "in" ? target.value.includes(value[target.field]) : value[target.field] === target.value)))
       .map(([key, value]) => ({ id: key.split("/")[1], data: () => structuredClone(value) })) };
   }
   const deleted = Symbol("delete");
@@ -50,8 +56,18 @@ function fixture(options = {}) {
     },
   };
   const revoked = [];
+  const batches = [];
   const auth = {
     getUser: async () => structuredClone(account),
+    getUserByEmail: async email => {
+      if (email.toLowerCase() === account.email.toLowerCase()) return structuredClone(account);
+      throw Object.assign(new Error("Not found"), { code: "auth/user-not-found" });
+    },
+    getUsers: async identifiers => {
+      assert.ok(identifiers.length <= 100, "Auth batch lookup supports at most 100 accounts");
+      batches.push(identifiers.map(item => item.uid));
+      return { users: identifiers.filter(item => !(options.accountMissing && item.uid === "official")).map(item => item.uid === "official" ? structuredClone(account) : { uid: item.uid, emailVerified: true, disabled: false }) };
+    },
     setCustomUserClaims: async (uid, claims) => {
       if (options.authFailure) throw new Error("Fixture Auth unavailable");
       account.customClaims = claims;
@@ -63,11 +79,11 @@ function fixture(options = {}) {
   const staffAuth = {
     authenticatedStaff: async (request, masterOnly, recent) => {
       assert.equal(masterOnly, true, "MENRO-only server guard must run");
-      assert.equal(recent, true, "Access mutations must require recent sign-in");
+      assert.equal(recent, request.method === "POST" ? true : undefined, "Access mutations must require recent sign-in");
       if (options.signedOut) throw new policy.StaffAccessError("Sign in", 401);
       const profile = records.get("users/" + identity.uid) || {};
       if (policy.staffAccessProblem(profile, identity) || policy.staffRole(profile.role) !== "admin") throw new policy.StaffAccessError("Only MENRO");
-      if (now - identity.auth_time > 300) throw new policy.StaffAccessError("Sign in again", 401);
+      if (recent && now - identity.auth_time > 300) throw new policy.StaffAccessError("Sign in again", 401);
       return { app: {}, db, identity };
     },
     requireStaffSecurity: async () => {},
@@ -77,7 +93,13 @@ function fixture(options = {}) {
     "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy };
   const exported = {};
   new Function("require", "exports", compiled)(name => modules[name] || require(name), exported);
-  return { records, account, revoked, now, async post(body, status = 200) {
+  return { records, account, revoked, batches, now, async get(email, status = 200) {
+    const response = await exported.GET(new Request("http://127.0.0.1:3000/api/staff/manage" + (email === undefined ? "" : "?email=" + encodeURIComponent(email))));
+    const result = await response.json();
+    assert.equal(response.status, status, result.error || "Expected response");
+    assert.equal(response.headers.get("Cache-Control"), status === 200 ? "private, no-store" : null);
+    return result;
+  }, async post(body, status = 200) {
     const response = await exported.POST(new Request("http://127.0.0.1:3000/api/staff/manage", { method: "POST", body: JSON.stringify({ userId: "official", ...body }) }));
     const result = await response.json();
     assert.equal(response.status, status, result.error || "Expected response");
@@ -145,4 +167,79 @@ test("Cross-service failures and revoked MENRO access keep activation blocked", 
     assert.equal(app.records.get("users/official").accessStatus, "activating");
     assert.equal(app.records.get("staff_requests/official").status, "pending");
   }
+});
+
+test("Pending requests across barangays use current Auth verification without another applicant sign-in", async () => {
+  const app = fixture({ account: { emailVerified: false }, extraRecords: policy.STAFF_BARANGAYS.map((barangay, index) => [
+    "staff_requests/official-" + index, { name: barangay + " official", barangay, status: "pending" },
+  ]) });
+  let list = await app.get();
+  assert.equal(list.requests.length, 14);
+  assert.equal(list.requests.find(item => item.id === "official").emailVerified, false);
+  assert.deepEqual(list.requests.filter(item => item.id !== "official").map(item => item.barangay), [...policy.STAFF_BARANGAYS]);
+  app.account.emailVerified = true;
+  app.account.email = "verified-address@example.invalid";
+  list = await app.get();
+  const official = list.requests.find(item => item.id === "official");
+  assert.equal(official.emailVerified, true); assert.equal(official.email, app.account.email);
+  assert.equal(official.accountUnavailable, false);
+});
+
+test("Deleted or disabled Auth accounts remain visible but unavailable for review", async () => {
+  for (const options of [{ accountMissing: true }, { account: { disabled: true } }]) {
+    const app = fixture(options);
+    const list = await app.get();
+    assert.equal(list.requests.length, 1);
+    assert.equal(list.requests[0].accountUnavailable, true);
+  }
+});
+
+test("Large pending lists stay within Firebase Auth's batch limit", async () => {
+  const app = fixture({ extraRecords: Array.from({ length: 200 }, (_, index) => ["staff_requests/extra-" + index, { status: "pending" }]) });
+  const list = await app.get();
+  assert.equal(list.requests.length, 201); assert.deepEqual(app.batches.map(batch => batch.length), [100, 100, 1]);
+});
+
+test("MENRO can find a verified registration with no request without listing unrelated residents", async () => {
+  const app = fixture({ noRequest: true, profile: { name: "Existing Official", contact: "09000000000" } });
+  assert.equal((await app.get()).requests.length, 0);
+  const found = (await app.get("official@example.invalid")).account;
+  assert.equal(found.emailVerified, true); assert.equal(found.requestStatus, null);
+  assert.equal(found.name, "Existing Official"); assert.equal(found.barangay, "Sala");
+  await app.get("missing@example.invalid", 404);
+  for (const options of [{ signedOut: true }, { identity: { staffRole: "semi-admin" } }]) {
+    await fixture(options).get("official@example.invalid", options.signedOut ? 401 : 403);
+  }
+});
+
+test("Recovering a registration queues approval without granting permissions or changing the resident profile", async () => {
+  const app = fixture({ noRequest: true, profile: { points: 57 } });
+  await app.post({ action: "recover", name: "Existing Official", position: "Barangay secretary", contact: "09000000000", barangay: "Solis", role: "Admin" });
+  const pending = app.records.get("staff_requests/official");
+  assert.equal(pending.status, "pending"); assert.equal(pending.barangay, "Solis");
+  assert.equal(app.records.get("users/official").role, "Resident");
+  assert.equal(app.records.get("users/official").points, 57);
+  assert.equal(app.account.customClaims.staffRole, undefined); assert.equal(app.revoked.length, 0);
+  assert.ok([...app.records.values()].some(item => item.action === "staff.request.recovered" && item.actor === "menro"));
+  await app.post({ action: "approve", barangay: "Solis", identityConfirmed: true });
+  assert.equal(app.account.customClaims.staffRole, "semi-admin"); assert.equal(app.account.customClaims.staffBarangay, "Solis");
+});
+
+test("Recovery cannot bypass pending requests, verification, suspension or active access", async () => {
+  const details = { action: "recover", name: "Official", position: "Barangay secretary", contact: "09000000000", barangay: "Solis" };
+  for (const options of [{}, { noRequest: true, account: { emailVerified: false } }, { noRequest: true, account: { disabled: true } },
+    { noRequest: true, profile: { accessStatus: "suspended" } }, { noRequest: true, profile: { role: "Semi-Admin", accessStatus: "active" } }]) {
+    const app = fixture(options);
+    await app.post(details, 409);
+    assert.equal(app.account.customClaims.staffRole, undefined);
+  }
+});
+
+test("An incomplete recovered request requires official details before approval", async () => {
+  const app = fixture({ request: { position: "", needsOfficialDetails: true } });
+  await app.post({ action: "approve", barangay: "Sala", identityConfirmed: true }, 400);
+  assert.equal(app.records.get("users/official").role, "Resident");
+  await app.post({ action: "approve", position: "Barangay secretary", barangay: "Sala", identityConfirmed: true });
+  assert.equal(app.records.get("users/official").position, "Barangay secretary");
+  assert.equal(app.records.get("staff_requests/official").needsOfficialDetails, false);
 });

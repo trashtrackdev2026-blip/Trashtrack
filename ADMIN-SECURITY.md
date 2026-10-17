@@ -2,13 +2,15 @@
 
 Use the same sign-in page for MENRO Master Admin and barangay staff. The stored role names remain `Admin` and `Semi-Admin` for compatibility.
 
-1. Officials open `/signup`, enter their official email, name, contact and one of the 13 barangays, and choose a password of at least 12 characters.
-2. Firebase sends a verification link when the official submits the registration form. They open it, sign in, and select **Refresh account status** at `/staff-account`.
-3. They submit their official position and barangay access request. Pending applicants receive no staff privileges.
-4. MENRO opens **User Management → Staff access**, verifies the official's identity and authority, and chooses **Admin** or **Semi-Admin**. Admin receives full MENRO access, including staff approvals. Semi-Admin must be assigned one of the 13 barangays.
+1. Officials open `/signup`, enter their official email, name, official position, contact and one of the 13 barangays, and choose a password of at least 12 characters.
+2. Registration saves the resident profile and pending staff request together on the server, then sends a verification email. A failed request can be retried without creating another login account or duplicating the pending request.
+3. The request appears immediately in MENRO's pending list as awaiting verification. Firebase Auth supplies the current verification status; the official does not need to submit another form after verifying. Pending applicants receive no staff privileges. The list refreshes every 30 seconds while visible and when MENRO returns to the page.
+4. MENRO opens **User Management → Staff access**, confirms the official position, verifies the official's identity and authority, and chooses **Admin** or **Semi-Admin**. Approval checks email verification on the server. Admin receives full MENRO access, including staff approvals. Semi-Admin must be assigned one of the 13 barangays.
 5. The official signs in again to use the approved permissions. Semi-Admins can review and forward only reports from their assigned barangay. MENRO endorses collection and confirms collection before resolution.
 
 MENRO can reject requests, change active staff roles or barangay assignments, suspend staff, or reactivate them. Changing access requires sign-in within the last five minutes. Accounts cannot change their own access. The last active MENRO Admin cannot be demoted or suspended. Role changes invalidate old sessions and are audited. An invalid legacy barangay account must verify its email and request a corrected assignment; it is never silently reassigned. Public signup cannot create MENRO Master Admins; only an authenticated MENRO Admin can approve that access.
+
+For older registrations that created a login but never submitted an access request, MENRO can use **Find a missing registration**, enter the registered email, complete the official details, and select **Add to pending requests**. This requires verified email and recent MENRO sign-in, records an audit entry, and grants no access. The separate review and approval step remains required. Officials can also sign in at `/staff-account` and submit the missing request themselves. Ordinary resident accounts are not automatically listed as staff applicants.
 
 ## Active safeguards
 
