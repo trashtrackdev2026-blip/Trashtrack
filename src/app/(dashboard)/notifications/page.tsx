@@ -24,6 +24,7 @@ import { subscribeWithDeadline } from "@/lib/live-data";
 import { DataState } from "@/components/ui/data-state";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { staffRequest } from "@/lib/staff-client";
 
 interface NotificationData {
   id: string;
@@ -32,6 +33,9 @@ interface NotificationData {
   type: string;
   isRead: boolean;
   date?: string;
+  recipients: string;
+  push: boolean;
+  pushStatus: string;
 }
 
 export default function NotificationsPage() {
@@ -42,6 +46,8 @@ export default function NotificationsPage() {
   const [attempt, setAttempt] = useState(0);
   const retryData = () => { setLoading(true); setDataError(null); setAttempt(value => value + 1); };
   const [selectedNotif, setSelectedNotif] = useState<NotificationData | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [deliveryError, setDeliveryError] = useState("");
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,8 +62,7 @@ export default function NotificationsPage() {
     const matchesSearch = notif.title.toLowerCase().includes(search.toLowerCase()) || notif.message.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === "category" || notif.type.toLowerCase() === category;
     
-    // Status logic (assuming "Sent" means it exists and "Draft" isn't fully implemented in DB, we will just filter by isRead as a proxy or just show all if 'status' selected)
-    const matchesStatus = status === "status" || (status === "sent" ? true : false); 
+    const matchesStatus = status === "status" || (status === "sent" ? !notif.push || notif.pushStatus === "queued" : status === "failed" ? notif.pushStatus === "failed" : notif.push && ["pending", "sending"].includes(notif.pushStatus));
     
     return matchesSearch && matchesCategory && matchesStatus;
   });
@@ -74,6 +79,7 @@ export default function NotificationsPage() {
           message: data.message || "",
           type: data.type || "general",
           isRead: data.isRead || false,
+          recipients: data.recipients || "All Barangays", push: data.push === true, pushStatus: data.pushStatus || (data.push ? "pending" : "disabled"),
           date: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (data.date || "Recently")
         });
       });
@@ -92,11 +98,18 @@ export default function NotificationsPage() {
       }
     }
   };
+  const retryPhone = async (id: string) => {
+    setRetrying(id); setDeliveryError("");
+    try { await staffRequest("/api/notifications/send", { notificationId: id }); }
+    catch (error) { setDeliveryError(error instanceof Error ? error.message : "Phone delivery could not be queued."); }
+    finally { setRetrying(null); }
+  };
 
   return (
     <>
       <div className="space-y-6 max-w-[1400px] mx-auto">
         <DataState loading={loading} error={dataError} onRetry={retryData} />
+        {deliveryError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{deliveryError}</p>}
         
         {/* Header */}
         <div className="flex flex-col gap-2 mb-2">
@@ -163,6 +176,7 @@ export default function NotificationsPage() {
                   <SelectItem value="schedule">Schedule</SelectItem>
                   <SelectItem value="alert">Alerts</SelectItem>
                   <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="event">Events</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -173,7 +187,8 @@ export default function NotificationsPage() {
                 <SelectContent>
                   <SelectItem value="status">Status (All)</SelectItem>
                   <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="pending">Phone pending</SelectItem>
+                  <SelectItem value="failed">Phone failed</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -231,7 +246,7 @@ export default function NotificationsPage() {
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="text-xs font-semibold text-slate-700">All Residents</span>
+                      <span className="text-xs font-semibold text-slate-700">{notif.recipients}</span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex flex-col">
@@ -240,11 +255,12 @@ export default function NotificationsPage() {
                     </td>
                     <td className="py-4 px-6">
                       <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1 rounded-full ${notif.isRead ? 'text-slate-500 bg-slate-100' : 'text-[#2E7D32] bg-[#E8F5E9]'}`}>
-                        {notif.isRead ? 'Read' : 'Unread'} <Check className="w-3 h-3" />
+                        {!notif.push ? "In-app only" : notif.pushStatus === "queued" ? "Phone queued" : notif.pushStatus === "failed" ? "Phone failed" : "Phone pending"} <Check className="w-3 h-3" />
                       </span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-center gap-2">
+                        {notif.push && notif.pushStatus !== "queued" && <Button disabled={retrying !== null} variant="outline" size="sm" onClick={() => void retryPhone(notif.id)}>{retrying === notif.id ? "Queuing…" : "Retry phone delivery"}</Button>}
                         <Button 
                           onClick={() => setSelectedNotif(notif)} 
                           variant="outline" 

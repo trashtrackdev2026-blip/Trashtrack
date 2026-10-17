@@ -4,6 +4,7 @@ import { CertificateError, certificateSettings, eventDate, validId } from "@/lib
 import { requireCertificateSecurity } from "@/lib/certificate-security";
 import { timingSafeEqual } from "node:crypto";
 import { parseAttendanceQr, assertQrCheckIn } from "@/lib/event-qr-data";
+import { eventRegistrationClosed } from "@/lib/event-lifecycle";
 
 export const runtime = "nodejs";
 
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
         if (registrationSnap.exists) return; // Preserve confirmed attendance and avoid duplicate counts.
         const event = eventSnap.data();
         if (!event) throw new CertificateError("Event not found.", 404);
-        if (event.status === "Completed" || event.status === "Cancelled") throw new CertificateError("Registration for this event is closed.", 409);
+        if (eventRegistrationClosed(event)) throw new CertificateError("Registration for this event is closed.", 409);
         if (Number(event.totalSlots) > 0 && Number(event.availableSlots) <= 0) throw new CertificateError("This event has no available slots.", 409);
         tx.create(registration, {
           eventId, userId: identity.uid, userName: profile.name || "Resident",

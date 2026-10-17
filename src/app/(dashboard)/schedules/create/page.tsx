@@ -9,7 +9,8 @@ import { Check, Calendar as CalendarIcon, Clock, MapPin, FileText, Send, ArrowRi
 import Link from "next/link";
 import { db } from "@/lib/firebase";
 import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
+import { staffRequest } from "@/lib/staff-client";
 
 export default function CreateSchedulePage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -23,24 +24,27 @@ export default function CreateSchedulePage() {
     notes: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [publicationId] = useState(() => doc(collection(db, "schedules")).id);
+  const [deliveryError, setDeliveryError] = useState("");
 
   const handlePublish = async () => {
     if (!form.date || !isValid(parseISO(form.date)) || !form.time || !form.barangay) return;
     setIsSubmitting(true);
+    setDeliveryError("");
     try {
-      await addDoc(collection(db, "schedules"), {
+      await staffRequest("/api/community/publish", {
+        kind: "schedule", id: publicationId,
         barangay: form.barangay,
         day: format(parseISO(form.date), "EEEE"),
         time: form.time,
         date: form.date,
         status: "Active",
         description: form.notes,
-        createdAt: serverTimestamp()
       });
       setStep(3);
     } catch (e) {
       console.error("Error publishing schedule:", e);
-      alert("Failed to publish schedule");
+      setDeliveryError(e instanceof Error ? e.message : "Publishing could not be confirmed. Retry with the same details; the saved schedule will not be duplicated.");
     } finally {
       setIsSubmitting(false);
     }
@@ -49,6 +53,7 @@ export default function CreateSchedulePage() {
   return (
     <>
       <div className="space-y-8 max-w-[1400px] mx-auto">
+        {deliveryError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{deliveryError}</p>}
         
         {/* Header */}
         <div className="flex flex-col gap-2">

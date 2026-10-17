@@ -8,7 +8,9 @@ import { Send, Image as ImageIcon, Calendar as CalendarIcon, Clock, MapPin, QrCo
 import Link from "next/link";
 import Image from "next/image";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
+import { staffRequest } from "@/lib/staff-client";
+import { STAFF_BARANGAYS } from "@/lib/staff-access";
 import { QRCodeSVG } from "qrcode.react";
 import { CertificatePreview } from "@/components/events/CertificatePreview";
 import { certificateSettings, eventDate } from "@/lib/certificate-data";
@@ -29,6 +31,7 @@ export default function CreateEventPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [publicationId] = useState(() => doc(collection(db, "events")).id);
   const [isUploading, setIsUploading] = useState(false);
   const [certificateEnabled, setCertificateEnabled] = useState(true);
   const [certificateSignatory, setCertificateSignatory] = useState("");
@@ -73,7 +76,8 @@ export default function CreateEventPage() {
       const settings = { certificateEnabled, certificateSignatory, certificatePosition, certificateOrganizer };
       if (certificateEnabled) certificateSettings(settings);
       const certificateDate = eventDate({ dateISO: form.date });
-      await addDoc(collection(db, "events"), {
+      await staffRequest("/api/community/publish", {
+        kind: "event", id: publicationId,
         title: form.title,
         barangay: form.barangay,
         location: form.location,
@@ -82,12 +86,12 @@ export default function CreateEventPage() {
         attendanceMethod: attendance,
         ...settings,
         time: `${form.time} - ${form.endTime || 'TBD'}`,
+        startTime: form.time, endTime: form.endTime,
         participants: 0,
         status: "Upcoming",
         description: form.description,
         img: form.image,
         category: form.category,
-        createdAt: serverTimestamp()
       });
       setIsSuccess(true);
     } catch (e) {
@@ -250,17 +254,8 @@ export default function CreateEventPage() {
                         <SelectValue placeholder="Select barangay" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Alangilan">Alangilan</SelectItem>
-                        <SelectItem value="Looc">Looc</SelectItem>
-                        <SelectItem value="Magapi">Magapi</SelectItem>
-                        <SelectItem value="Makina">Makina</SelectItem>
-                        <SelectItem value="Malabanan">Malabanan</SelectItem>
-                        <SelectItem value="Paligawan">Paligawan</SelectItem>
-                        <SelectItem value="Palsara">Palsara</SelectItem>
-                        <SelectItem value="Poblacion">Poblacion</SelectItem>
-                        <SelectItem value="Sala">Sala</SelectItem>
-                        <SelectItem value="Sampalocan">Sampalocan</SelectItem>
-                        <SelectItem value="Solis">Solis</SelectItem>
+                        <SelectItem value="All Barangays">All Barangays</SelectItem>
+                        {STAFF_BARANGAYS.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

@@ -26,3 +26,7 @@ npm run check:bundle
 See [VERCEL-LAUNCH.md](./VERCEL-LAUNCH.md) for the prepared Vercel configuration, environment import, Firebase domain setup, Android backend change, and launch checks. `npm run prepare:vercel` creates a private import file; it does not publish the dashboard or change Firebase permissions.
 
 Existing workflows and security details are documented in [ADMIN-SECURITY.md](./ADMIN-SECURITY.md) and [PERFORMANCE.md](./PERFORMANCE.md).
+
+Publishing a collection schedule or event now saves its barangay announcement in the same server transaction and queues a phone notification for that barangay. MENRO can also target all barangays. Retrying the same publication ID reuses the saved post and notification. The Notifications page shows the actual audience, phone delivery state and retry action.
+
+The resident scanner accepts clean identifiable disposal items and distinguishes an unclear image from a person or animal. Model confidence values expressed as probabilities are normalized to percentages. The Android app includes event archives, working participation/certificate filters and a full-schedule barangay selector; install its updated APK to use those screens.
