@@ -2,10 +2,15 @@ import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { authenticatedAccount } from "./staff-auth";
 import { StaffAccessError } from "./staff-access";
-// The counter is stored server-side so restarting the LAN server does not reset limits.
-export async function authenticatedAi(request: Request) {
+export async function authenticatedScanner(request: Request) {
   const account = await authenticatedAccount(request);
   if (!account.profile.role) throw new StaffAccessError("Complete account registration first.");
+  return account;
+}
+
+// Chat keeps its server-side counter; object scanning has no per-user request quota.
+export async function authenticatedAi(request: Request) {
+  const account = await authenticatedScanner(request);
   const bucket = Math.floor(Date.now() / 60000);
   const ref = account.db.collection("api_limits").doc(account.identity.uid);
   await account.db.runTransaction(async tx => {

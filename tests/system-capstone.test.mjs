@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { validateBaleteBoundaries } from "../src/lib/barangay-geofence.ts";
 import { reportSubmission } from "../src/lib/report-submission.ts";
-import { classificationText, NOT_WASTE_TEXT, UNCERTAIN_TEXT } from "../src/lib/waste-classification.ts";
+import { classificationText, UNCERTAIN_TEXT } from "../src/lib/waste-classification.ts";
 import { learningResourceType, publicLearningUrl } from "../src/lib/learning-resource.ts";
 
 const boundaries = validateBaleteBoundaries(JSON.parse(readFileSync(new URL("../public/geojson/balete_barangays.json", import.meta.url))));
@@ -40,14 +40,20 @@ test("photo and video evidence is validated together and legacy imageUrl still p
   assert.throws(() => reportSubmission({ ...body, description: "  " }, profile, boundaries, "demo"));
 });
 
-test("people, animals, uncertain scenes and malformed AI results never receive a waste category", () => {
-  const result = { isWaste: true, subject: "discarded_object", item: "Plastic bottle", type: "Recyclable", confidence: 95, steps: ["Empty and rinse", "Place in the recycling bin"] };
+test("scanner identifies general subjects and keeps tentative objects without a confidence cutoff", () => {
+  const result = { item: "Plastic bottle", type: "Recyclable", confidence: 95, steps: ["Empty and rinse", "Place in the recycling bin"] };
   assert.match(classificationText(JSON.stringify(result)), /TYPE: Recyclable/);
-  for (const extra of [{ subject: "person", type: "Special" }, { item: "Human person", type: "Special" }, { subject: "animal" }, { isWaste: false }])
-    assert.equal(classificationText(JSON.stringify({ ...result, ...extra })), NOT_WASTE_TEXT);
+  for (const item of ["Person", "Dog", "Growing tree", "Building"]) {
+    const text = classificationText(JSON.stringify({ ...result, item, type: "Not Waste", steps: ["A visible subject, not an item for disposal"] }));
+    assert.match(text, new RegExp("ITEM: " + item));
+    assert.match(text, /TYPE: Not Waste/);
+  }
   assert.throws(() => classificationText("ITEM: Person\nTYPE: Special"));
-  assert.throws(() => classificationText(JSON.stringify({ ...result, isWaste: "true" })));
-  assert.equal(classificationText(JSON.stringify({ ...result, confidence: 40 })), UNCERTAIN_TEXT);
+  for (const invalid of [{ confidence: -1 }, { confidence: 101 }, { type: "Bogus" }, { steps: [] }, { item: "" }])
+    assert.throws(() => classificationText(JSON.stringify({ ...result, ...invalid })));
+  assert.match(classificationText(JSON.stringify({ ...result, confidence: 40 })), /CONFIDENCE: 40%/);
+  assert.match(classificationText(JSON.stringify({ ...result, confidence: 1 })), /CONFIDENCE: 1%/);
+  assert.equal(classificationText(JSON.stringify({ ...result, type: "Uncertain" })), UNCERTAIN_TEXT);
   assert.match(classificationText(JSON.stringify({ ...result, confidence: 0.95 })), /CONFIDENCE: 95%/);
   for (const item of ["Baby food jar", "Plastic bottle held by a person", "Man-made plastic container"]) assert.match(classificationText(JSON.stringify({ ...result, item })), /TYPE: Recyclable/);
 });
