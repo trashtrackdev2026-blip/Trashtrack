@@ -235,7 +235,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
 
           {/* Right Panel - Report Details */}
           {activeReport && (
-            <div className="w-full lg:w-[400px] shrink-0 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-max overflow-hidden">
+            <div key={activeReport.id} className="w-full lg:w-[400px] shrink-0 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-max overflow-hidden">
               <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex flex-col">
                   <span className="font-bold text-slate-900">Report Details</span>
