@@ -5,16 +5,15 @@ import { buildPhonePush } from "../src/lib/phone-push.ts";
 
 const record = { title: "Collection update", message: "Collection starts tomorrow at 8 AM.", type: "schedule", recipients: "All Barangays" };
 
-test("background Android delivery includes a notification payload and the actual phone channel", () => {
+test("distinct phone updates are non-collapsible and contain everything needed for the tray and inbox", () => {
   const message = buildPhonePush("notice-1", record, BALETE_BARANGAYS);
-  assert.deepEqual(message.notification, { title: record.title, body: record.message });
+  assert.equal(message.notification, undefined);
   assert.equal(message.topic, "trashtrack_residents_v1");
   assert.equal(message.android.priority, "high");
-  assert.equal(message.android.notification.channelId, "trashtrack_updates");
-  assert.equal(message.android.notification.icon, "ic_notification");
-  assert.equal(message.android.notification.sound, "default");
-  assert.equal(message.android.notification.tag, "trashtrack:notice-1");
-  assert.deepEqual(message.data, { notificationId: "notice-1", openNotifications: "true", type: "schedule" });
+  assert.equal(message.android.collapseKey, undefined);
+  assert.equal(message.android.ttl, 7 * 24 * 60 * 60 * 1000);
+  assert.deepEqual(message.data, { notificationId: "notice-1", openNotifications: "true", type: "schedule",
+    title: record.title, message: record.message, recipients: "All Barangays" });
 });
 
 test("each of the 13 barangays targets its own subscription, including San Sebastian", () => {
@@ -40,7 +39,6 @@ test("blank, oversized and malformed content is rejected before Firebase deliver
 test("a retry uses the same Android tag and notification ID instead of creating another tray item", () => {
   const first = buildPhonePush("stable-notice", record, BALETE_BARANGAYS);
   const retry = buildPhonePush("stable-notice", record, BALETE_BARANGAYS);
-  assert.equal(first.android.notification.tag, retry.android.notification.tag);
   assert.equal(first.data.notificationId, retry.data.notificationId);
-  assert.notEqual(first.android.notification.tag, buildPhonePush("another-notice", record, BALETE_BARANGAYS).android.notification.tag);
+  assert.notEqual(first.data.notificationId, buildPhonePush("another-notice", record, BALETE_BARANGAYS).data.notificationId);
 });

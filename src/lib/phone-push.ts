@@ -16,19 +16,13 @@ export function buildPhonePush(id: string, data: Record<string, unknown>, barang
   return {
     topic: recipients === "All Barangays" ? ALL_RESIDENTS_TOPIC :
       `trashtrack_barangay_${String(recipients).toLowerCase().replaceAll(" ", "_")}_v1`,
-    notification: { title, body },
-    data: { notificationId: id, openNotifications: "true", type: String(data.type ?? "general") },
+    // Data messages without a collapse key keep distinct updates while offline.
+    // Android persists the inbox item and posts the visible notification itself.
+    data: { notificationId: id, openNotifications: "true", type: String(data.type ?? "general"),
+      title, message: body, recipients: String(recipients) },
     android: {
       priority: "high",
-      ttl: 24 * 60 * 60 * 1000,
-      notification: {
-        channelId: PHONE_NOTIFICATION_CHANNEL,
-        icon: "ic_notification",
-        color: "#216B26",
-        sound: "default",
-        defaultVibrateTimings: true,
-        tag: `trashtrack:${id}`,
-      },
+      ttl: 7 * 24 * 60 * 60 * 1000,
     },
   };
 }

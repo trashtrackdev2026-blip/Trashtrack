@@ -25,6 +25,8 @@ import { DataState } from "@/components/ui/data-state";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { staffRequest } from "@/lib/staff-client";
+import { phoneDeliveryDue } from "@/lib/notification-publication";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface NotificationData {
   id: string;
@@ -36,6 +38,10 @@ interface NotificationData {
   recipients: string;
   push: boolean;
   pushStatus: string;
+  createdAtMillis: number;
+  pushStartedAtMillis?: number;
+  pushNextRetryAt?: number;
+  pushRetryable?: boolean;
 }
 
 export default function NotificationsPage() {
@@ -73,6 +79,9 @@ export default function NotificationsPage() {
       const notifs: NotificationData[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        const millis = (value: unknown): number => typeof value === "number" ? value :
+          value && typeof value === "object" && "toMillis" in value && typeof value.toMillis === "function" ? value.toMillis() : 0;
+        const timestamp = millis(data.createdAt) || millis(data.timestamp);
         notifs.push({
           id: doc.id,
           title: data.title || "Notification",
@@ -80,14 +89,37 @@ export default function NotificationsPage() {
           type: data.type || "general",
           isRead: data.isRead || false,
           recipients: data.recipients || "All Barangays", push: data.push === true, pushStatus: data.pushStatus || (data.push ? "pending" : "disabled"),
-          date: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (data.date || "Recently")
+          createdAtMillis: timestamp, pushStartedAtMillis: millis(data.pushStartedAt),
+          pushNextRetryAt: data.pushNextRetryAt, pushRetryable: data.pushRetryable,
+          date: timestamp ? new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (data.date || "Recently")
         });
       });
-      setNotifications(notifs);
+      setNotifications(notifs.sort((a, b) => b.createdAtMillis - a.createdAtMillis));
       setLoading(false);
       setDataError(null);
     }, error => { setDataError(error.message.includes("taking too long") ? error.message : "Unable to load notifications. Check your connection and retry."); setLoading(false); });
   }, [role, attempt]);
+
+  useEffect(() => {
+    if (role !== "Admin") return;
+    let disposed = false;
+    let running = false;
+    const resumeDelivery = async () => {
+      if (running || !navigator.onLine) return;
+      running = true;
+      for (const notice of notifications.filter(item => phoneDeliveryDue(item)).slice(0, 3)) {
+        if (disposed) break;
+        try { await staffRequest("/api/notifications/send", { notificationId: notice.id }); }
+        catch { /* Saved failures remain visible and eligible for the next retry. */ }
+      }
+      running = false;
+    };
+    const timer = window.setInterval(() => void resumeDelivery(), 30_000);
+    const firstRetry = window.setTimeout(() => void resumeDelivery(), 1_500);
+    window.addEventListener("online", resumeDelivery);
+    // Let an in-progress publisher finish before starting an outbox retry.
+    return () => { disposed = true; clearInterval(timer); clearTimeout(firstRetry); window.removeEventListener("online", resumeDelivery); };
+  }, [role, notifications]);
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this notification?")) {
@@ -352,18 +384,13 @@ export default function NotificationsPage() {
       </div>
 
       {/* View Notification Modal */}
+      <Dialog open={selectedNotif !== null} onOpenChange={open => { if (!open) setSelectedNotif(null); }}>
       {selectedNotif && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 relative">
+          <DialogContent className="sm:max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 gap-0 bg-white">
             
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Notification Details</h2>
-              <button 
-                onClick={() => setSelectedNotif(null)}
-                className="text-slate-400 hover:text-slate-700"
-              >
-                <span className="text-2xl leading-none">&times;</span>
-              </button>
+              <DialogTitle className="text-lg font-bold text-slate-900">Notification Details</DialogTitle>
+              <DialogDescription className="sr-only">Saved notification sent to {selectedNotif.recipients}</DialogDescription>
             </div>
 
             <div className="p-8 flex flex-col gap-6">
@@ -397,9 +424,9 @@ export default function NotificationsPage() {
               </div>
 
             </div>
-          </div>
-        </div>
+          </DialogContent>
       )}
+      </Dialog>
     </>
   );
 }

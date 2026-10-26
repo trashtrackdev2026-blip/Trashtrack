@@ -7,11 +7,13 @@ import * as policy from "../src/lib/staff-access.ts";
 import * as certificates from "../src/lib/certificate-data.ts";
 import { buildPhonePush } from "../src/lib/phone-push.ts";
 import { eventRegistrationClosed } from "../src/lib/event-lifecycle.ts";
+import { notificationPublication, phoneDeliveryDue } from "../src/lib/notification-publication.ts";
 const require = createRequire(import.meta.url), ts = require("typescript");
 const compile = path => ts.transpileModule(fs.readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const routeCode = compile("../src/app/api/community/publish/route.ts");
 const deliveryCode = compile("../src/lib/notification-delivery.ts");
 const sendCode = compile("../src/app/api/notifications/send/route.ts");
+const createNoticeCode = compile("../src/app/api/notifications/create/route.ts");
 const schedule = { kind: "schedule", id: "test-schedule", barangay: "Sala", date: "2099-10-17", time: "08:00", description: "Roadside pickup" };
 
 function fixture(options = {}) {
@@ -36,12 +38,17 @@ function fixture(options = {}) {
     "firebase-admin/messaging": { getMessaging: () => ({ send: async payload => {
       pushes.push(payload); if (options.failFirstPush && !failed) { failed = true; throw new Error("Messaging unavailable"); } return "test-message";
     } }) }, "./barangay-geofence": { BALETE_BARANGAYS: policy.STAFF_BARANGAYS }, "./phone-push": { buildPhonePush }, "./staff-access": policy,
-    "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates };
+    "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates,
+    "@/lib/notification-publication": { notificationPublication } };
   const delivery = {}; new Function("require","exports",deliveryCode)(name => modules[name] || require(name), delivery);
   modules["@/lib/notification-delivery"] = delivery;
   const route = {}; new Function("require","exports",routeCode)(name => modules[name] || require(name), route);
   const send = {}; new Function("require","exports",sendCode)(name => modules[name] || require(name), send);
-  return { records, pushes, async post(body = schedule, expected = 200, retryOnly = false) {
+  const createNotice = {}; new Function("require","exports",createNoticeCode)(name => modules[name] || require(name), createNotice);
+  return { records, pushes, async create(body, expected = 200) {
+    const response = await createNotice.POST(new Request("https://example.invalid/api/notifications/create", { method:"POST", body:JSON.stringify(body) }));
+    const result = await response.json(); assert.equal(response.status, expected, result.error || "Expected response"); return result;
+  }, async post(body = schedule, expected = 200, retryOnly = false) {
     const response = await (retryOnly ? send : route).POST(new Request("https://example.invalid/api/community/publish", { method:"POST", body:JSON.stringify(body) }));
     const result = await response.json(); assert.equal(response.status, expected, result.error || "Expected response"); return result;
   } };
@@ -54,8 +61,53 @@ test("Publishing saves the schedule and in-app notice together and queues only t
     const notice = app.records.get("notifications/schedule_test-schedule");
     assert.equal(notice.recipients, barangay); assert.equal(notice.pushStatus, "queued");
     assert.equal(app.pushes[0].topic, "trashtrack_barangay_" + barangay.toLowerCase().replaceAll(" ","_") + "_v1");
-    assert.ok(app.pushes[0].notification.body.includes("2099-10-17"));
+    assert.ok(app.pushes[0].data.message.includes("2099-10-17"));
   }
+});
+
+const notice = { id: "stable-notice", title: "Collection schedule update", message: "Use the blue bags.", type: "schedule", recipients: "Sala", push: true };
+
+test("notification creation saves one inbox record and reuses it after lost responses", async () => {
+  const app = fixture();
+  assert.equal((await app.create(notice)).queued, true);
+  await app.create(notice);
+  assert.equal(app.records.size, 2);
+  assert.equal(app.pushes.length, 1);
+  assert.equal(app.records.get("notifications/stable-notice").message, notice.message);
+  await app.create({ ...notice, message: "Different content" }, 409);
+});
+
+test("failed phone delivery preserves a visible saved inbox item and retries without duplicates", async () => {
+  const app = fixture({ failFirstPush: true });
+  const first = await app.create(notice);
+  assert.equal(first.saved, true); assert.equal(first.queued, false);
+  const saved = app.records.get("notifications/stable-notice");
+  assert.equal(saved.pushStatus, "failed"); assert.equal(saved.pushRetryable, true);
+  assert.ok(saved.pushNextRetryAt > Date.now());
+  assert.equal((await app.create(notice)).queued, true);
+  assert.equal(app.records.size, 2); assert.equal(app.pushes.length, 2);
+});
+
+test("in-app-only notices and invalid or unauthorized sends never trigger an unintended push", async () => {
+  const app = fixture(); await app.create({ ...notice, push: false });
+  assert.equal(app.pushes.length, 0); assert.equal(app.records.get("notifications/stable-notice").pushStatus, "disabled");
+  for (const [options, body, code] of [[{ signedOut: true }, notice, 401], [{ profile: { accessStatus: "suspended" } }, notice, 403],
+    [{ profile: { role: "Semi-Admin", barangay: "Looc" } }, notice, 403], [{}, { ...notice, recipients: "Other town" }, 400], [{}, { ...notice, title: "" }, 400]]) {
+    const current = fixture(options); await current.create(body, code); assert.equal(current.records.size, 1); assert.equal(current.pushes.length, 0);
+  }
+});
+
+test("automatic outbox retries wait for new sends, recover stale sends and skip permanent failures", () => {
+  const now = 1_000_000;
+  const saved = { push: true, pushStatus: "pending", createdAtMillis: now };
+  assert.equal(phoneDeliveryDue(saved, now), false);
+  assert.equal(phoneDeliveryDue(saved, now + 30_000), true);
+  assert.equal(phoneDeliveryDue({ ...saved, pushStatus: "queued" }, now + 90_000), false);
+  assert.equal(phoneDeliveryDue({ ...saved, pushStatus: "sending", pushStartedAtMillis: now }, now + 299_000), false);
+  assert.equal(phoneDeliveryDue({ ...saved, pushStatus: "sending", pushStartedAtMillis: now }, now + 300_000), true);
+  assert.equal(phoneDeliveryDue({ ...saved, pushStatus: "failed", pushNextRetryAt: now + 60_000 }, now + 59_000), false);
+  assert.equal(phoneDeliveryDue({ ...saved, pushStatus: "failed", pushNextRetryAt: now + 60_000 }, now + 60_000), true);
+  assert.equal(phoneDeliveryDue({ ...saved, pushStatus: "failed", pushRetryable: false }, now + 90_000), false);
 });
 test("Lost responses and phone retries never create duplicate posts or resend a queued notice", async () => {
   const app = fixture(); await app.post(); await app.post();

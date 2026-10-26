@@ -1,22 +1,47 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { area, featureCollection, intersect, kinks } from "@turf/turf";
+import { createHash } from "node:crypto";
+import { area, difference, featureCollection, intersect, kinks, union } from "@turf/turf";
 import { BALETE_BARANGAYS, validateBaleteBoundaries, locateBarangay, assignReportBarangay } from "../src/lib/barangay-geofence.ts";
 
 const data = JSON.parse(readFileSync(new URL("../public/geojson/balete_barangays.json", import.meta.url)));
-const source = JSON.parse(readFileSync(new URL("../data/balete-source-full.json", import.meta.url)));
+const sourceBytes = readFileSync(new URL("../data/balete-municipal-source.json", import.meta.url));
+const source = JSON.parse(sourceBytes);
+const outline = JSON.parse(readFileSync(new URL("../data/balete-municipal-outline.json", import.meta.url)));
 const boundaries = validateBaleteBoundaries(data);
 
-test("all 13 PSA barangays retain the original source geometry and correct PSGC", () => {
+test("all 13 barangays use municipality-supplied geometry and retain the application PSGC", () => {
   assert.deepEqual(boundaries.features.map(feature => feature.properties.name), [...BALETE_BARANGAYS]);
   for (const feature of boundaries.features) {
-    const original = source.features.find(item => String(item.properties.adm4_psgc).padStart(10, "0") === feature.properties.psgc);
+    const original = source.features.find(item => item.properties.BRGYName === feature.properties.sourceName);
+    assert.equal(feature.properties.psgc, `0401004${String(BALETE_BARANGAYS.indexOf(feature.properties.name) + 1).padStart(3, "0")}`);
     assert.deepEqual(feature.geometry, original.geometry);
     const [lng, lat] = feature.properties.labelPoint;
     assert.equal(locateBarangay(boundaries, lat, lng).barangay, feature.properties.name);
   }
   assert.equal(boundaries.features.some(feature => feature.properties.name === "Kinalaglagan"), false);
+  assert.equal(boundaries.features.find(feature => feature.properties.name === "Sampalocan").properties.sourceName, "Sampalukan");
+  assert.equal(data.metadata.extractedSourceSha256, createHash("sha256").update(sourceBytes).digest("hex"));
+  assert.equal(data.metadata.sourceCrs, "EPSG:32651");
+});
+
+test("archived municipality shapefile components match their provenance checksums", () => {
+  for (const collection of [source, outline]) for (const [filename, checksum] of Object.entries(collection.metadata.sourceFiles)) {
+    const bytes = readFileSync(new URL(`../data/municipality-2026-10-26/${filename}`, import.meta.url));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), checksum, filename);
+  }
+});
+
+test("the barangay union covers the supplied municipal outline, including Calawit", () => {
+  const merged = union(boundaries);
+  const municipal = outline.features[0];
+  for (const [a, b] of [[merged, municipal], [municipal, merged]]) {
+    const remainder = difference(featureCollection([a, b]));
+    assert.ok(!remainder || area(remainder) < 0.001, "Municipal coverage differs");
+  }
+  assert.equal(municipal.geometry.type, "MultiPolygon");
+  assert.equal(municipal.geometry.coordinates.length, 2);
 });
 
 test("source polygons have no self-intersections or overlapping interiors", () => {
@@ -27,11 +52,26 @@ test("source polygons have no self-intersections or overlapping interiors", () =
   }
 });
 
-test("Calawit is on Volcano Island; San Sebastian is included; old mainland Calawit was Palsara", () => {
+test("municipal corrections classify mainland pins correctly and keep Calawit on Volcano Island", () => {
   assert.equal(locateBarangay(boundaries, 14.006, 121.010).barangay, "Calawit");
   assert.equal(locateBarangay(boundaries, 14.0262, 121.0642).barangay, "San Sebastian");
-  assert.equal(locateBarangay(boundaries, 14.019, 121.098).barangay, "Poblacion");
-  assert.equal(locateBarangay(boundaries, 13.995, 121.102).barangay, "Palsara");
+  assert.equal(locateBarangay(boundaries, 14.019, 121.098).barangay, "Makina");
+  assert.equal(locateBarangay(boundaries, 14.028, 121.120).barangay, "Malabanan");
+  assert.equal(locateBarangay(boundaries, 14.0044, 121.1147).barangay, "Alangilan");
+  assert.equal(locateBarangay(boundaries, 14.03865, 121.10361).barangay, "Solis");
+  assert.equal(locateBarangay(boundaries, 14.01187, 121.10181).barangay, "Palsara");
+  assert.equal(locateBarangay(boundaries, 14.03338, 121.09381).barangay, "Sampalocan");
+  assert.equal(locateBarangay(boundaries, 13.995, 121.102).status, "outside");
+});
+
+test("a supplied shared vertex remains a boundary requiring review", () => {
+  const makina = boundaries.features.find(feature => feature.properties.name === "Makina");
+  const poblacion = boundaries.features.find(feature => feature.properties.name === "Poblacion");
+  const shared = makina.geometry.coordinates[0].find(xy => poblacion.geometry.coordinates[0].some(other => xy[0] === other[0] && xy[1] === other[1]));
+  assert.ok(shared);
+  const result = locateBarangay(boundaries, shared[1], shared[0]);
+  assert.equal(result.status, "boundary");
+  assert.ok(result.barangays.includes("Makina") && result.barangays.includes("Poblacion"));
 });
 
 test("lake and neighboring towns stay outside, and swapped/invalid GPS is rejected", () => {

@@ -12,6 +12,14 @@ for (const route of ["api/certificates", "api/certificates/preview"]) {
     for (const asset of required) if (!bundled.has(asset)) errors.push(`${route}: missing ${relative(process.cwd(), asset)} in function bundle.`);
   } catch { errors.push(`Build trace is missing for ${route}. Run npm run build first.`); }
 }
+const reportRoute = resolve(base, "api/reports/submit/route.js.nft.json");
+try {
+  const trace = JSON.parse(readFileSync(reportRoute, "utf8"));
+  const boundaryAsset = resolve("public/geojson/balete_barangays.json");
+  if (!trace.files.some(path => resolve(dirname(reportRoute), path) === boundaryAsset)) {
+    errors.push("api/reports/submit: missing barangay boundaries in function bundle.");
+  }
+} catch { errors.push("Build trace is missing for api/reports/submit. Run npm run build first."); }
 function inspect(folder) {
   for (const entry of readdirSync(folder, { withFileTypes: true })) {
     const file = resolve(folder, entry.name);
@@ -30,4 +38,4 @@ function inspect(folder) {
 try { if (statSync(base).isDirectory()) inspect(base); }
 catch { errors.push("The production server build is missing."); }
 if (errors.length) { for (const error of new Set(errors)) console.error(error); process.exitCode = 1; }
-else console.log("Function bundle check passed: certificate template/font/license included, private configuration excluded.");
+else console.log("Function bundle check passed: report boundaries and certificate assets included, private configuration excluded.");

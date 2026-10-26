@@ -248,7 +248,7 @@ export default function CreateSchedulePage() {
                         className="w-full bg-white border border-slate-200 rounded-md p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#2E7D32] resize-none"
                         placeholder="Enter any additional notes or instructions..."
                       />
-                      <p className="text-[10px] text-slate-400 mt-1">Optional notes for internal reference.</p>
+                      <p className="text-[10px] text-slate-400 mt-1">These notes are shown to residents with the collection schedule.</p>
                     </div>
                   </div>
                 ) : (

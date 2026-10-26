@@ -1,15 +1,21 @@
-// Input: original, unsimplified Balete records extracted from the source archive.
+// Input: municipality-supplied shapefiles converted by convert-municipal-boundaries.py.
 // Run with: node scripts/import-balete-boundaries.mjs
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { bbox, booleanPointInPolygon, centerOfMass, point, pointToPolygonDistance } from "@turf/turf";
 
-const sourceUrl = new URL("../data/balete-source-full.json", import.meta.url);
+const sourceUrl = new URL("../data/balete-municipal-source.json", import.meta.url);
 const sourceBytes = readFileSync(sourceUrl);
 const source = JSON.parse(sourceBytes);
 const names = ["Alangilan", "Calawit", "Looc", "Magapi", "Makina", "Malabanan", "Paligawan",
   "Palsara", "Poblacion", "Sala", "Sampalocan", "Solis", "San Sebastian"];
 if (source.features.length !== 13) throw new Error("Expected 13 source barangays.");
+const aliases = { Sampalukan: "Sampalocan" };
+const canonicalName = feature => aliases[feature.properties.BRGYName] ?? feature.properties.BRGYName;
+if (new Set(source.features.map(canonicalName)).size !== 13 ||
+    source.features.some(feature => !names.includes(canonicalName(feature)))) {
+  throw new Error("Unexpected or duplicate municipal source barangay.");
+}
 
 function interiorLabel(feature) {
   const [west, south, east, north] = bbox(feature);
@@ -29,30 +35,28 @@ function interiorLabel(feature) {
 
 const features = names.map((name, index) => {
   const psgc = `0401004${String(index + 1).padStart(3, "0")}`;
-  const original = source.features.find(feature => String(feature.properties.adm4_psgc).padStart(10, "0") === psgc);
-  if (!original || original.properties.adm4_en !== name || original.properties.adm3_psgc !== 401004000) {
+  const original = source.features.find(feature => canonicalName(feature) === name);
+  if (!original) {
     throw new Error(`Missing or mismatched source: ${name}.`);
   }
   return {
     type: "Feature", id: psgc,
     properties: { id: name.toLowerCase().replaceAll(" ", "-"), name, psgc,
-      municipality: "Balete", province: "Batangas", labelPoint: interiorLabel(original) },
+      municipality: "Balete", province: "Batangas", sourceName: original.properties.BRGYName,
+      sourceAreaHectares: original.properties["Area (has)"], labelPoint: interiorLabel(original) },
     geometry: original.geometry,
   };
 });
 const output = {
-  type: "FeatureCollection", name: "Balete_Batangas_Published_Barangay_Boundaries",
+  type: "FeatureCollection", name: "Balete_Batangas_Municipal_Barangay_Boundaries",
   metadata: {
     municipalityPsgc: "0401004000", coordinateSystem: "EPSG:4326",
-    coordinateOrder: "longitude, latitude", psgcSnapshot: "2023-12-31",
-    source: "NAMRIA/PSA via OCHA HDX; PSGC-enriched archive by altcoder",
-    sourceArchive: "https://github.com/altcoder/philippines-psgc-shapefiles/blob/main/dist/PH_Adm4_BgySubMuns.shp.zip",
-    sourceMember: "BgySubMuns.shp.shp", sourceDataset: "https://data.humdata.org/dataset/cod-ab-phl",
-    barangayList: "https://psa.gov.ph/classification/psgc/barangays/0401004000",
-    license: "CC BY-IGO (upstream boundary data); MIT (repository code)",
+    coordinateOrder: "longitude, latitude",
+    ...source.metadata,
+    nameAliases: aliases,
+    psgcMapping: "Existing application barangay codes retained; municipal source identifies barangays by BRGYName.",
     extractedSourceSha256: createHash("sha256").update(sourceBytes).digest("hex"),
-    geometryProcessing: "Original source vertices retained; no simplification or synthetic partitioning.",
-    limitations: "Published administrative reference boundaries, not a cadastral survey or legal LGU certification. PSGC dates describe code/name updates, not a new border survey.",
+    limitations: "Survey date and redistribution terms were not supplied. Received date records import provenance, not a survey date. Phone GPS accuracy still affects pins near a border.",
   },
   bbox: bbox({ type: "FeatureCollection", features }), features,
 };

@@ -105,7 +105,7 @@ export default function Map({ barangayStats = [], selectedBarangay = "all-barang
     <div className="w-full h-full relative isolate overflow-hidden rounded-xl">
       <MapContainer center={[14.0, 121.07]} zoom={12} style={{ height: "100%", width: "100%", zIndex: 0 }}>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19}
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Boundaries: NAMRIA/PSA via <a href="https://data.humdata.org/dataset/cod-ab-phl">OCHA</a>' />
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Boundaries: Municipality of Balete, Batangas' />
         <BoundaryView data={boundaries} selectedBarangay={selectedBarangay} />
         <GeoJSON key={selectedBarangay + ":" + JSON.stringify(barangayStats)} data={displayData}
           style={feature => ({
@@ -119,8 +119,7 @@ export default function Map({ barangayStats = [], selectedBarangay = "all-barang
             content.style.whiteSpace = "pre-line";
             content.textContent = [props.name, "Balete, Batangas", "PSGC: " + props.psgc,
               props.status + ": " + props.pending + " active reports",
-              "Published administrative boundary (PSGC 2023)",
-              "Confirm disputed borders with the LGU."].join("\n");
+              "Municipality-supplied barangay boundary"].join("\n");
             layer.bindPopup(content);
           }} />
         <BarangayLabels data={boundaries} stats={barangayStats} selectedBarangay={selectedBarangay} />

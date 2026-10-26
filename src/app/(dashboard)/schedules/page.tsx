@@ -23,6 +23,8 @@ interface Schedule {
   date?: string;
   time: string;
   status: string;
+  description?: string;
+  notes?: string;
 }
 
 export default function SchedulesPage() {
@@ -249,7 +251,10 @@ export default function SchedulesPage() {
                     {loading && <tr><td colSpan={5} className="py-8 text-center text-slate-500">Loading schedules...</td></tr>}
                     {schedules.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((schedule) => (
                       <tr key={schedule.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors group">
-                        <td className="py-3 px-6 font-medium text-slate-800">{schedule.barangay}</td>
+                        <td className="py-3 px-6 font-medium text-slate-800">
+                          {schedule.barangay}
+                          {(schedule.description?.trim() || schedule.notes?.trim()) && <p className="mt-1 min-w-40 whitespace-pre-wrap break-words text-xs font-normal leading-relaxed text-slate-600">Notes: {schedule.description?.trim() || schedule.notes?.trim()}</p>}
+                        </td>
                         <td className="py-3 px-4 font-medium text-slate-600">{schedule.date || schedule.day}</td>
                         <td className="py-3 px-4 font-medium text-slate-600">{schedule.time}</td>
                         <td className="py-3 px-4">

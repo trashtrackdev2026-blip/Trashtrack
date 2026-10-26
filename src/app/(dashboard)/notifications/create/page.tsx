@@ -8,16 +8,18 @@ import { Bell, Send, HelpCircle, Users, CalendarIcon, AlertTriangle } from "luci
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
-import { readApiResponse } from "@/lib/api-response";
+import { staffRequest } from "@/lib/staff-client";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export default function CreateNotificationPage() {
   const router = useRouter();
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [savedNotificationId, setSavedNotificationId] = useState<string | null>(null);
+  const [notificationId] = useState(() => doc(collection(db, "notifications")).id);
   const [deliveryError, setDeliveryError] = useState("");
   
   const [form, setForm] = useState({
@@ -33,34 +35,18 @@ export default function CreateNotificationPage() {
     if (!user || !form.title.trim() || !form.message.trim()) return;
     setIsSending(true);
     setDeliveryError("");
-    let notificationId = savedNotificationId;
     try {
-      if (!notificationId) {
-        const record = await addDoc(collection(db, "notifications"), {
-          title: form.title.trim(), message: form.message.trim(),
-          type: form.category === "Collection Schedule" ? "schedule" : form.category === "System Alert" ? "alert" : "event",
-          recipients: form.recipients, push: form.push, pushStatus: form.push ? "pending" : "disabled",
-          isRead: false, createdBy: user.uid,
-          date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-          timestamp: serverTimestamp(), createdAt: serverTimestamp(),
-        });
-        notificationId = record.id;
-        setSavedNotificationId(notificationId);
-      }
-      if (form.push) {
-        const token = await user.getIdToken();
-        const response = await fetch("/api/notifications/send", {
-          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ notificationId }), signal: AbortSignal.timeout(20_000),
-        });
-        const result = await readApiResponse(response, "Phone delivery could not be queued.");
-        if (result.queued !== true) throw new Error("Phone delivery could not be queued.");
-      }
+      const result = await staffRequest<{ saved: boolean; queued: boolean; deliveryError?: string }>("/api/notifications/create", {
+        id: notificationId, title: form.title, message: form.message, recipients: form.recipients,
+        type: form.category === "Collection Schedule" ? "schedule" : form.category === "System Alert" ? "alert" : "event", push: form.push,
+      });
+      if (result.saved) setSavedNotificationId(notificationId);
+      if (form.push && !result.queued) throw new Error(result.deliveryError || "Phone delivery is pending. Retry this saved notification.");
       alert(form.push ? "Notification saved and queued for phones." : "Notification saved in the app's notification history.");
       router.push("/notifications");
     } catch (error) {
       const message = error instanceof Error && error.name !== "TimeoutError" ? error.message : "Delivery could not be confirmed. Retry to check its status.";
-      setDeliveryError(`${notificationId ? "Notification saved. " : "Notification could not be saved. "}${message}`);
+      setDeliveryError(`${savedNotificationId ? "Notification saved. " : ""}${message} Retrying uses the same notification ID.`);
     } finally {
       setIsSending(false);
       setShowConfirm(false);
@@ -268,26 +254,19 @@ export default function CreateNotificationPage() {
       </div>
 
       {/* Confirm Modal Overlay */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+      <Dialog open={showConfirm} onOpenChange={open => { if (!isSending) setShowConfirm(open); }}>
+          <DialogContent className="sm:max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 gap-0 bg-white">
             
             <div className="p-8 flex flex-col items-center text-center">
-              <button 
-                onClick={() => setShowConfirm(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-700"
-              >
-                <span className="text-xl leading-none">&times;</span>
-              </button>
 
               <div className="w-16 h-16 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mb-6">
                 <HelpCircle className="w-8 h-8" />
               </div>
 
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Confirm Notification</h2>
-              <p className="text-sm text-slate-500 mb-8 max-w-xs">
+              <DialogTitle className="text-xl leading-normal font-bold text-slate-900 mb-2">Confirm Notification</DialogTitle>
+              <DialogDescription className="text-sm text-slate-500 mb-8 max-w-xs">
                 Are you sure you want to send this notification to residents in the selected barangay?
-              </p>
+              </DialogDescription>
 
               <div className="w-full text-left space-y-3 mb-8">
                 <div className="flex">
@@ -312,6 +291,7 @@ export default function CreateNotificationPage() {
               <div className="flex w-full gap-3">
                 <Button 
                   onClick={() => setShowConfirm(false)}
+                  disabled={isSending}
                   variant="outline" 
                   className="flex-1 h-11 border-slate-200 text-slate-600 font-semibold rounded-xl"
                 >
@@ -327,9 +307,8 @@ export default function CreateNotificationPage() {
               </div>
 
             </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
     </>
   );
 }

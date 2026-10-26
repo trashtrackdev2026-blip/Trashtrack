@@ -14,11 +14,25 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { subscribeWithDeadline } from "@/lib/live-data";
 
 export function Header({ toggleSidebar }: { toggleSidebar: () => void }) {
   const { user, role } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [pendingDeliveries, setPendingDeliveries] = useState(0);
+  useEffect(() => {
+    if (role !== "Admin") return;
+    return subscribeWithDeadline(collection(db, "notifications"), snapshot => {
+      setPendingDeliveries(snapshot.docs.filter(doc => {
+        const notice = doc.data();
+        return notice.push === true && ["pending", "sending", "failed"].includes(notice.pushStatus ?? "pending");
+      }).length);
+    }, () => setPendingDeliveries(0));
+  }, [role]);
 
   // Simple mapping to get page title and subtitle
   const getPageInfo = () => {
@@ -53,7 +67,7 @@ export function Header({ toggleSidebar }: { toggleSidebar: () => void }) {
       <div className="flex shrink-0 items-center gap-3 md:gap-6">
         <button aria-label="Open notifications" onClick={() => router.push(role === "Admin" ? "/notifications" : "/reports")} className="relative text-slate-600 hover:text-slate-900 transition-colors">
           <Bell className="w-6 h-6" />
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full flex items-center justify-center text-[8px] text-white font-bold">5</span>
+          {role === "Admin" && pendingDeliveries > 0 && <span aria-label={`${pendingDeliveries} phone deliveries need attention`} className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 bg-green-500 border-2 border-white rounded-full flex items-center justify-center text-[8px] text-white font-bold">{pendingDeliveries > 99 ? "99+" : pendingDeliveries}</span>}
         </button>
 
         <DropdownMenu>

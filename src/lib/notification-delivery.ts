@@ -16,15 +16,18 @@ export async function queuePhoneNotification(app: App, db: Firestore, id: string
     let message;
     try { message = buildPhonePush(id, data, BALETE_BARANGAYS); }
     catch (error) { throw new StaffAccessError(error instanceof Error ? error.message : "Invalid notification details.", 400); }
-    tx.update(reference, { pushStatus: "sending", pushStartedAt: FieldValue.serverTimestamp() });
+    tx.update(reference, { pushStatus: "sending", pushStartedAt: FieldValue.serverTimestamp(),
+      pushAttempts: (typeof data.pushAttempts === "number" ? data.pushAttempts : 0) + 1 });
     return message;
   });
   if (!payload) return;
   try {
     const messageId = await getMessaging(app).send(payload);
-    await reference.update({ pushStatus: "queued", pushMessageId: messageId, pushQueuedAt: FieldValue.serverTimestamp() });
-  } catch {
-    await reference.update({ pushStatus: "failed" }).catch(() => {});
+    await reference.update({ pushStatus: "queued", pushMessageId: messageId, pushQueuedAt: FieldValue.serverTimestamp(), pushRetryable: false });
+  } catch (error) {
+    const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "unknown";
+    const retryable = !["messaging/invalid-argument", "messaging/invalid-payload", "messaging/authentication-error", "messaging/mismatched-credential"].includes(code);
+    await reference.update({ pushStatus: "failed", pushErrorCode: code, pushRetryable: retryable, pushNextRetryAt: Date.now() + 60_000 }).catch(() => {});
     throw new StaffAccessError("The post is saved, but phone delivery could not be queued. Retry publishing to send the saved notification.", 502);
   }
 }
