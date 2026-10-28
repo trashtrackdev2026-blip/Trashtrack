@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, LockKeyhole } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { signInError } from "@/lib/sign-in-errors";
 import { staffRole } from "@/lib/staff-access";
@@ -59,15 +59,15 @@ export function LoginForm() {
       <p className="text-xs text-slate-500">Enter the six-digit code from your authenticator app.</p>
     </div> : <>
       <div className="space-y-2"><label htmlFor="email" className="text-sm font-medium">Email address</label>
-        <Input id="email" type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} required className="h-11 rounded-xl" />
+        <div className="relative"><Mail aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-600" /><Input id="email" placeholder="Enter your email" type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} required className="h-11 rounded-xl pl-12" /></div>
       </div>
       <div className="space-y-2"><label htmlFor="password" className="text-sm font-medium">Password</label>
-        <div className="relative"><Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={event => setCapsLock(event.getModifierState("CapsLock"))} onKeyUp={event => setCapsLock(event.getModifierState("CapsLock"))} required className="h-11 rounded-xl pr-12" />
-          <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-controls="password" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)} className="absolute right-1 top-1 flex h-9 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-green-800">{showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}</button>
+        <div className="relative"><LockKeyhole aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-600" /><Input placeholder="Enter your password" id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={event => setCapsLock(event.getModifierState("CapsLock"))} onKeyUp={event => setCapsLock(event.getModifierState("CapsLock"))} required className="h-11 rounded-xl pl-12 pr-12" />
+          <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-controls="password" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)} className="absolute right-1 top-1/2 -translate-y-1/2 flex h-9 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-green-800">{showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}</button>
         </div>
         {capsLock && <p role="status" className="text-xs text-amber-700">Caps Lock is on.</p>}
       </div>
-      <Link href="/forgot-password" className="text-sm text-green-800 hover:underline">Forgot your password?</Link>
+      <Link href="/forgot-password" className="inline-block text-sm text-green-800 hover:underline">Forgot your password?</Link>
     </>}
     <Button type="submit" disabled={loading} className="w-full h-11 rounded-xl bg-green-800 hover:bg-green-900">{loading ? "Checking account…" : resolver ? "Verify and sign in" : "Sign in"}</Button>
     {resolver ? <button type="button" onClick={() => { setResolver(null); setCode(""); setError(""); setErrorReference(""); }} className="text-sm text-green-800">Use another account</button> :

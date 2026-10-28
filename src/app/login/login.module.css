@@ -1,0 +1,35 @@
+.page { min-height: 100svh; width: 100%; display: flex; position: relative; background: #fff; color: #0e2332; }
+.panel { width: 44%; min-height: 100svh; padding: clamp(30px, 5vw, 80px) clamp(28px, 4.2vw, 76px) 32px; display: flex; flex-direction: column; position: relative; z-index: 2; background: #fff; }
+.panel::before { content: ''; position: absolute; left: -55px; bottom: 0; width: 115%; height: 185px; border-radius: 45% 70% 0 0; background: linear-gradient(135deg, #eaf3e9bb, #fff0 70%); pointer-events: none; z-index: -1; }
+.brand { display: flex; align-items: center; gap: 11px; color: #197332; font-family: var(--font-outfit), sans-serif; font-weight: 750; font-size: 24px; }
+.brandMark { display: grid; place-items: center; width: 40px; height: 40px; background: linear-gradient(135deg, #0d6c36, #438f43); border-radius: 5px; color: #fff; font-size: 23px; font-family: var(--font-inter), sans-serif; font-weight: 600; }
+.content { width: 100%; max-width: 440px; margin: auto; padding: 55px 0 28px; }
+.content h1 { font-size: clamp(30px, 2.4vw, 44px); line-height: 1.08; font-weight: 750; letter-spacing: -.9px; margin-bottom: 16px; }
+.content h1 span { color: #0b6538; }
+.intro { color: #78869a; font-size: 17px; line-height: 1.35; margin-bottom: 32px; }
+.content form { font-size: 16px; }
+.content form label { color: #132737; font-size: 16px; font-weight: 500; }
+.content form input { height: 56px; border-radius: 14px; border-color: #d9dde3; box-shadow: none; font-size: 15px; background: #fff; }
+.content form input::placeholder { color: #89909b; }
+.content form button[type=submit] { min-height: 52px; border-radius: 13px; background: linear-gradient(110deg, #08703b, #096533); font-size: 17px; font-weight: 650; box-shadow: none; }
+.content form button[type=submit]:hover { background: #075c2d; }
+.content form button[type=submit]:disabled { opacity: .65; }
+.content form a { color: #096b2b; }
+.support { display: flex; align-items: center; gap: 13px; margin-top: 42px; padding: 14px 18px; border-radius: 15px; background: #f0f6ee; font-size: 13px; color: #677581; line-height: 1.5; }
+.support strong { color: #12602d; font-weight: 600; }
+.supportIcon { color: #126830; border-radius: 50%; background: #e6f0e3; width: 45px; height: 45px; display: grid; place-items: center; flex: 0 0 auto; }
+.copyright { color: #8693a7; font-size: 12px; text-align: center; }
+.hero { position: fixed; right: 0; top: 0; bottom: 0; width: 61%; overflow: hidden; clip-path: polygon(0 0, 100% 0, 100% 100%, 8% 100%); background: #a4bfa1; }
+.heroImage { object-fit: cover; object-position: 55% center; }
+.message { position: absolute; left: 9%; bottom: 5%; width: min(420px, 76%); padding: 25px 28px; color: white; border-radius: 24px; border: 1px solid #ffffff70; background: #3d503f66; backdrop-filter: blur(16px); box-shadow: 0 10px 40px #18362725; }
+.leaf { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; background: #ecf7e6dd; color: #326c37; margin-bottom: 12px; }
+.message h2 { font-weight: 750; font-size: clamp(28px, 1.9vw, 35px); line-height: 1.12; letter-spacing: -.7px; }
+.message p { font-size: 15px; line-height: 1.5; font-weight: 500; margin-top: 18px; }
+@media(min-width: 1700px) { .content { padding-top: 65px; } }
+@media(max-width: 1100px) { .panel { width: 48%; padding-left: 34px; padding-right: 34px; } .hero { width: 54%; } .message { left: 12%; width: 80%; padding: 24px; bottom: 18%; } .intro { font-size: 15px; } }
+@media(max-width: 899px) { .hero { display: none; } .panel { width: 100%; max-width: 600px; margin: auto; padding: 32px 28px 24px; } .content { padding: 55px 0 35px; } .content h1 { font-size: 36px; } .support { margin-top: 32px; } }
+@media(max-height: 760px) and (min-width: 900px) { .panel { padding-top: 30px; padding-bottom: 24px; } .content { padding-top: 30px; padding-bottom: 24px; } .support { margin-top: 28px; } .intro { margin-bottom: 24px; } }
+
+@media(min-width: 1101px) { .panel { clip-path: polygon(0 0, 90% 0, 100% 100%, 0 100%); } .hero { clip-path: none; } }
+
+.panel::after { content: ""; position: absolute; left: 0; bottom: 0; width: 145px; height: 80px; background: url("/images/reference-elements.png") -466px -113px / 614.4px 409.6px no-repeat; opacity: .6; pointer-events: none; z-index: -1; }
