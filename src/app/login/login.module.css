@@ -1,6 +1,10 @@
 .page { min-height: 100svh; width: 100%; display: flex; position: relative; background: #fff; color: #0e2332; }
 .panel { width: 44%; min-height: 100svh; padding: clamp(30px, 5vw, 80px) clamp(28px, 4.2vw, 76px) 32px; display: flex; flex-direction: column; position: relative; z-index: 2; background: #fff; }
-.panel::before { content: ''; position: absolute; left: -55px; bottom: 0; width: 115%; height: 185px; border-radius: 45% 70% 0 0; background: linear-gradient(135deg, #eaf3e9bb, #fff0 70%); pointer-events: none; z-index: -1; }
+.panelArtwork { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+.panelCurves { position: absolute; inset: 0; width: 100%; height: 100%; }
+.foliageLeft, .foliageRight { position: absolute; bottom: 0; background-image: url("/images/signin-corner-foliage.webp"); background-repeat: no-repeat; }
+.foliageLeft { left: 0; width: 28%; height: 17%; background-size: 220% 270%; background-position: left bottom; }
+.foliageRight { right: 0; width: 24%; height: 13%; background-size: 280% 400%; background-position: right bottom; }
 .brand { display: flex; align-items: center; gap: 11px; color: #197332; font-family: var(--font-outfit), sans-serif; font-weight: 750; font-size: 24px; }
 .brandMark { display: grid; place-items: center; width: 40px; height: 40px; background: linear-gradient(135deg, #0d6c36, #438f43); border-radius: 5px; color: #fff; font-size: 23px; font-family: var(--font-inter), sans-serif; font-weight: 600; }
 .content { width: 100%; max-width: 440px; margin: auto; padding: 55px 0 28px; }
@@ -31,5 +35,3 @@
 @media(max-height: 760px) and (min-width: 900px) { .panel { padding-top: 30px; padding-bottom: 24px; } .content { padding-top: 30px; padding-bottom: 24px; } .support { margin-top: 28px; } .intro { margin-bottom: 24px; } }
 
 @media(min-width: 1101px) { .panel { clip-path: polygon(0 0, 90% 0, 100% 100%, 0 100%); } .hero { clip-path: none; } }
-
-.panel::after { content: ""; position: absolute; left: 0; bottom: 0; width: 145px; height: 80px; background: url("/images/reference-elements.png") -466px -113px / 614.4px 409.6px no-repeat; opacity: .6; pointer-events: none; z-index: -1; }
