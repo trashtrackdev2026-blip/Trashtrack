@@ -1,5 +1,6 @@
 .page{min-height:100svh;display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,460px);grid-template-rows:auto 1fr auto;column-gap:7%;padding:clamp(30px,5vw,80px) clamp(28px,6vw,110px) 30px;position:relative;isolation:isolate;overflow:hidden;color:#123b2e;background:#48634f}
-.background{object-fit:cover;object-position:center;z-index:-3}
+.backgroundPicture{position:absolute;inset:0;z-index:-3;pointer-events:none}
+.background{object-fit:cover;object-position:center}
 .shade{position:absolute;inset:0;z-index:-2;background:linear-gradient(90deg,rgba(8,34,25,.18),transparent 65%),linear-gradient(0deg,rgba(10,32,24,.27),transparent 65%);pointer-events:none}
 .brand{grid-column:1;grid-row:1;align-self:start;width:fit-content;padding:8px 15px 10px 0;text-shadow:0 1px 18px #fff8}
 .message{grid-column:1;grid-row:2;align-self:center;margin:50px 0;max-width:650px;color:#fffef1;text-shadow:0 2px 22px #0b271a66}

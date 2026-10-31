@@ -6,7 +6,7 @@ import styles from "./login.module.css";
 
 export default function LoginPage() {
   return <main className={styles.page}>
-    <picture>
+    <picture className={styles.backgroundPicture}>
       <source
         type="image/webp"
         srcSet="/images/balete-lakeside-1280.webp 1280w, /images/balete-lakeside-1920.webp 1920w, /images/balete-lakeside-hd.webp 2500w"
