@@ -16,7 +16,7 @@ const operations = [
 const community = [
   { name: "Announcements", href: "/notifications", icon: Bell },
   { name: "Events", href: "/events", icon: CalendarCheck },
-  { name: "Learning library", href: "/education", icon: BookOpen },
+  { name: "Learning Management", href: "/education", icon: BookOpen },
   { name: "Analytics", href: "/analytics", icon: ChartNoAxesCombined },
 ];
 const barangayItems = [

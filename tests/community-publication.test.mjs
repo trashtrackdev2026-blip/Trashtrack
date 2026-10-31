@@ -9,12 +9,16 @@ import * as certificates from "../src/lib/certificate-data.ts";
 import { buildPhonePush } from "../src/lib/phone-push.ts";
 import { eventRegistrationClosed } from "../src/lib/event-lifecycle.ts";
 import { notificationPublication, phoneDeliveryDue } from "../src/lib/notification-publication.ts";
+import { eventFormFields } from "../src/lib/event-form.ts";
+import { notificationEdit } from "../src/lib/notification-edit.ts";
 const require = createRequire(import.meta.url), ts = require("typescript");
 const compile = path => ts.transpileModule(fs.readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const routeCode = compile("../src/app/api/community/publish/route.ts");
 const deliveryCode = compile("../src/lib/notification-delivery.ts");
 const sendCode = compile("../src/app/api/notifications/send/route.ts");
 const createNoticeCode = compile("../src/app/api/notifications/create/route.ts");
+const draftCode = compile("../src/app/api/events/drafts/route.ts");
+const editNoticeCode = compile("../src/app/api/notifications/manage/route.ts");
 const schedule = { kind: "schedule", id: "test-schedule", barangay: "Sala", date: "2099-10-17", time: "08:00", description: "Roadside pickup" };
 
 function fixture(options = {}) {
@@ -27,7 +31,7 @@ function fixture(options = {}) {
   const db = { collection: name => ({ doc: id => ref(name + "/" + id), where:(field,op,value) => ({collection:name,field,value}) }), async runTransaction(callback) {
     const working = new Map([...records].map(([key, value]) => [key, { ...value }]));
     const result = await callback({ get: async target => target.collection ? ({docs:[...working].filter(([path,value]) => path.startsWith(target.collection+"/") && value[target.field] === target.value).map(([path,value]) => ({id:path.split("/")[1],data:()=>value}))}) : ({ exists: working.has(target.path), data: () => working.get(target.path) }),
-      set: (target,value) => {working.set(target.path,value);},
+      set: (target,value, options) => {working.set(target.path,options?.merge ? {...working.get(target.path),...value} : value);},
       create: (target, value) => { assert.equal(working.has(target.path), false); working.set(target.path, value); },
       update: (target, value) => { assert.ok(working.has(target.path)); working.set(target.path, { ...working.get(target.path), ...value }); } });
     records.clear(); for (const [key, value] of working) records.set(key, value);
@@ -41,13 +45,16 @@ function fixture(options = {}) {
       pushes.push(payload); if (options.failFirstPush && !failed) { failed = true; throw new Error("Messaging unavailable"); } return "test-message";
     } }) }, "./barangay-geofence": { BALETE_BARANGAYS: policy.STAFF_BARANGAYS }, "./phone-push": { buildPhonePush }, "./staff-access": policy,
     "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/schedule-policy": schedules, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates,
-    "@/lib/notification-publication": { notificationPublication } };
+    "@/lib/notification-publication": { notificationPublication }, "@/lib/event-form": {eventFormFields}, "@/lib/notification-edit": {notificationEdit} };
   const delivery = {}; new Function("require","exports",deliveryCode)(name => modules[name] || require(name), delivery);
   modules["@/lib/notification-delivery"] = delivery;
   const route = {}; new Function("require","exports",routeCode)(name => modules[name] || require(name), route);
   const send = {}; new Function("require","exports",sendCode)(name => modules[name] || require(name), send);
   const createNotice = {}; new Function("require","exports",createNoticeCode)(name => modules[name] || require(name), createNotice);
-  return { records, pushes, async create(body, expected = 200) {
+  const draft = {}; new Function("require","exports",draftCode)(name => modules[name] || require(name), draft);
+  const edit = {}; new Function("require","exports",editNoticeCode)(name => modules[name] || require(name), edit);
+  const invoke = async (route,body,expected) => {const response=await route.POST(new Request("https://example.invalid/api/test",{method:"POST",body:JSON.stringify(body)}));const result=await response.json();assert.equal(response.status,expected,result.error);return result;};
+  return { records, pushes, draft:(body,expected=200)=>invoke(draft,body,expected), edit:(body,expected=200)=>invoke(edit,body,expected), async create(body, expected = 200) {
     const response = await createNotice.POST(new Request("https://example.invalid/api/notifications/create", { method:"POST", body:JSON.stringify(body) }));
     const result = await response.json(); assert.equal(response.status, expected, result.error || "Expected response"); return result;
   }, async post(body = schedule, expected = 200, retryOnly = false) {
@@ -157,5 +164,35 @@ test("Registration closes after the event's Manila end time and for completed/ca
   const now=Date.parse("2026-10-17T12:00:00+08:00");
   const event={status:"Upcoming",dateISO:"2026-10-17",time:"10:00 - 13:00"};
   assert.equal(eventRegistrationClosed(event,now),false); assert.equal(eventRegistrationClosed({...event,time:"10:00 - 11:59"},now),true);
-  for(const status of ["Completed","Finished","Cancelled","Archived"]) assert.equal(eventRegistrationClosed({...event,status},now),true);
+  for(const status of ["Draft","Completed","Finished","Cancelled","Archived"]) assert.equal(eventRegistrationClosed({...event,status},now),true);
+});
+
+test("An incomplete event draft can be resumed and published exactly once without premature notifications",async()=>{
+  const app=fixture();
+  const draft={id:"draft-cleanup",title:"Cleanup",barangay:"Sala",certificateEnabled:false};
+  await app.draft(draft);assert.equal(app.records.get("events/draft-cleanup").status,"Draft");assert.equal(app.pushes.length,0);assert.equal(app.records.size,2);
+  await app.draft({...draft,description:"Bring gloves"});assert.equal(app.records.get("events/draft-cleanup").description,"Bring gloves");
+  const publish={...draft,kind:"event",dateISO:"2099-11-15",startTime:"9:00 AM",endTime:"12:00 PM"};
+  await app.post(publish);await app.post(publish);
+  assert.equal(app.records.get("events/draft-cleanup").status,"Upcoming");assert.equal(app.pushes.length,1);
+  await app.draft(draft,409);
+});
+
+test("Revoked staff, barangay staff, and another official cannot overwrite an event draft",async()=>{
+  const body={id:"draft",title:"Cleanup",barangay:"Sala",certificateEnabled:false};
+  for(const options of [{signedOut:true},{profile:{role:"Semi-Admin",barangay:"Sala"}},{profile:{accessStatus:"suspended"}}]){
+    const app=fixture(options);await app.draft(body,options.signedOut?401:403);assert.equal(app.records.size,1);
+  }
+  const app=fixture();app.records.set("events/draft",{status:"Draft",createdBy:"other-official"});await app.draft(body,409);
+  await app.post({...body,kind:"event",dateISO:"2099-11-15",startTime:"09:00"},409);assert.equal(app.pushes.length,0);
+});
+
+test("Notification edits keep the delivery record and audience, detect stale edits, and never resend",async()=>{
+  const app=fixture();await app.create(notice);const sent=app.records.get("notifications/stable-notice");
+  await app.edit({id:notice.id,expectedRevision:0,title:"Updated collection",message:"Use green bags.",type:"schedule"});
+  const updated=app.records.get("notifications/stable-notice");assert.equal(updated.message,"Use green bags.");assert.equal(updated.pushStatus,sent.pushStatus);assert.equal(updated.recipients,"Sala");assert.equal(app.pushes.length,1);
+  await app.edit({id:notice.id,expectedRevision:0,title:"Stale edit",message:"Old copy",type:"schedule"},409);
+  await app.edit({id:notice.id,expectedRevision:1,title:"Different audience",message:"Copy",type:"schedule",recipients:"Looc"},400);
+  updated.pushStatus="sending";await app.edit({id:notice.id,expectedRevision:1,title:"Wait",message:"Copy",type:"schedule"},409);
+  for(const profile of [{role:"Semi-Admin",barangay:"Sala"},{accessStatus:"suspended"}]){const denied=fixture({profile});await denied.edit({id:notice.id,expectedRevision:0},403);assert.equal(denied.records.size,1);}
 });

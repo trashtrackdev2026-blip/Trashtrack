@@ -1,0 +1,5 @@
+import { collectionTimeLabel } from "@/lib/collection-calendar";
+
+export function ScheduleSummary({form}:{form:{barangay:string;day:string;date:string;time:string;notes:string}}){
+  return <section className="tt-surface space-y-5 p-6" aria-label="Live schedule summary"><div><h2>Schedule summary</h2><p className="mt-1 text-xs text-muted-foreground">Updates as you complete the form.</p></div><dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-4 text-sm">{[["Barangay",form.barangay],["Day of collection",form.day],["Start time",form.time?collectionTimeLabel(form.time):""],["Collection date",form.date],["Notes",form.notes||"No additional notes"]].map(([label,value])=><div key={label} className="contents"><dt className="text-muted-foreground">{label}</dt><dd className="break-words text-right font-medium whitespace-pre-wrap">{value||"Not set"}</dd></div>)}</dl><p className="rounded-lg bg-green-50 p-3 text-xs text-green-900">Published schedules appear in the collection calendar and resident app.</p></section>;
+}

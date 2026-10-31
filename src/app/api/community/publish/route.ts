@@ -24,7 +24,8 @@ export async function POST(request: Request) {
       const actor = actorSnap.data() || {};
       if (staffAccessProblem(actor, identity as unknown as Record<string, unknown>)) throw new StaffAccessError("Your staff access changed. Sign in again.");
       if (staffRole(actor.role) !== "admin" && publication.post.barangay !== actor.barangay) throw new StaffAccessError("Publish only for your assigned barangay.");
-      if (postSnap.exists) {
+      const publishingDraft = body.kind === "event" && postSnap.exists && postSnap.data()?.status === "Draft" && postSnap.data()?.createdBy === identity.uid && !noticeSnap.exists;
+      if (postSnap.exists && !publishingDraft) {
         if (postSnap.data()?.createdBy !== identity.uid || postSnap.data()?.publicationHash !== hash || !noticeSnap.exists) throw new StaffAccessError("This publication already exists with different details. Open the saved post.", 409);
         return;
       }
@@ -34,7 +35,9 @@ export async function POST(request: Request) {
         assertCollectionAvailable(publication.post, schedules.docs.map(doc => doc.data()));
         tx.set(dayRef, { revision: Number(day.data()?.revision || 0) + 1 });
       }
-      tx.create(postRef, { ...publication.post, createdBy: identity.uid, publicationHash: hash, createdAt: FieldValue.serverTimestamp() });
+      const post = { ...publication.post, createdBy: identity.uid, publicationHash: hash, createdAt: FieldValue.serverTimestamp() };
+      if (publishingDraft) tx.update(postRef,{...post,publishedAt:FieldValue.serverTimestamp()});
+      else tx.create(postRef,post);
       tx.create(noticeRef, { ...publication.announcement, sourceId: body.id, push: true, pushStatus: "pending", isRead: false, createdBy: identity.uid,
         createdAt: FieldValue.serverTimestamp(), timestamp: FieldValue.serverTimestamp() });
     });

@@ -113,7 +113,7 @@ export function StaffManagement() {
       </div>)}
     </div>
     {selected && <div className="space-y-4 rounded-xl border border-green-200 bg-green-50 p-5">
-      <h3 className="font-semibold">{selected.action === "approve" ? "Review" : "Change access for"} {selected.account.name}</h3>
+      <h3 className="font-semibold">{selected.action === "approve" ? "Review" : "Change barangay for"} {selected.account.name}</h3>
       <p className="break-all text-sm text-slate-600">{selected.account.email}</p>
       {selected.action === "approve" && <label className="block text-sm font-medium">Official position<input disabled={busy} required maxLength={120} value={officialPosition} onChange={e => { setOfficialPosition(e.target.value); setConfirmed(false); }} className="mt-2 w-full rounded-lg border bg-white p-3" placeholder="Confirm the official's position" /></label>}
       <div className="rounded-lg border bg-white p-3 text-sm"><span className="block font-semibold">Semi-Admin · barangay official</span><p className="mt-1 text-slate-600">This role is fixed. MENRO Admin access cannot be assigned here.</p></div>
@@ -143,7 +143,7 @@ export function StaffManagement() {
         <p className="break-all text-sm"><strong>{registered.email}</strong> · {registered.emailVerified ? "Email verified" : "Email not verified"}</p>
         {registered.disabled || ["suspended", "disabled", "activating"].includes(registered.accessStatus) ? <p className="text-sm text-amber-800">Resolve this account&apos;s existing staff access before adding a request.</p> :
           registered.requestStatus === "pending" ? <p className="text-sm text-green-800">This account already has a pending request. Refresh and review it below.</p> :
-          staffRole(registered.role) === "admin" || (staffRole(registered.role) && registered.accessStatus === "active") ? <p className="text-sm text-green-800">This account already has staff access. Use Change access in Staff accounts.</p> :
+          staffRole(registered.role) === "admin" || (staffRole(registered.role) && registered.accessStatus === "active") ? <p className="text-sm text-green-800">This account already has staff access. Use Manage the account in Staff accounts.</p> :
           registered.role.toLowerCase() === "resident" && !registered.requestStatus ? <p className="text-sm text-amber-800">This is a resident account. Use a separate email to register as barangay staff.</p> :
           !registered.emailVerified ? <p className="text-sm text-amber-800">The official must verify their email before MENRO can recover and approve this registration.</p> :
           <form onSubmit={recoverRegistration} className="space-y-3">
@@ -158,7 +158,7 @@ export function StaffManagement() {
 <details className="tt-staff-disclosure"><summary>Manage staff accounts</summary><div className="overflow-x-auto"><h3 className="mb-3 font-semibold">Staff accounts</h3><table className="w-full text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="py-2">Official</th><th>Access</th><th>Status</th><th>Action</th></tr></thead><tbody>
       {data?.staff.map(item => <tr key={item.id} className="border-b"><td className="py-3 pr-3"><p className="font-semibold">{item.name}</p><p className="text-xs text-slate-500">{item.email}</p></td><td className="pr-3">{staffRole(item.role) === "admin" ? "Admin · MENRO" : "Semi-Admin · " + item.barangay}</td><td className="pr-3">{item.accessStatus}</td>
         <td>{item.id === user?.uid ? <span className="text-slate-400">Your account</span> : item.accessStatus === "needs-review" ? <span className="text-xs text-amber-700">Official must verify email and submit a request</span> :
-          <div className="flex flex-wrap gap-3">{item.accessStatus === "active" && staffRole(item.role) === "semi-admin" && <button disabled={busy} onClick={() => review({ action: "assign", account: item })} className="font-medium text-green-800">Change access</button>}
+          <div className="flex flex-wrap gap-3">
           <button disabled={busy} onClick={() => void action(item.accessStatus === "active" ? "suspend" : "reactivate", item.id)} className="font-medium text-green-800">{item.accessStatus === "active" ? "Suspend access" : "Reactivate"}</button></div>}</td></tr>)}
     </tbody></table></div></details>
 <details className="text-sm"><summary className="cursor-pointer font-semibold">Recent access and report audit</summary>

@@ -17,6 +17,10 @@ import { EventCertificateSettings } from "@/components/events/EventCertificateSe
 import { CertificatePreview } from "@/components/events/CertificatePreview";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { EditEventDialog, type EditableEvent } from "@/components/events/EditEventDialog";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { STAFF_BARANGAYS } from "@/lib/staff-access";
+import { collectionTimeLabel } from "@/lib/collection-calendar";
 import { Pencil } from "lucide-react";
 import { AttendanceQr } from "@/components/events/AttendanceQr";
 import { useAuth } from "@/context/AuthContext";
@@ -48,6 +52,7 @@ interface EventData {
 
 export default function EventsPage() {
   const { role } = useAuth();
+  const router = useRouter();
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -240,7 +245,7 @@ export default function EventsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="upcoming">Upcoming</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem><SelectItem value="upcoming">Upcoming</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                     </SelectContent>
                   </Select>
@@ -254,7 +259,7 @@ export default function EventsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Barangays</SelectItem>
-                      {[...new Set(events.map(event => event.barangay))].filter(Boolean).sort().map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                      {[...STAFF_BARANGAYS,"All Barangays"].map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -282,8 +287,8 @@ export default function EventsPage() {
             <div className="tt-event-agenda">
                 {filteredEvents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(event => { const raw=event.dateISO || event.date;const date=new Date(raw + (/^\d{4}-\d{2}-\d{2}$/.test(raw) ? "T12:00:00" : ""));const valid=!Number.isNaN(date.getTime());return <article key={event.id} className={"tt-event-row" + (activeEvent?.id === event.id ? " is-selected" : "")}>
                   <div className="tt-date-block"><strong>{valid ? date.getDate().toString().padStart(2,"0") : "—"}</strong><span>{valid ? date.toLocaleDateString("en-PH",{month:"short"}) : "Event"}</span></div>
-                  <button type="button" className="tt-event-main" onClick={() => handleView(event)} aria-pressed={activeEvent?.id === event.id}><strong>{event.title}</strong><small>{event.barangay}<br />{event.date} · {event.time}<br />{event.participants || 0} registered · {event.status}</small></button>
-                  <div className="tt-event-row-actions"><Button variant="outline" onClick={() => handleView(event)} aria-label={"View " + event.title}>View</Button><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end">{event.status.toLowerCase() !== "completed" && <DropdownMenuItem onClick={() => setEditingEvent(event)}><Pencil />Edit event</DropdownMenuItem>}<DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+                  <button type="button" className="tt-event-main" onClick={() => handleView(event)} aria-pressed={activeEvent?.id === event.id}><strong>{event.title}</strong><small>{event.barangay}<br />{event.date} · {event.time?.split(" - ").map(collectionTimeLabel).join(" – ")}<br />{event.participants || 0} registered · {event.status}</small></button>
+                  <div className="tt-event-row-actions"><Button variant="outline" onClick={() => handleView(event)} aria-label={"View " + event.title}>View</Button><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end">{event.status.toLowerCase() !== "completed" && <DropdownMenuItem onClick={() => {if(event.status === "Draft")router.push("/events/create?draft="+encodeURIComponent(event.id));else setEditingEvent(event);}}><Pencil />{event.status === "Draft"?"Continue draft":"Edit event"}</DropdownMenuItem>}<DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
                 </article>;})}
                 {!loading && filteredEvents.length === 0 && <p className="tt-empty">No events match your filters.</p>}
               </div>
@@ -386,8 +391,8 @@ export default function EventsPage() {
               <DialogTitle className="font-bold text-lg text-slate-900">Event Details</DialogTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${activeEvent.status.toLowerCase() === 'completed' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-blue-50 text-blue-500'}`}>{activeEvent.status}</span>
-                {activeEvent.status.toLowerCase() !== 'completed' && (
-                  <Button onClick={handleMarkCompleted} disabled={loadingParticipants || busyAttendance !== null} size="sm" variant="outline" className="h-6 text-[10px] px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100">
+                {!["completed","draft"].includes(activeEvent.status.toLowerCase()) && (
+                  <Button onClick={handleMarkCompleted} disabled={loadingParticipants || busyAttendance !== null} size="sm" variant="outline" className="min-h-11 px-4 bg-green-50 border-green-200 text-green-800 hover:bg-green-100">
                     Mark Completed
                   </Button>
                 )}
@@ -411,7 +416,7 @@ export default function EventsPage() {
                 <Calendar className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Date & Time</span>
-                  <span className="text-xs font-medium text-slate-800">{activeEvent.date} • {activeEvent.time}</span>
+                  <span className="text-xs font-medium text-slate-800">{activeEvent.date} • {activeEvent.time?.split(" - ").map(collectionTimeLabel).join(" – ")}</span>
                 </div>
               </div>
 
@@ -441,7 +446,7 @@ export default function EventsPage() {
             </div>
 
             <div className="mt-auto">
-              <AttendanceQr key={activeEvent.id} eventId={activeEvent.id} method={activeEvent.attendanceMethod} />
+              {activeEvent.status !== "Draft" && <AttendanceQr key={activeEvent.id} eventId={activeEvent.id} method={activeEvent.attendanceMethod} />}
 
               <div className="bg-green-50 p-3 rounded-lg flex items-start gap-2 border border-green-100/50">
                 <div className="w-4 h-4 rounded-full bg-[#2E7D32] text-white flex items-center justify-center shrink-0 mt-0.5">
@@ -450,7 +455,7 @@ export default function EventsPage() {
                 <p className="text-[10px] text-[#2E7D32] leading-tight">Attendance is confirmed by scanning the event QR or by MENRO below. Completed participants with unconfirmed attendance see a pending certificate in the phone.</p>
               </div>
             </div>
-            <EventCertificateSettings key={activeEvent.id} event={activeEvent} onPreview={setCertificatePreview} />
+            {activeEvent.status === "Draft" ? <Link href={"/events/create?draft="+encodeURIComponent(activeEvent.id)} className="tt-primary-link">Continue editing draft</Link> : <EventCertificateSettings key={activeEvent.id} event={activeEvent} onPreview={setCertificatePreview} />}
             {actionError && <p role="alert" className="mt-3 text-xs text-red-700">{actionError}</p>}
             <div className="mt-6">
               <h5 className="font-bold text-sm text-slate-800 border-b border-slate-100 pb-2 mb-3 flex items-center gap-2">

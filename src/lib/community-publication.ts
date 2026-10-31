@@ -1,5 +1,6 @@
 import { STAFF_BARANGAYS, StaffAccessError } from "./staff-access.ts";
-import { certificateSettings, eventDate } from "./certificate-data.ts";
+import { eventDate } from "./certificate-data.ts";
+import { eventFormFields } from "./event-form.ts";
 
 export function communityPublication(kind: unknown, body: Record<string, unknown>) {
   if (kind !== "schedule" && kind !== "event") throw new StaffAccessError("Choose a schedule or event.", 400);
@@ -14,12 +15,7 @@ export function communityPublication(kind: unknown, body: Record<string, unknown
     return { post: { barangay, date, day, time, status: "Active", description: text("description", 2000) },
       announcement: { title: "Collection schedule · " + barangay, message: `Waste collection for ${barangay} is scheduled on ${date} at ${time}. Check the full schedule in TrashTrack.`, type: "schedule", recipients: barangay } };
   }
-  const title = text("title", 150), start = text("startTime", 5), end = text("endTime", 5);
-  if (!title || !/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || (end && (!/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || end <= start))) throw new StaffAccessError("Enter an event title and valid start/end times.", 400);
-  const date = eventDate({ dateISO: body.dateISO });
-  const settings = body.certificateEnabled === false ? { certificateEnabled: false, certificateSignatory: text("certificateSignatory", 100), certificatePosition: text("certificatePosition", 100), certificateOrganizer: text("certificateOrganizer", 160) } : certificateSettings(body);
-  return { post: { title, barangay, date: date.display, dateISO: date.iso, time: `${start} - ${end || "TBD"}`, startTime: start, endTime: end,
-    location: text("location", 240), description: text("description", 5000), category: text("category", 80), img: text("img", 2000),
-    participants: 0, status: "Upcoming", attendanceMethod: body.attendanceMethod === "manual" ? "manual" : "qr", ...settings },
-    announcement: { title: "New event · " + title.slice(0, 80), message: `${title.slice(0, 150)} on ${date.display} at ${start}. Open Events in TrashTrack for details.`, type: "event", recipients: barangay } };
+  const fields = eventFormFields(body);
+  return { post: { ...fields,participants:0,status:"Upcoming" },
+    announcement: { title: "New event · " + fields.title.slice(0, 80), message: `${fields.title.slice(0,150)} on ${fields.date} at ${fields.startTime}. Open Events in TrashTrack for details.`, type:"event",recipients:barangay } };
 }

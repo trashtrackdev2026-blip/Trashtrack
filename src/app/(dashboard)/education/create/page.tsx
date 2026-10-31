@@ -1,5 +1,6 @@
 "use client";
 
+import { staffRequest } from "@/lib/staff-client";
 import { useState } from "react";
 import { learningResourceType, publicLearningUrl } from "@/lib/learning-resource";
 import { Button } from "@/components/ui/button";
@@ -8,14 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Send, 
   Image as ImageIcon, 
-  ArrowLeft, 
   LayoutDashboard, 
   FileText, 
-  Video as VideoIcon, 
-  Upload, 
   X, 
   Film, 
-  File,
   PlayCircle
 } from "lucide-react";
 import Link from "next/link";
@@ -37,6 +34,7 @@ export default function CreateEducationResourcePage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [pendingDocument,setPendingDocument]=useState<{url:string;name:string}|null>(null);
   const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
 
   const getFileType = (url: string, fileName = "") => learningResourceType(url, fileName, form.type);
@@ -44,7 +42,7 @@ export default function CreateEducationResourcePage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadError("");
+    setUploadError("");setPendingDocument(null);
     const document = /\.(pdf|docx?|pptx?|txt)$/i.test(file.name);
     const limit = (document ? 25 : 50) * 1024 * 1024;
     if (file.size > limit) { setUploadError(`Choose a file smaller than ${document ? 25 : 50} MB.`); return; }
@@ -64,8 +62,9 @@ export default function CreateEducationResourcePage() {
       if (!res.ok || !data.secure_url) throw new Error(data.error?.message || "Upload failed. Check Cloudinary upload settings and retry.");
       const url = publicLearningUrl(data.secure_url);
       if (document) {
-        const delivery = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(20_000) });
-        if (!delivery.ok) throw new Error("The file uploaded but cannot be downloaded. In Cloudinary Security settings, enable PDF delivery and verify the upload preset allows documents. Then upload again, or use a public PDF link.");
+        setPendingDocument({url,name:file.name});
+        await staffRequest("/api/learning/verify",{url});
+        setPendingDocument(null);
       }
       setForm(prev => ({ ...prev, image: url, videoUrl: "", fileName: file.name }));
     } catch (error) {
@@ -79,7 +78,7 @@ export default function CreateEducationResourcePage() {
       return;
     }
 
-    if (isUploading) return;
+    if (isUploading || pendingDocument) return;
     setUploadError("");
     setIsSubmitting(true);
     try {
@@ -126,6 +125,7 @@ export default function CreateEducationResourcePage() {
           </p>
         </div>
 
+        {pendingDocument && <div className="tt-surface space-y-3 p-5"><p className="text-sm">“{pendingDocument.name}” uploaded, but delivery has not passed verification. It is not published yet.</p><Button disabled={isUploading} variant="outline" onClick={async()=>{setIsUploading(true);setUploadError("");try{await staffRequest("/api/learning/verify",{url:pendingDocument.url});setForm(current=>({...current,image:pendingDocument.url,videoUrl:"",fileName:pendingDocument.name}));setPendingDocument(null);}catch(error){setUploadError(error instanceof Error?error.message:"Delivery check failed.");}finally{setIsUploading(false);}}}>Recheck file delivery</Button><a href="https://cloudinary.com/documentation/image_delivery_options" target="_blank" rel="noopener noreferrer" className="ml-4 text-sm text-green-800 underline">File delivery setup help</a></div>}
         {/* Main Content Area */}
         <div className="flex flex-col lg:flex-row gap-8">
 
@@ -245,7 +245,7 @@ export default function CreateEducationResourcePage() {
                       <div className="space-y-2">
                         <Input
                           value={form.videoUrl}
-                          onChange={(e) => setForm({ ...form, videoUrl: e.target.value, image: e.target.value, fileName: "" })}
+                          onChange={(e) => { setPendingDocument(null); setUploadError(""); setForm({ ...form, videoUrl: e.target.value, image: e.target.value, fileName: "" }); }}
                           placeholder="https://... public PDF, article or video link"
                           className="h-11 bg-white border-slate-200"
                         />
@@ -331,7 +331,7 @@ export default function CreateEducationResourcePage() {
                       Cancel
                     </Button>
                   </Link>
-                  <Button disabled={isSubmitting || isUploading} onClick={handlePublish} className="px-6 h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm">
+                  <Button disabled={isSubmitting || isUploading || !!pendingDocument} onClick={handlePublish} className="px-6 h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm">
                     <Send className="w-4 h-4 mr-2" /> {isSubmitting ? "Publishing..." : "Publish Resource"}
                   </Button>
                 </div>

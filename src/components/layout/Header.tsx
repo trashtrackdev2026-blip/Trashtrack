@@ -12,22 +12,22 @@ import { subscribeWithDeadline } from "@/lib/live-data";
 
 type PageInfo = { title: string; subtitle: string; section: string; action?: { href: string; label: string } };
 const pages: Record<string, PageInfo> = {
-  "/": { section: "Overview", title: "A cleaner Balete, together.", subtitle: "Here’s what needs your attention today.", action: { href: "/schedules/create", label: "New schedule" } },
+  "/": { section: "Overview", title: "A cleaner Balete, together.", subtitle: "Here’s what needs your attention today." },
   "/schedules": { section: "Collections", title: "Collection schedules", subtitle: "A clear plan for every barangay.", action: { href: "/schedules/create", label: "New schedule" } },
   "/users": { section: "Residents & staff", title: "Residents & staff", subtitle: "People at the heart of a cleaner Balete." },
   "/reports": { section: "Reports", title: "Community reports", subtitle: "Listen, validate, and help resolve local concerns." },
   "/reports-to-menro": { section: "Reports to MENRO", title: "Reports to MENRO", subtitle: "Forward verified concerns and follow their progress." },
-  "/notifications": { section: "Announcements", title: "Announcements", subtitle: "Keep residents informed, wherever they are.", action: { href: "/notifications/create", label: "Compose notification" } },
+  "/notifications": { section: "Announcements", title: "Announcements", subtitle: "Keep residents informed, wherever they are.", action: { href: "/notifications/create", label: "Create notification" } },
   "/events": { section: "Events", title: "Community events", subtitle: "Bring people together for a healthier community.", action: { href: "/events/create", label: "Create event" } },
-  "/education": { section: "Learning library", title: "Learning library", subtitle: "Useful knowledge for everyday environmental care.", action: { href: "/education/create", label: "Add resource" } },
+  "/education": { section: "Learning Management", title: "Learning Management", subtitle: "Useful knowledge for everyday environmental care.", action: { href: "/education/create", label: "Add resource" } },
   "/analytics": { section: "Analytics", title: "Reports & analytics", subtitle: "See patterns. Focus care where it matters." },
   "/settings": { section: "Settings", title: "Settings & security", subtitle: "A comfortable workspace. An account you can trust." },
 };
 const creationPages: Record<string, PageInfo> = {
   "/schedules/create": { section: "Collections", title: "Plan a collection", subtitle: "Set the details, review, and share with your barangay." },
   "/events/create": { section: "Events", title: "Create a community event", subtitle: "Make room for your community to come together." },
-  "/notifications/create": { section: "Announcements", title: "Compose a notification", subtitle: "A clear message, delivered to the right community." },
-  "/education/create": { section: "Learning library", title: "Add a learning resource", subtitle: "Share something useful with your community." },
+  "/notifications/create": { section: "Announcements", title: "Create a notification", subtitle: "A clear message, delivered to the right community." },
+  "/education/create": { section: "Learning Management", title: "Add a learning resource", subtitle: "Share something useful with your community." },
 };
 
 export function Header({ toggleSidebar }: { toggleSidebar: () => void }) {

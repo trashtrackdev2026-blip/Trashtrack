@@ -63,7 +63,7 @@ export default function CreateNotificationPage() {
           <p className="text-sm text-slate-500">Compose and send a notification to residents.</p>
         </div>
 
-        <nav className="tt-tabs" aria-label="Announcements"><Link href="/notifications">Notification history</Link><Link href="/notifications/create" aria-current="page">Compose notification</Link></nav>
+        <nav className="tt-tabs" aria-label="Announcements"><Link href="/notifications">Notification history</Link><Link href="/notifications/create" aria-current="page">Create notification</Link></nav>
         {/* Main Content Area */}
         <div className="tt-notification-compose">
 

@@ -1,7 +1,9 @@
 export function learningResourceType(url: string, fileName = "", resourceType = "Guide"): "none" | "document" | "video" | "image" | "article" {
   if (!url.trim()) return "none";
   let path = "";
-  try { path = decodeURIComponent(new URL(url).pathname).toLowerCase(); } catch { /* Publishing validates the URL. */ }
+  let host = "";
+  try { const parsed = new URL(url); path = decodeURIComponent(parsed.pathname).toLowerCase(); host = parsed.hostname.toLowerCase(); } catch { /* Publishing validates the URL. */ }
+  if (["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtube-nocookie.com"].includes(host)) return "video";
   const target = fileName.toLowerCase() || path;
   if (/\.(pdf|docx?|pptx?|txt)$/.test(target)) return "document";
   if (/\.(mp4|webm|mov|avi|mkv|m4v|3gp)$/.test(target) || path.includes("/video/upload/")) return "video";

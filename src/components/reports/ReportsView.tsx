@@ -1,4 +1,6 @@
 "use client";
+import { reportBarangayLabel } from "@/lib/report-location-label";
+import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { ReportEvidence } from "@/components/reports/ReportEvidence";
 
 import { useState } from "react";
@@ -45,7 +47,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const [typeFilter, setTypeFilter] = useState("all");
   const visibleReports = filterReportSummary(reports, summaryFilter, role).filter(report =>
     (!search.trim() || [report.id, report.type, report.description, report.location, report.reporterName].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
-    && (barangayFilter === "all" || report.location === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
+    && (barangayFilter === "all" || reportBarangayLabel(report.location) === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
   const activeReport = visibleReports.find(report => report.id === activeReportId);
   const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
   const canSave = !!activeReport && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
@@ -171,7 +173,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
 
             <div className="tt-filter-bar mx-4 mt-4">
               <label className="relative min-w-40 flex-1"><span className="sr-only">Search reports</span><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" /><input value={search} onChange={event => { setSearch(event.target.value);setActiveReportId(null); }} placeholder="Search reports" className="h-10 w-full rounded-lg border bg-white/50 pl-9 pr-3 text-sm" /></label>
-              <Select value={barangayFilter} onValueChange={value => { setBarangayFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report barangay" className="w-40"><SelectValue>{barangayFilter === "all" ? "All barangays" : barangayFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All barangays</SelectItem>{[...new Set(reports.map(report => report.location))].filter(Boolean).sort().map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
+              <Select value={barangayFilter} onValueChange={value => { setBarangayFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report barangay" className="w-40"><SelectValue>{barangayFilter === "all" ? "All barangays" : barangayFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All barangays</SelectItem>{BALETE_BARANGAYS.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
               <Select value={typeFilter} onValueChange={value => { setTypeFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report category" className="w-40"><SelectValue>{typeFilter === "all" ? "All categories" : typeFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{[...new Set(reports.map(report => report.type))].filter(Boolean).sort().map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
             </div>
             <div className="px-4 pb-2">

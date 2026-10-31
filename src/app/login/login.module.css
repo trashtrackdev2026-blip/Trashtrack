@@ -2,7 +2,7 @@
 .backgroundPicture{position:absolute;inset:0;z-index:-3;pointer-events:none}
 .background{object-fit:cover;object-position:center}
 .shade{position:absolute;inset:0;z-index:-2;background:linear-gradient(90deg,rgba(8,34,25,.18),transparent 65%),linear-gradient(0deg,rgba(10,32,24,.27),transparent 65%);pointer-events:none}
-.brand{grid-column:1;grid-row:1;align-self:start;width:fit-content;padding:8px 15px 10px 0;text-shadow:0 1px 18px #fff8}
+.brand{grid-column:1;grid-row:1;align-self:start;width:fit-content;padding:12px 18px;background:#fffef5f5;border:1px solid #fff;border-radius:16px;box-shadow:0 4px 18px #163b2c22;color:#123b2e;text-shadow:none}
 .message{grid-column:1;grid-row:2;align-self:center;margin:50px 0;max-width:650px;color:#fffef1;text-shadow:0 2px 22px #0b271a66}
 .message h2{font-family:var(--font-outfit),sans-serif;font-size:clamp(42px,4.8vw,76px);font-weight:650;letter-spacing:-2.4px;line-height:1.03}
 .message p{font-size:clamp(15px,1.5vw,22px);margin-top:20px;line-height:1.6;max-width:450px}

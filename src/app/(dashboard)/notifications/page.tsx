@@ -11,6 +11,7 @@ import {
   Search, 
   ChevronDown,
   Eye,
+  Pencil,
   Trash2,
   Check
 } from "lucide-react";
@@ -24,6 +25,8 @@ import { DataState } from "@/components/ui/data-state";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { staffRequest } from "@/lib/staff-client";
+import { EditNotificationDialog } from "@/components/notifications/EditNotificationDialog";
+import { notificationDeliveryLabel } from "@/lib/notification-edit";
 import { phoneDeliveryDue } from "@/lib/notification-publication";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -41,6 +44,7 @@ interface NotificationData {
   pushStartedAtMillis?: number;
   pushNextRetryAt?: number;
   pushRetryable?: boolean;
+  revision?: number;
 }
 
 export default function NotificationsPage() {
@@ -55,6 +59,7 @@ export default function NotificationsPage() {
   const [deleteError, setDeleteError] = useState("");
   const [filterNow, setFilterNow] = useState(() => Date.now());
   const [dateFilter, setDateFilter] = useState("date");
+  const [editingNotice,setEditingNotice] = useState<NotificationData|null>(null);
   const [selectedNotif, setSelectedNotif] = useState<NotificationData | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [deliveryError, setDeliveryError] = useState("");
@@ -72,7 +77,7 @@ export default function NotificationsPage() {
     const matchesSearch = notif.title.toLowerCase().includes(search.toLowerCase()) || notif.message.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === "category" || notif.type.toLowerCase() === category;
 
-    const matchesStatus = status === "status" || (status === "sent" ? !notif.push || notif.pushStatus === "queued" : status === "failed" ? notif.pushStatus === "failed" : notif.push && ["pending", "sending"].includes(notif.pushStatus));
+    const matchesStatus = status === "status" || (status === "in-app" ? !notif.push : status === "sent" ? notif.push && notif.pushStatus === "queued" : status === "failed" ? notif.push && notif.pushStatus === "failed" : notif.push && ["pending","sending"].includes(notif.pushStatus));
 
     const now = filterNow;
     const today = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Manila"}).format(new Date(now));
@@ -97,7 +102,7 @@ export default function NotificationsPage() {
           isRead: data.isRead || false,
           recipients: data.recipients || "All Barangays", push: data.push === true, pushStatus: data.pushStatus || (data.push ? "pending" : "disabled"),
           createdAtMillis: timestamp, pushStartedAtMillis: millis(data.pushStartedAt),
-          pushNextRetryAt: data.pushNextRetryAt, pushRetryable: data.pushRetryable,
+          pushNextRetryAt: data.pushNextRetryAt, pushRetryable: data.pushRetryable, revision:Number(data.revision||0),
           date: timestamp ? new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (data.date || "Recently")
         });
       });
@@ -151,7 +156,7 @@ export default function NotificationsPage() {
         {/* Header */}
         <div className="tt-legacy-heading flex flex-col gap-2 mb-2">
           <h1 className="text-[26px] font-bold text-slate-900 leading-tight">Notifications</h1>
-          <p className="text-sm text-slate-500">Create and manage notifications sent to residents.</p>
+          <p className="text-sm text-slate-500">Manage in-app announcements and their phone delivery. “Sent to phone service” confirms queuing, not that every resident has read it.</p>
         </div>
 
         {/* KPI Cards */}
@@ -219,13 +224,13 @@ export default function NotificationsPage() {
 
               <Select value={status} onValueChange={(val) => { setStatus(val ?? "all"); setCurrentPage(1); }}>
                 <SelectTrigger className="w-[130px] h-11 bg-white border-slate-200">
-                  <SelectValue>{status === "status" ? "All statuses" : status === "sent" ? "Sent" : status === "failed" ? "Phone failed" : "Phone pending"}</SelectValue>
+                  <SelectValue>{status === "status" ? "All statuses" : status === "sent" ? "Sent" : status === "failed" ? "Phone delivery failed" : "Waiting for phone delivery"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="status">Status (All)</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="pending">Phone pending</SelectItem>
-                  <SelectItem value="failed">Phone failed</SelectItem>
+                  <SelectItem value="in-app">In-app only</SelectItem><SelectItem value="sent">Sent to phone service</SelectItem>
+                  <SelectItem value="pending">Waiting for phone delivery</SelectItem>
+                  <SelectItem value="failed">Phone delivery failed</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -245,7 +250,7 @@ export default function NotificationsPage() {
 
         </div>
 
-        <nav className="tt-tabs" aria-label="Announcements"><Link href="/notifications" aria-current="page">Notification history</Link><Link href="/notifications/create">Compose notification</Link></nav>
+        <nav className="tt-tabs" aria-label="Announcements"><Link href="/notifications" aria-current="page">Notification history</Link><Link href="/notifications/create">Create notification</Link></nav>
         {/* Table Area */}
         <div className="tt-surface overflow-hidden">
           <div className="overflow-x-auto">
@@ -289,7 +294,7 @@ export default function NotificationsPage() {
                     </td>
                     <td className="py-4 px-6">
                       <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1 rounded-full ${notif.isRead ? 'text-slate-500 bg-slate-100' : 'text-[#2E7D32] bg-[#E8F5E9]'}`}>
-                        {!notif.push ? "In-app only" : notif.pushStatus === "queued" ? "Phone queued" : notif.pushStatus === "failed" ? "Phone failed" : "Phone pending"} <Check className="w-3 h-3" />
+                        {notificationDeliveryLabel(notif.push,notif.pushStatus)} <Check className="w-3 h-3" />
                       </span>
                     </td>
                     <td className="py-4 px-6">
@@ -303,6 +308,7 @@ export default function NotificationsPage() {
                         >
                           <Eye className="w-3.5 h-3.5 mr-1.5" /> View
                         </Button>
+                        <Button variant="ghost" size="icon" aria-label={"Edit " + notif.title} disabled={notif.pushStatus === "sending"} onClick={()=>setEditingNotice(notif)}><Pencil/></Button>
                         <Button aria-label={"Delete " + notif.title} onClick={() => {setDeleteTarget(notif);setDeleteError("");}} variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50">
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -385,6 +391,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
+      {editingNotice&&<EditNotificationDialog key={editingNotice.id} notice={editingNotice} onClose={()=>setEditingNotice(null)}/>}
       <Dialog open={!!deleteTarget} onOpenChange={open => {if (!open && !deleting) setDeleteTarget(null);}}><DialogContent showCloseButton={!deleting}><DialogTitle>Delete notification?</DialogTitle><DialogDescription>This removes “{deleteTarget?.title}” from the notification history. Phone notifications already delivered cannot be recalled.</DialogDescription>{deleteError && <p role="alert" className="text-red-700">{deleteError}</p>}<div className="flex justify-end gap-3"><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button disabled={deleting} onClick={() => void handleDelete()} className="bg-red-700 text-white hover:bg-red-800">{deleting ? "Deleting…" : "Delete notification"}</Button></div></DialogContent></Dialog>
       {/* View Notification Modal */}
       <Dialog open={selectedNotif !== null} onOpenChange={open => { if (!open) setSelectedNotif(null); }}>

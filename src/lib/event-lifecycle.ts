@@ -1,7 +1,7 @@
 import { eventDate } from "./certificate-data.ts";
 
 export function eventRegistrationClosed(event: Record<string, unknown>, now = Date.now()) {
-  if (["completed", "complete", "finished", "archived", "cancelled", "canceled"].includes(String(event.status).trim().toLowerCase())) return true;
+  if (["draft", "completed", "complete", "finished", "archived", "cancelled", "canceled"].includes(String(event.status).trim().toLowerCase())) return true;
   try {
     const date = eventDate(event).iso;
     const times = String(event.time || "").match(/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/g) || [];
