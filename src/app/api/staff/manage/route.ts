@@ -79,11 +79,12 @@ export async function POST(request: Request) {
       if (staffRole(actorSnap.data()?.role) !== "admin" || staffAccessProblem(actorSnap.data() || {}, identity as unknown as Record<string, unknown>)) throw new StaffAccessError("Your access changed. Sign in again.");
       const current = targetSnap.data();
       if (body.action === "recover") {
+        if (String(current?.role).toLowerCase() === "resident" && !requestSnap.data()) throw new StaffAccessError("Resident emails cannot be converted into staff accounts. Ask the official to register a separate staff email.", 409);
         if (targetAuth.disabled || ["suspended", "disabled", "activating"].includes(String(current?.accessStatus))) throw new StaffAccessError("Resolve this account's existing staff access before adding a request.", 409);
         if (staffRole(current?.role) === "admin" || (staffRole(current?.role) && current?.accessStatus === "active")) throw new StaffAccessError("This account already has staff access. Use Change access instead.", 409);
         if (requestSnap.data()?.status === "pending") throw new StaffAccessError("This official already appears in pending requests. Refresh the list.", 409);
         if (!current) tx.set(targetRef, { name: recovery!.name, email: targetAuth.email, contact: recovery!.contact,
-          barangay: recovery!.barangay, role: "Resident", points: 0, createdAt: FieldValue.serverTimestamp() });
+          barangay: recovery!.barangay, role: "Semi-Admin", accessStatus: "needs-review", points: 0, createdAt: FieldValue.serverTimestamp() });
         tx.set(requestRef, { ...recovery!, userId: body.userId, email: targetAuth.email, status: "pending",
           submittedBy: identity.uid, submittedAt: FieldValue.serverTimestamp() });
         tx.create(db.collection("audit_logs").doc(), { action: "staff.request.recovered", actor: identity.uid,
@@ -99,8 +100,8 @@ export async function POST(request: Request) {
         return approved;
       }
       if (body.action === "assign") {
+        if (staffRole(current?.role) === "admin") throw new StaffAccessError("MENRO Admin roles cannot be changed through barangay staff management.", 403);
         if (!current || !staffRole(current.role) || current.accessStatus !== "active" || targetAuth.disabled) throw new StaffAccessError("Reactivate or approve this staff account before changing its access.", 409);
-        if (staffRole(current.role) === "admin" && assignment!.role !== "Admin" && masters.docs.filter(doc => doc.data().accessStatus === "active").length <= 1) throw new StaffAccessError("The last active MENRO Admin cannot be demoted.", 409);
         tx.update(targetRef, { ...assignment!, accessStatus: "activating", pendingAccessOperation: operation,
           accessChangedBy: identity.uid, accessChangedAt: FieldValue.serverTimestamp() });
         return { ...current, ...assignment! };

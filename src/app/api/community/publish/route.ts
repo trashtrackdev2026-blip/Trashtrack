@@ -4,6 +4,7 @@ import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/s
 import { StaffAccessError, staffAccessProblem, staffRole } from "@/lib/staff-access";
 import { communityPublication } from "@/lib/community-publication";
 import { queuePhoneNotification } from "@/lib/notification-delivery";
+import { assertCollectionAvailable } from "@/lib/schedule-policy";
 import { CertificateError } from "@/lib/certificate-data";
 
 export const runtime = "nodejs";
@@ -26,6 +27,12 @@ export async function POST(request: Request) {
       if (postSnap.exists) {
         if (postSnap.data()?.createdBy !== identity.uid || postSnap.data()?.publicationHash !== hash || !noticeSnap.exists) throw new StaffAccessError("This publication already exists with different details. Open the saved post.", 409);
         return;
+      }
+      if (body.kind === "schedule" && "date" in publication.post) {
+        const dayRef = db.collection("schedule_days").doc(publication.post.date);
+        const [day, schedules] = await Promise.all([tx.get(dayRef), tx.get(db.collection("schedules").where("date", "==", publication.post.date))]);
+        assertCollectionAvailable(publication.post, schedules.docs.map(doc => doc.data()));
+        tx.set(dayRef, { revision: Number(day.data()?.revision || 0) + 1 });
       }
       tx.create(postRef, { ...publication.post, createdBy: identity.uid, publicationHash: hash, createdAt: FieldValue.serverTimestamp() });
       tx.create(noticeRef, { ...publication.announcement, sourceId: body.id, push: true, pushStatus: "pending", isRead: false, createdBy: identity.uid,

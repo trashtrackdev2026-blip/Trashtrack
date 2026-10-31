@@ -4,6 +4,7 @@ import { CertificateError, certificateSettings, eventDate, validId } from "@/lib
 import { requireCertificateSecurity } from "@/lib/certificate-security";
 import { timingSafeEqual } from "node:crypto";
 import { parseAttendanceQr, assertQrCheckIn } from "@/lib/event-qr-data";
+import { eventEditFields } from "@/lib/event-edit";
 import { eventRegistrationClosed } from "@/lib/event-lifecycle";
 
 export const runtime = "nodejs";
@@ -11,7 +12,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
-    if (!body || !["register", "checkIn", "attendance", "complete", "certificateSettings"].includes(body.action)) {
+    if (!body || !["register", "checkIn", "attendance", "complete", "certificateSettings", "edit"].includes(body.action)) {
       throw new CertificateError("Choose a valid event action.");
     }
     const { db, identity, profile } = await authenticatedResident(request, !["register", "checkIn"].includes(body.action));
@@ -85,7 +86,9 @@ export async function POST(request: Request) {
     await db.runTransaction(async tx => {
       const event = (await tx.get(eventRef)).data();
       if (!event) throw new CertificateError("Event not found.", 404);
-      if (body.action === "certificateSettings") {
+      if (body.action === "edit") {
+        tx.update(eventRef, { ...eventEditFields(body, event), updatedBy: identity.uid, updatedAt: FieldValue.serverTimestamp() });
+      } else if (body.action === "certificateSettings") {
         const date = eventDate({ dateISO: body.dateISO, date: event.date });
         const settings = body.certificateEnabled === false ? {
           certificateEnabled: false,

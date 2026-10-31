@@ -38,7 +38,7 @@ test("Public requests cannot select a master role or inject security fields", ()
   assert.throws(() => requestFields({ ...input, position: "" }));
 });
 test("MENRO role assignment validates authority and isolates barangay scope", () => {
-  assert.deepEqual(staffAssignmentFields({ role: "Admin", barangay: "Sala", identityConfirmed: true, mfaRequired: false }), { role: "Admin", barangay: "" });
+  assert.throws(() => staffAssignmentFields({ role: "Admin", barangay: "Sala", identityConfirmed: true }), /Semi-Admin access only/);
   for (const barangay of STAFF_BARANGAYS) assert.deepEqual(staffAssignmentFields({ role: "Semi-Admin", barangay, identityConfirmed: true }), { role: "Semi-Admin", barangay });
   assert.deepEqual(staffAssignmentFields({ barangay: "Sala", identityConfirmed: true }), { role: "Semi-Admin", barangay: "Sala" });
   for (const body of [

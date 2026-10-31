@@ -15,6 +15,9 @@ import { db } from "@/lib/firebase";
 import { eventRequest } from "@/lib/event-client";
 import { EventCertificateSettings } from "@/components/events/EventCertificateSettings";
 import { CertificatePreview } from "@/components/events/CertificatePreview";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { EditEventDialog, type EditableEvent } from "@/components/events/EditEventDialog";
+import { Pencil } from "lucide-react";
 import { AttendanceQr } from "@/components/events/AttendanceQr";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -50,6 +53,7 @@ export default function EventsPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const retryData = () => { setLoading(true); setDataError(null); setAttempt(value => value + 1); };
+  const [editingEvent, setEditingEvent] = useState<EditableEvent | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<{id: string; userId: string; userName: string; barangay: string; registeredAt: number; attended: boolean}[]>([]);
   const [participantsEventId, setParticipantsEventId] = useState<string | null>(null);
@@ -87,7 +91,7 @@ export default function EventsPage() {
       });
       setEvents(eventsList);
       setLoading(false); setDataError(null);
-      setActiveEventId(current => eventsList.some(event => event.id === current) ? current : eventsList[0]?.id ?? null);
+      setActiveEventId(current => eventsList.some(event => event.id === current) ? current : null);
 
     }, (error) => {
       setLoading(false); setDataError(error.message.includes("taking too long") ? error.message : "Unable to load events. Check your connection and retry.");
@@ -168,11 +172,7 @@ export default function EventsPage() {
 
   const handleView = (event: EventData) => {
     setActiveEventId(event.id);
-    if (window.innerWidth < 1024) {
-      setTimeout(() => {
-        document.getElementById("event-detail")?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
-      }, 100);
-    }
+
   };
 
   return (
@@ -217,7 +217,7 @@ export default function EventsPage() {
           />
         </div>
 
-        <div className="tt-event-layout">
+        <div className="min-w-0">
           {/* Main Table Area */}
           <div className="flex-1 tt-surface overflow-hidden flex flex-col">
 
@@ -283,7 +283,7 @@ export default function EventsPage() {
                 {filteredEvents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(event => { const raw=event.dateISO || event.date;const date=new Date(raw + (/^\d{4}-\d{2}-\d{2}$/.test(raw) ? "T12:00:00" : ""));const valid=!Number.isNaN(date.getTime());return <article key={event.id} className={"tt-event-row" + (activeEvent?.id === event.id ? " is-selected" : "")}>
                   <div className="tt-date-block"><strong>{valid ? date.getDate().toString().padStart(2,"0") : "—"}</strong><span>{valid ? date.toLocaleDateString("en-PH",{month:"short"}) : "Event"}</span></div>
                   <button type="button" className="tt-event-main" onClick={() => handleView(event)} aria-pressed={activeEvent?.id === event.id}><strong>{event.title}</strong><small>{event.barangay}<br />{event.date} · {event.time}<br />{event.participants || 0} registered · {event.status}</small></button>
-                  <div className="tt-event-row-actions"><Button variant="outline" onClick={() => handleView(event)} aria-label={"View " + event.title}>View</Button><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+                  <div className="tt-event-row-actions"><Button variant="outline" onClick={() => handleView(event)} aria-label={"View " + event.title}>View</Button><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end">{event.status.toLowerCase() !== "completed" && <DropdownMenuItem onClick={() => setEditingEvent(event)}><Pencil />Edit event</DropdownMenuItem>}<DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
                 </article>;})}
                 {!loading && filteredEvents.length === 0 && <p className="tt-empty">No events match your filters.</p>}
               </div>
@@ -378,11 +378,13 @@ export default function EventsPage() {
           </div>
 
           {/* Right Panel: Event Details */}
+          <Dialog open={!!activeEvent} onOpenChange={open => { if (!open) setActiveEventId(null); }}>
           {activeEvent && (
-          <div id="event-detail" className="tt-surface min-w-0 scroll-mt-5 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg text-slate-900">Event Details</h3>
-              <div className="flex items-center gap-2">
+          <DialogContent id="event-detail" className="sm:max-w-3xl">
+            <DialogDescription className="sr-only">Event information, attendance and certificates.</DialogDescription>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3 pr-8">
+              <DialogTitle className="font-bold text-lg text-slate-900">Event Details</DialogTitle>
+              <div className="flex flex-wrap items-center gap-2">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${activeEvent.status.toLowerCase() === 'completed' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-blue-50 text-blue-500'}`}>{activeEvent.status}</span>
                 {activeEvent.status.toLowerCase() !== 'completed' && (
                   <Button onClick={handleMarkCompleted} disabled={loadingParticipants || busyAttendance !== null} size="sm" variant="outline" className="h-6 text-[10px] px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100">
@@ -502,10 +504,12 @@ export default function EventsPage() {
               )}
             </div>
 
-          </div>
+          </DialogContent>
           )}
+          </Dialog>
         </div>
       </div>
+      {editingEvent && <EditEventDialog key={editingEvent.id} event={editingEvent} onClose={() => setEditingEvent(null)} />}
     </>
   );
 }

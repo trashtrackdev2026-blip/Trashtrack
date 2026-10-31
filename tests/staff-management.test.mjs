@@ -107,17 +107,21 @@ function fixture(options = {}) {
   } };
 }
 
-test("MENRO approves Admin access, saves its role and clears barangay claims", async () => {
-  const app = fixture();
-  await app.post({ action: "approve", role: "Admin", barangay: "Sala", identityConfirmed: true });
-  const profile = app.records.get("users/official");
-  assert.equal(profile.role, "Admin"); assert.equal(profile.barangay, ""); assert.equal(profile.accessStatus, "active");
-  assert.equal(profile.pendingAccessOperation, undefined);
-  assert.deepEqual(app.account.customClaims, { retained: true, staffRole: "admin", staffBarangay: "" });
-  assert.deepEqual(app.revoked, ["official"]);
-  assert.equal(app.records.get("staff_requests/official").approvedRole, "Admin");
-  assert.ok([...app.records.values()].some(value => value.action === "staff.approve" && value.role === "Admin"));
+test("MENRO cannot promote a barangay account to Admin", async () => {
+  for (const action of ["approve", "assign"]) {
+    const app = fixture({ profile:{role:"Semi-Admin",accessStatus:"active"} });
+    await app.post({action,role:"Admin",identityConfirmed:true},400);
+    assert.equal(app.records.get("users/official").role,"Semi-Admin");
+    assert.equal(app.account.customClaims.staffRole,undefined);
+  }
 });
+
+test("Barangay access editor cannot demote an existing MENRO Admin", async () => {
+  const app=fixture({profile:{role:"Admin",accessStatus:"active"}});
+  await app.post({action:"assign",role:"Semi-Admin",barangay:"Sala",identityConfirmed:true},403);
+  assert.equal(app.records.get("users/official").role,"Admin");assert.equal(app.revoked.length,0);
+});
+
 test("Legacy approvals still grant only the selected barangay", async () => {
   const app = fixture();
   await app.post({ action: "approve", barangay: "Sala", identityConfirmed: true });
@@ -127,7 +131,7 @@ test("Legacy approvals still grant only the selected barangay", async () => {
 test("Unauthorized, old-session and self-access changes are blocked before writes", async () => {
   for (const [options, status] of [[{ signedOut: true }, 401], [{ identity: { staffRole: "semi-admin" } }, 403], [{ identity: { auth_time: Math.floor(Date.now() / 1000) - 301 } }, 401]]) {
     const app = fixture(options);
-    await app.post({ action: "approve", role: "Admin", identityConfirmed: true }, status);
+    await app.post({ action: "approve", role: "Semi-Admin", barangay: "Sala", identityConfirmed: true }, status);
     assert.equal(app.records.get("users/official").role, "Resident"); assert.equal(app.revoked.length, 0);
   }
   const app = fixture();
@@ -136,7 +140,7 @@ test("Unauthorized, old-session and self-access changes are blocked before write
 });
 test("Unverified officials, invalid roles and unconfirmed assignments cannot activate", async () => {
   const unverified = fixture({ account: { emailVerified: false } });
-  await unverified.post({ action: "approve", role: "Admin", identityConfirmed: true }, 409);
+  await unverified.post({ action: "approve", role: "Semi-Admin", barangay: "Sala", identityConfirmed: true }, 409);
   for (const body of [{ role: "Resident", identityConfirmed: true }, { role: "Admin", identityConfirmed: false }, { role: "Semi-Admin", barangay: "Poblacion 2", identityConfirmed: true }]) {
     const app = fixture(); await app.post({ action: "approve", ...body }, 400);
     assert.equal(app.records.get("staff_requests/official").status, "pending"); assert.equal(app.account.customClaims.staffRole, undefined);
@@ -144,26 +148,24 @@ test("Unverified officials, invalid roles and unconfirmed assignments cannot act
 });
 test("Changing active staff access updates scope and preserves required MFA", async () => {
   const app = fixture({ profile: { role: "Semi-Admin", accessStatus: "active", barangay: "Sala", mfaRequired: true } });
-  await app.post({ action: "assign", role: "Admin", identityConfirmed: true });
-  assert.equal(app.account.customClaims.staffRole, "admin"); assert.equal(app.account.customClaims.staffBarangay, "");
   await app.post({ action: "assign", role: "Semi-Admin", barangay: "Solis", identityConfirmed: true });
   const profile = app.records.get("users/official");
   assert.equal(profile.role, "Semi-Admin"); assert.equal(profile.barangay, "Solis"); assert.equal(profile.mfaRequired, true);
   assert.equal(app.account.customClaims.staffRole, "semi-admin"); assert.equal(app.account.customClaims.staffBarangay, "Solis");
-  assert.ok(profile.staffValidAfter >= app.now); assert.equal(app.revoked.length, 2);
+  assert.ok(profile.staffValidAfter >= app.now); assert.equal(app.revoked.length, 1);
   assert.equal(app.records.get("staff_requests/official").status, "pending", "Role edits do not approve unrelated requests");
 });
 test("Pending and suspended accounts cannot bypass approval or reactivation through role edits", async () => {
   for (const accessStatus of ["needs-review", "suspended", "activating"]) {
     const app = fixture({ profile: { role: "Semi-Admin", accessStatus } });
-    await app.post({ action: "assign", role: "Admin", identityConfirmed: true }, 409);
+    await app.post({ action: "assign", role: "Semi-Admin", barangay: "Sala", identityConfirmed: true }, 409);
     assert.equal(app.records.get("users/official").accessStatus, accessStatus);
   }
 });
 test("Cross-service failures and revoked MENRO access keep activation blocked", async () => {
   for (const [options, status] of [[{ authFailure: true }, 500], [{ actorChanged: true }, 409]]) {
     const app = fixture(options);
-    await app.post({ action: "approve", role: "Admin", identityConfirmed: true }, status);
+    await app.post({ action: "approve", role: "Semi-Admin", barangay: "Sala", identityConfirmed: true }, status);
     assert.equal(app.records.get("users/official").accessStatus, "activating");
     assert.equal(app.records.get("staff_requests/official").status, "pending");
   }
@@ -212,12 +214,12 @@ test("MENRO can find a verified registration with no request without listing unr
   }
 });
 
-test("Recovering a registration queues approval without granting permissions or changing the resident profile", async () => {
-  const app = fixture({ noRequest: true, profile: { points: 57 } });
+test("Recovering a staff registration queues approval without granting permissions", async () => {
+  const app = fixture({ noRequest: true, profile: { role:"Semi-Admin", accessStatus:"needs-review", points: 57 } });
   await app.post({ action: "recover", name: "Existing Official", position: "Barangay secretary", contact: "09000000000", barangay: "Solis", role: "Admin" });
   const pending = app.records.get("staff_requests/official");
   assert.equal(pending.status, "pending"); assert.equal(pending.barangay, "Solis");
-  assert.equal(app.records.get("users/official").role, "Resident");
+  assert.equal(app.records.get("users/official").role, "Semi-Admin");
   assert.equal(app.records.get("users/official").points, 57);
   assert.equal(app.account.customClaims.staffRole, undefined); assert.equal(app.revoked.length, 0);
   assert.ok([...app.records.values()].some(item => item.action === "staff.request.recovered" && item.actor === "menro"));
@@ -242,4 +244,10 @@ test("An incomplete recovered request requires official details before approval"
   await app.post({ action: "approve", position: "Barangay secretary", barangay: "Sala", identityConfirmed: true });
   assert.equal(app.records.get("users/official").position, "Barangay secretary");
   assert.equal(app.records.get("staff_requests/official").needsOfficialDetails, false);
+});
+
+test("Resident email cannot be recovered into staff access", async () => {
+  const app=fixture({noRequest:true});
+  await app.post({action:"recover",name:"Official",position:"Secretary",contact:"09000000000",barangay:"Sala"},409);
+  assert.equal(app.records.get("users/official").role,"Resident");assert.equal(app.records.has("staff_requests/official"),false);
 });

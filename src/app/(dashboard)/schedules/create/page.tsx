@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, Calendar as CalendarIcon, Clock, MapPin, FileText, Send, ArrowRight, ArrowLeft, Info, CalendarCheck2, LayoutDashboard, PenSquare } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { collection, doc } from "firebase/firestore";
 import { staffRequest } from "@/lib/staff-client";
 
 export default function CreateSchedulePage() {
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Form state
@@ -170,7 +172,7 @@ export default function CreateSchedulePage() {
                 </div>
 
                 <div className="flex gap-4 w-full max-w-2xl mx-auto mb-4">
-                  <Button variant="outline" className="flex-1 h-12 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50">
+                  <Button onClick={() => { router.push("/schedules"); }} variant="outline" className="flex-1 h-12 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50">
                     <CalendarIcon className="w-4 h-4 mr-2" /> View Schedule
                   </Button>
                   <Link href="/schedules" className="flex-1">
@@ -222,22 +224,26 @@ export default function CreateSchedulePage() {
                       <p className="text-[10px] text-slate-400 mt-1">The weekday follows the collection date. This schedule runs once on that date.</p>
                     </div>
 
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Start Time <span className="text-red-500">*</span></label>
+                      <label htmlFor="collection-start" className="text-xs font-bold text-slate-700 uppercase tracking-wide">Start Time <span className="text-red-500">*</span></label>
                       <div className="relative">
-                        <Input value={form.time} onChange={(e) => setForm({...form, time: e.target.value})} type="time" className="w-full bg-white border-slate-200 h-11 pl-4 pr-10" />
+                        <Input id="collection-start" value={form.time} onChange={(e) => setForm({...form, time: e.target.value})} type="time" className="w-full bg-white border-slate-200 h-11 pl-4 pr-10" />
                         <Clock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                       </div>
                       <p className="text-[10px] text-slate-400 mt-1">Select the time when collection is scheduled to start.</p>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Collection Date <span className="text-red-500">*</span></label>
+                      <label htmlFor="collection-date" className="text-xs font-bold text-slate-700 uppercase tracking-wide">Collection Date <span className="text-red-500">*</span></label>
                       <div className="relative">
-                        <Input value={form.date} onChange={(e) => { const date = e.target.value; setForm({...form, date, day: date && isValid(parseISO(date)) ? format(parseISO(date), "EEEE") : ""}); }} type="date" className="w-full bg-white border-slate-200 h-11 pl-4 pr-10 text-slate-700" />
+                        <Input id="collection-date" value={form.date} onChange={(e) => { const date = e.target.value; setForm({...form, date, day: date && isValid(parseISO(date)) ? format(parseISO(date), "EEEE") : ""}); }} type="date" className="w-full bg-white border-slate-200 h-11 pl-4 pr-10 text-slate-700" />
                       </div>
                       <p className="text-[10px] text-slate-500 mt-1">Collection appears only on the selected date.</p>
                     </div>
+
+                    </div>
+                    <p className="text-xs text-slate-500">One collection per barangay and date. Choose any future date; there is no booking horizon.</p>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Notes (Optional)</label>

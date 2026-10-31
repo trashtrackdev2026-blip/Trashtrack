@@ -23,10 +23,10 @@ export function validStaffBarangay(value: unknown): value is string {
 // registration continues to use requestFields and cannot choose a staff role.
 export function staffAssignmentFields(body: Record<string, unknown>) {
   const role = staffRole(body.role === undefined ? "Semi-Admin" : body.role);
-  if (!role) throw new StaffAccessError("Choose Admin or Semi-Admin access.", 400);
+  if (role !== "semi-admin") throw new StaffAccessError("Staff management assigns Semi-Admin access only. MENRO Admin roles cannot be granted or changed here.", 400);
   if (body.identityConfirmed !== true) throw new StaffAccessError("Confirm the official's identity and authority for this access.", 400);
   if (role === "semi-admin" && !validStaffBarangay(body.barangay)) throw new StaffAccessError("Assign one of Balete's 13 barangays for Semi-Admin access.", 400);
-  return { role: role === "admin" ? "Admin" as const : "Semi-Admin" as const, barangay: role === "admin" ? "" : body.barangay as string };
+  return { role: "Semi-Admin" as const, barangay: body.barangay as string };
 }
 export function staffAccessProblem(profile: Record<string, unknown>, claims: Record<string, unknown>, now = Date.now() / 1000) {
   const role = staffRole(profile.role);

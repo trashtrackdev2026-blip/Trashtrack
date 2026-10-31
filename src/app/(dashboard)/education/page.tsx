@@ -1,5 +1,6 @@
 "use client";
 
+import { ResourcePreview } from "@/components/education/ResourcePreview";
 import { learningResourceType } from "@/lib/learning-resource";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,7 @@ export default function EducationPage() {
         resourcesList.push({ id: doc.id, ...doc.data() } as ResourceData);
       });
       setResources(resourcesList);
-      setActiveResource(current => resourcesList.find(item => item.id === current?.id) || resourcesList[0] || null);
+      setActiveResource(current => resourcesList.find(item => item.id === current?.id) || null);
       setLoading(false);
       setDataError(null);
     }, error => { setDataError(error.message.includes("taking too long") ? error.message : "Unable to load learning resources. Check your connection and retry."); setLoading(false); });
@@ -150,7 +151,7 @@ export default function EducationPage() {
           />
         </div>
 
-        <div className="tt-library-layout">
+        <div className="min-w-0">
 
           <div className="flex-1 space-y-4">
             {/* Action Bar */}
@@ -301,33 +302,14 @@ export default function EducationPage() {
           </div>
 
           {/* Right Panel - Resource Details */}
+          <Dialog open={!!activeResource} onOpenChange={open => { if (!open) setActiveResource(null); }}>
           {activeResource && (
-          <div className="min-w-0">
-            <div className="tt-surface p-6 flex flex-col h-full relative">
+          <DialogContent className="sm:max-w-3xl">
+            <DialogDescription className="sr-only">Read this learning resource and manage its published details.</DialogDescription>
+            <div className="min-w-0">
 
-              <button type="button" aria-label="Close resource preview" onClick={() => setActiveResource(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-700">
-                <span className="text-xl leading-none">&times;</span>
-              </button>
-
-              <h3 className="font-bold text-slate-900 mb-6 pr-8">Resource Details</h3>
-
-              <div className="w-full aspect-video rounded-xl bg-slate-100 mb-6 relative overflow-hidden flex flex-col justify-between p-3">
-                {(() => {
-                  const source = activeResource.fileUrl || activeResource.videoUrl || activeResource.image || "";
-                  const kind = learningResourceType(source, activeResource.fileName, activeResource.type);
-                  return kind === "image" ? <Image src={source} alt={activeResource.title} fill sizes="350px" className="object-cover" /> :
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-emerald-50 p-4 text-slate-700">
-                      {kind === "video" ? <PlayCircle className="h-10 w-10 text-green-800" /> : <FileText className="h-10 w-10 text-green-800" />}
-                      <span className="max-w-full truncate text-xs font-semibold">{activeResource.fileName || activeResource.title}</span>
-                      {source ? <a href={source} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-green-800 underline">{kind === "article" ? "Read article" : kind === "video" ? "Watch video" : "View document"}</a>
-                        : <span className="text-xs">No file or link available</span>}
-                    </div>;
-                })()}
-
-                <div className="relative z-10 flex justify-end">
-                  <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm ${activeResource.type?.toLowerCase() === 'video' ? 'bg-blue-50 text-blue-600' : 'bg-white text-[#2E7D32]'}`}>{activeResource.type}</span>
-                </div>
-              </div>
+              <DialogTitle className="mb-4 pr-8">Resource Details</DialogTitle>
+              <ResourcePreview resource={activeResource} />
 
               <h4 className="text-xl font-bold text-slate-900 mb-3 leading-tight">{activeResource.title}</h4>
 
@@ -372,8 +354,9 @@ export default function EducationPage() {
               </div>
 
             </div>
-          </div>
+          </DialogContent>
           )}
+          </Dialog>
 
         </div>
       </div>

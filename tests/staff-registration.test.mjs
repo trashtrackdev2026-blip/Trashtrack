@@ -61,17 +61,17 @@ test("Registration saves an unverified applicant and pending request atomically 
   const app = fixture();
   await app.post({ ...details, role: "Admin", accessStatus: "active", userId: "someone-else", email: "forged@example.invalid" });
   const profile = app.records.get("users/applicant");
-  assert.equal(profile.role, "Resident"); assert.equal(profile.points, 0); assert.equal(profile.accessStatus, undefined);
+  assert.equal(profile.role, "Semi-Admin"); assert.equal(profile.points, 0); assert.equal(profile.accessStatus, "needs-review");
   const pending = await app.get();
   assert.equal(pending.status, "pending"); assert.equal(pending.userId, "applicant");
   assert.equal(pending.email, app.identity.email); assert.equal(pending.barangay, "Solis");
   assert.ok([...app.records.values()].some(item => item.action === "staff.request"));
 });
 
-test("A verified legacy registration can submit its missing request without replacing resident data", async () => {
+test("Resident accounts must use a separate email for staff registration", async () => {
   const app = fixture({ identity: { email_verified: true }, profile: { role: "Resident", points: 83, barangay: "Sala", name: "Saved name" } });
-  await app.post();
-  assert.equal((await app.get()).status, "pending");
+  await app.post(details,409);
+  assert.equal(await app.get(),null);
   assert.deepEqual(app.records.get("users/applicant"), { role: "Resident", points: 83, barangay: "Sala", name: "Saved name" });
 });
 

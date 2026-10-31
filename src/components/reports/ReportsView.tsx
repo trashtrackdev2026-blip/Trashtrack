@@ -14,7 +14,7 @@ import dynamic from "next/dynamic";
 
 import type { CommunityReport } from "@/hooks/use-reports";
 import { DataState } from "@/components/ui/data-state";
-import { nextReportStatuses, canUpdateReport, REPORT_STATUS_LABELS, type ReportRole } from "@/lib/report-workflow";
+import { nextReportStatuses, canUpdateReport, REPORT_STATUS_LABELS, REPORT_ACTION_LABELS, type ReportRole } from "@/lib/report-workflow";
 import { filterReportSummary, type ReportSummaryFilter } from "@/lib/report-summary";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -46,7 +46,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const visibleReports = filterReportSummary(reports, summaryFilter, role).filter(report =>
     (!search.trim() || [report.id, report.type, report.description, report.location, report.reporterName].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
     && (barangayFilter === "all" || report.location === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
-  const activeReport = visibleReports.find(report => report.id === activeReportId) || visibleReports[0];
+  const activeReport = visibleReports.find(report => report.id === activeReportId);
   const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
   const canSave = !!activeReport && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
   const summaryLabels = { all: "All reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
@@ -160,7 +160,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           />
         </div>
 
-        <div className="tt-report-layout">
+        <div className="min-w-0">
 
           {/* Main Table Area */}
           <div id="reports-table" className="min-w-0 flex-1 tt-surface flex flex-col overflow-hidden">
@@ -189,16 +189,18 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           </div>
 
           {/* Right Panel - Report Details */}
+          <Dialog open={!!activeReport} onOpenChange={open => { if (!open && !isUpdating) { setActiveReportId(null);setShowConfirm(false);setNewStatus("");setRemarks(""); } }}>
           {activeReport && (
-            <div key={activeReport.id} className="tt-report-detail tt-surface">
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <DialogContent key={activeReport.id} className="gap-0 p-0 sm:max-w-3xl" showCloseButton={!isUpdating}>
+              <DialogDescription className="sr-only">Review the submitted evidence, location and report status.</DialogDescription>
+              <div className="p-5 pr-12 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
                 <div className="flex flex-col">
-                  <span className="font-bold text-slate-900">Report Details</span>
+                  <DialogTitle className="font-bold text-slate-900">Report Details</DialogTitle>
                   <span className="text-xs font-bold text-slate-500 mt-1">ID: ...{activeReport.id.slice(-6)}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`text-[10px] px-2 py-1 rounded-full uppercase tracking-wider font-bold ${getStatusColor(activeReport.status)}`}>
-                    {activeReport.status}
+                    {REPORT_STATUS_LABELS[activeReport.status as keyof typeof REPORT_STATUS_LABELS] || activeReport.status}
                   </span>
                 </div>
               </div>
@@ -275,7 +277,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                         </SelectTrigger>
                         <SelectContent>
                           {allowedStatuses.map(status => (
-                            <SelectItem key={status} value={status}>{REPORT_STATUS_LABELS[status]}</SelectItem>
+                            <SelectItem key={status} value={status}>{REPORT_ACTION_LABELS[status]}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -311,8 +313,9 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                 </div>
 
               </div>
-            </div>
+            </DialogContent>
           )}
+          </Dialog>
 
         </div>
 

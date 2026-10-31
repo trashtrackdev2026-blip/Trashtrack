@@ -16,3 +16,15 @@ export function publicLearningUrl(value: string): string {
   if (url.protocol !== "https:" || !url.hostname || url.username || url.password) throw new Error("Use a public HTTPS link for this learning material.");
   return url.href;
 }
+
+export function learningPreviewUrl(value: string): string | null {
+  try {
+    const url = new URL(publicLearningUrl(value));
+    if (url.hostname === "res.cloudinary.com") {
+      // Legacy upload links sometimes force attachment download, preventing an
+      // embedded reader. Keep the original resource and all other URL options.
+      url.pathname = url.pathname.replace(/\/fl_attachment(?::[^/,]+)?\//g, "/");
+    }
+    return url.href;
+  } catch { return null; }
+}

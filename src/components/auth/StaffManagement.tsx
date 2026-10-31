@@ -17,7 +17,7 @@ export function StaffManagement() {
   const { user, role } = useAuth();
   const [data, setData] = useState<Management | null>(null);
   const [selected, setSelected] = useState<Review | null>(null);
-  const [assignedRole, setAssignedRole] = useState<"Admin" | "Semi-Admin">("Semi-Admin");
+  const assignedRole = "Semi-Admin";
   const [officialPosition, setOfficialPosition] = useState("");
   const [barangay, setBarangay] = useState(""); const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
@@ -90,12 +90,12 @@ export function StaffManagement() {
   function review(value: Review) {
     setSelected(value); setBarangay(value.account.barangay); setConfirmed(false); setMessage("");
     setOfficialPosition(value.action === "approve" ? value.account.position || "" : "");
-    setAssignedRole(value.action === "assign" && staffRole(value.account.role) === "admin" ? "Admin" : "Semi-Admin");
+
   }
   if (role !== "Admin") return null;
   return <section id="staff-access" className="tt-surface tt-staff-access scroll-mt-6 space-y-5 p-5">
     <div className="flex items-center justify-between gap-4"><div><h2 className="text-xl font-bold">Staff access · MENRO approval</h2>
-      <p className="mt-1 text-sm text-slate-500">Approve verified officials for MENRO Admin access or Semi-Admin access to one barangay.</p></div>
+      <p className="mt-1 text-sm text-slate-500">Approve verified barangay officials for Semi-Admin access. MENRO Admin roles are fixed.</p></div>
       <button disabled={busy || loading} onClick={() => void load()} className="text-sm font-semibold text-green-800">{loading ? "Loading…" : "Refresh"}</button></div>
     {loading && <p role="status" className="text-sm text-slate-500">Loading staff requests and access…</p>}
     <div ref={feedback} className="space-y-3">
@@ -116,11 +116,8 @@ export function StaffManagement() {
       <h3 className="font-semibold">{selected.action === "approve" ? "Review" : "Change access for"} {selected.account.name}</h3>
       <p className="break-all text-sm text-slate-600">{selected.account.email}</p>
       {selected.action === "approve" && <label className="block text-sm font-medium">Official position<input disabled={busy} required maxLength={120} value={officialPosition} onChange={e => { setOfficialPosition(e.target.value); setConfirmed(false); }} className="mt-2 w-full rounded-lg border bg-white p-3" placeholder="Confirm the official's position" /></label>}
-      <label className="block text-sm font-medium">Access role<select disabled={busy} className="mt-2 w-full rounded-lg border bg-white p-3" value={assignedRole} onChange={e => { setAssignedRole(e.target.value as "Admin" | "Semi-Admin"); setConfirmed(false); }}>
-        <option value="Semi-Admin">Semi-Admin · assigned barangay</option><option value="Admin">Admin · MENRO</option>
-      </select></label>
-      {assignedRole === "Semi-Admin" ? <label className="block text-sm font-medium">Approved barangay<select disabled={busy} className="mt-2 w-full rounded-lg border bg-white p-3" value={barangay} onChange={e => { setBarangay(e.target.value); setConfirmed(false); }}><option value="">Select barangay</option>{STAFF_BARANGAYS.map(value => <option key={value}>{value}</option>)}</select></label> :
-        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Admin access includes all barangays, staff approvals and the full MENRO dashboard. Assign this only to an authorized MENRO administrator.</p>}
+      <div className="rounded-lg border bg-white p-3 text-sm"><span className="block font-semibold">Semi-Admin · barangay official</span><p className="mt-1 text-slate-600">This role is fixed. MENRO Admin access cannot be assigned here.</p></div>
+      <label className="block text-sm font-medium">Approved barangay<select disabled={busy} className="mt-2 w-full rounded-lg border bg-white p-3" value={barangay} onChange={e => { setBarangay(e.target.value); setConfirmed(false); }}><option value="">Select barangay</option>{STAFF_BARANGAYS.map(value => <option key={value}>{value}</option>)}</select></label>
       <label className="flex items-start gap-3 text-sm"><input disabled={busy} type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} className="mt-1" />I verified this person&apos;s identity and official authority and authorize the selected access.</label>
       <div ref={reviewFeedback}>{error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}</div>
       <div className="flex flex-wrap gap-3"><button disabled={busy || !confirmed || (selected.action === "approve" && !officialPosition.trim()) || (assignedRole === "Semi-Admin" && !validStaffBarangay(barangay))} onClick={() => void action(selected.action, selected.account.id)} className="rounded-lg bg-green-800 px-4 py-2 text-sm text-white disabled:opacity-40">{busy ? "Saving…" : selected.action === "approve" ? "Approve " + assignedRole + " access" : "Save access"}</button>
@@ -147,6 +144,7 @@ export function StaffManagement() {
         {registered.disabled || ["suspended", "disabled", "activating"].includes(registered.accessStatus) ? <p className="text-sm text-amber-800">Resolve this account&apos;s existing staff access before adding a request.</p> :
           registered.requestStatus === "pending" ? <p className="text-sm text-green-800">This account already has a pending request. Refresh and review it below.</p> :
           staffRole(registered.role) === "admin" || (staffRole(registered.role) && registered.accessStatus === "active") ? <p className="text-sm text-green-800">This account already has staff access. Use Change access in Staff accounts.</p> :
+          registered.role.toLowerCase() === "resident" && !registered.requestStatus ? <p className="text-sm text-amber-800">This is a resident account. Use a separate email to register as barangay staff.</p> :
           !registered.emailVerified ? <p className="text-sm text-amber-800">The official must verify their email before MENRO can recover and approve this registration.</p> :
           <form onSubmit={recoverRegistration} className="space-y-3">
             <label className="block text-sm font-medium">Full name<input disabled={busy} required maxLength={120} value={recoveryName} onChange={e => setRecoveryName(e.target.value)} className="mt-1 w-full rounded-lg border p-3" /></label>
@@ -160,7 +158,7 @@ export function StaffManagement() {
 <details className="tt-staff-disclosure"><summary>Manage staff accounts</summary><div className="overflow-x-auto"><h3 className="mb-3 font-semibold">Staff accounts</h3><table className="w-full text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="py-2">Official</th><th>Access</th><th>Status</th><th>Action</th></tr></thead><tbody>
       {data?.staff.map(item => <tr key={item.id} className="border-b"><td className="py-3 pr-3"><p className="font-semibold">{item.name}</p><p className="text-xs text-slate-500">{item.email}</p></td><td className="pr-3">{staffRole(item.role) === "admin" ? "Admin · MENRO" : "Semi-Admin · " + item.barangay}</td><td className="pr-3">{item.accessStatus}</td>
         <td>{item.id === user?.uid ? <span className="text-slate-400">Your account</span> : item.accessStatus === "needs-review" ? <span className="text-xs text-amber-700">Official must verify email and submit a request</span> :
-          <div className="flex flex-wrap gap-3">{item.accessStatus === "active" && <button disabled={busy} onClick={() => review({ action: "assign", account: item })} className="font-medium text-green-800">Change access</button>}
+          <div className="flex flex-wrap gap-3">{item.accessStatus === "active" && staffRole(item.role) === "semi-admin" && <button disabled={busy} onClick={() => review({ action: "assign", account: item })} className="font-medium text-green-800">Change access</button>}
           <button disabled={busy} onClick={() => void action(item.accessStatus === "active" ? "suspend" : "reactivate", item.id)} className="font-medium text-green-800">{item.accessStatus === "active" ? "Suspend access" : "Reactivate"}</button></div>}</td></tr>)}
     </tbody></table></div></details>
 <details className="text-sm"><summary className="cursor-pointer font-semibold">Recent access and report audit</summary>

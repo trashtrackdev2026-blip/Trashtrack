@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { communityPublication } from "../src/lib/community-publication.ts";
+import * as schedules from "../src/lib/schedule-policy.ts";
 import * as policy from "../src/lib/staff-access.ts";
 import * as certificates from "../src/lib/certificate-data.ts";
 import { buildPhonePush } from "../src/lib/phone-push.ts";
@@ -23,9 +24,10 @@ function fixture(options = {}) {
   let failed = false;
   class Timestamp { constructor(value = Date.now()) { this.value = value; } toMillis() { return this.value; } }
   const ref = path => ({ path, id: path.split("/").at(-1), get: async () => ({ data: () => records.get(path) }), update: async value => { records.set(path, { ...records.get(path), ...value }); } });
-  const db = { collection: name => ({ doc: id => ref(name + "/" + id) }), async runTransaction(callback) {
+  const db = { collection: name => ({ doc: id => ref(name + "/" + id), where:(field,op,value) => ({collection:name,field,value}) }), async runTransaction(callback) {
     const working = new Map([...records].map(([key, value]) => [key, { ...value }]));
-    const result = await callback({ get: async target => ({ exists: working.has(target.path), data: () => working.get(target.path) }),
+    const result = await callback({ get: async target => target.collection ? ({docs:[...working].filter(([path,value]) => path.startsWith(target.collection+"/") && value[target.field] === target.value).map(([path,value]) => ({id:path.split("/")[1],data:()=>value}))}) : ({ exists: working.has(target.path), data: () => working.get(target.path) }),
+      set: (target,value) => {working.set(target.path,value);},
       create: (target, value) => { assert.equal(working.has(target.path), false); working.set(target.path, value); },
       update: (target, value) => { assert.ok(working.has(target.path)); working.set(target.path, { ...working.get(target.path), ...value }); } });
     records.clear(); for (const [key, value] of working) records.set(key, value);
@@ -38,7 +40,7 @@ function fixture(options = {}) {
     "firebase-admin/messaging": { getMessaging: () => ({ send: async payload => {
       pushes.push(payload); if (options.failFirstPush && !failed) { failed = true; throw new Error("Messaging unavailable"); } return "test-message";
     } }) }, "./barangay-geofence": { BALETE_BARANGAYS: policy.STAFF_BARANGAYS }, "./phone-push": { buildPhonePush }, "./staff-access": policy,
-    "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates,
+    "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/schedule-policy": schedules, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates,
     "@/lib/notification-publication": { notificationPublication } };
   const delivery = {}; new Function("require","exports",deliveryCode)(name => modules[name] || require(name), delivery);
   modules["@/lib/notification-delivery"] = delivery;
@@ -112,15 +114,25 @@ test("automatic outbox retries wait for new sends, recover stale sends and skip 
 test("Lost responses and phone retries never create duplicate posts or resend a queued notice", async () => {
   const app = fixture(); await app.post(); await app.post();
   await app.post({ notificationId:"schedule_test-schedule" }, 200, true);
-  assert.equal(app.pushes.length,1); assert.equal(app.records.size,3);
+  assert.equal(app.pushes.length,1); assert.equal(app.records.size,4);
   await app.post({ ...schedule, barangay:"Looc" },409);
   assert.equal(app.records.get("schedules/test-schedule").barangay,"Sala");
+});
+
+test("A second publication cannot reserve the same barangay date by changing its time", async () => {
+  const app=fixture();await app.post();
+  await app.post({...schedule,id:"second",time:"07:00"},409);
+  await app.post({...schedule,id:"all",barangay:"All Barangays"},409);
+  assert.equal(app.records.has("schedules/second"),false);assert.equal(app.records.has("notifications/schedule_second"),false);
+  assert.equal(app.pushes.length,1);
+  await app.post({...schedule,id:"future",date:"2099-11-30"});
+  assert.equal(app.records.get("schedule_days/2099-11-30").revision,1);
 });
 test("A failed push leaves the saved post and in-app notice available and can be retried", async () => {
   const app = fixture({ failFirstPush:true }); await app.post(schedule,502);
   assert.equal(app.records.get("notifications/schedule_test-schedule").pushStatus,"failed");
   assert.ok(app.records.has("schedules/test-schedule"));
-  await app.post(); assert.equal(app.records.get("notifications/schedule_test-schedule").pushStatus,"queued"); assert.equal(app.records.size,3);
+  await app.post(); assert.equal(app.records.get("notifications/schedule_test-schedule").pushStatus,"queued"); assert.equal(app.records.size,4);
 });
 test("Barangay staff cannot publish or send outside their assignment while MENRO can target all residents", async () => {
   const app = fixture({ profile:{ role:"Semi-Admin", barangay:"Sala" } });

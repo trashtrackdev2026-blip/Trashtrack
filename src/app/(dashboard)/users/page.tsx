@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import { useState, useEffect, useMemo, useDeferredValue } from "react";
@@ -15,6 +16,7 @@ import { STAFF_BARANGAYS } from "@/lib/staff-access";
 import { useAuth } from "@/context/AuthContext";
 import { withTimeout } from "@/lib/request-timeout";
 import { DataState } from "@/components/ui/data-state";
+import { accountGroup as getAccountGroup } from "@/lib/account-group";
 
 interface UserData {
   id: string;
@@ -22,6 +24,7 @@ interface UserData {
   email: string;
   phone: string;
   role: string;
+  group: string;
   barangay: string;
   status: string;
   date: string;
@@ -31,6 +34,7 @@ interface UserData {
 
 export default function UsersPage() {
   const { role, user: currentUser, loading: authLoading } = useAuth();
+  const [accountGroup, setAccountGroup] = useState("resident");
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -54,8 +58,8 @@ export default function UsersPage() {
                           (u.phone && u.phone.toLowerCase().includes(deferredSearch.toLowerCase()));
     const matchesBarangay = barangayFilter === "all" || (u.barangay && u.barangay.toLowerCase() === barangayFilter.toLowerCase());
     const matchesStatus = statusFilter === "all" || (u.status && u.status.toLowerCase() === statusFilter.toLowerCase());
-    return matchesSearch && matchesBarangay && matchesStatus;
-  }), [users, deferredSearch, barangayFilter, statusFilter]);
+    return u.group === accountGroup && matchesSearch && matchesBarangay && matchesStatus;
+  }), [users, deferredSearch, barangayFilter, statusFilter, accountGroup]);
 
   useEffect(() => {
     if (authLoading || !currentUser || role !== "Admin") return;
@@ -70,8 +74,9 @@ export default function UsersPage() {
           return result;
         }).catch(error => { if (!cancelled) setDataError(error instanceof Error ? error.message : "Unable to load report totals."); return null; });
       try {
-        const usersSnap = await withTimeout(getDocs(collection(db, "users")), "Users are taking too long to load. Check your connection and retry.", 15_000);
+        const [usersSnap, requestsSnap] = await withTimeout(Promise.all([getDocs(collection(db, "users")), getDocs(collection(db, "staff_requests"))]), "Users are taking too long to load. Check your connection and retry.", 15_000);
         if (cancelled) return;
+        const staffApplicants = new Set(requestsSnap.docs.map(doc => doc.id));
 
         const usersList: UserData[] = [];
         usersSnap.forEach((doc) => {
@@ -97,7 +102,8 @@ export default function UsersPage() {
             name: data.name || "Unknown",
             email: data.email || "No email",
             phone: data.contact || data.phone || "",
-            role: data.role || "Resident",
+            role: String(data.role).toLowerCase() === "resident" && staffApplicants.has(doc.id) ? "Semi-Admin applicant" : data.role || "Resident",
+            group: getAccountGroup(data.role, staffApplicants.has(doc.id)),
             barangay: data.barangay || "Unassigned",
             status: data.accessStatus || data.status || "Registered",
             date: userDate,
@@ -141,23 +147,24 @@ export default function UsersPage() {
           />
           <KpiCard 
             title="Residents" 
-            value={users.filter(u => u.role.toLowerCase() === 'resident').length.toString()} 
+            value={users.filter(u => u.group === 'resident').length.toString()}
             subtitle="Registered residents" 
             icon={<User className="w-7 h-7" />} 
             iconBgColor="bg-blue-50" 
             iconColor="text-blue-500" 
           />
           <KpiCard 
-            title="Admins" 
-            value={users.filter(u => u.role.toLowerCase().includes('admin')).length.toString()} 
-            subtitle="System Administrators" 
+            title="Barangay staff"
+            value={users.filter(u => u.group === 'semi-admin').length.toString()}
+            subtitle="Officials and applicants"
             icon={<Shield className="w-7 h-7" />} 
             iconBgColor="bg-purple-50" 
             iconColor="text-purple-500" 
           />
         </div>
 
-        <div className="tt-people-layout"><div className="tt-surface overflow-hidden">
+        <nav className="tt-tabs" aria-label="Account group">{[{id:"resident",label:"Residents"},{id:"semi-admin",label:"Barangay staff"},{id:"admin",label:"MENRO admins"},{id:"approvals",label:"Staff approvals"}].map(group => <button key={group.id} type="button" aria-pressed={accountGroup === group.id} onClick={() => {setAccountGroup(group.id);setCurrentPage(1);setSelectedUser(null);setStatusFilter("all");}}>{group.label}</button>)}</nav>
+        {accountGroup === "approvals" ? <StaffManagement /> : <div className="tt-surface overflow-hidden">
 
           {/* Filters Bar */}
           <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -307,20 +314,15 @@ export default function UsersPage() {
               </div>
             );
           })()}
-        </div><aside className="tt-people-staff"><StaffManagement /></aside></div>
+        </div>}
       </div>
       {/* User Details Modal */}
+      <Dialog open={!!selectedUser} onOpenChange={open => { if (!open) setSelectedUser(null); }}>
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <DialogContent className="gap-0 p-0 sm:max-w-lg">
+            <DialogDescription className="sr-only">Profile information for {selectedUser.name}. Account roles are fixed.</DialogDescription>
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h3 className="font-bold text-slate-900 text-lg">User Profile</h3>
-              <button 
-                onClick={() => setSelectedUser(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
-              >
-                &times;
-              </button>
+              <DialogTitle className="font-bold text-slate-900 text-lg">User Profile</DialogTitle>
             </div>
 
             <div className="p-6 flex flex-col gap-6">
@@ -361,9 +363,9 @@ export default function UsersPage() {
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
       )}
+      </Dialog>
     </>
   );
 }

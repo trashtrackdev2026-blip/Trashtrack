@@ -1,4 +1,4 @@
-export type CollectionSchedule = { id: string; barangay: string; day: string; date?: string; time: string; status: string; description?: string; notes?: string };
+export type CollectionSchedule = { id: string; barangay: string; day: string; date?: string; time: string; status: string; description?: string; notes?: string; statusNotes?: string };
 export type CollectionFilters = { search: string; barangay: string; day: string; status: string };
 
 export function collectionTimeLabel(value: string): string {

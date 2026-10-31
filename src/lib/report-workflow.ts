@@ -3,6 +3,7 @@ export type ReportStatus = "Pending" | "UnderReview" | "For MENRO Review" | "MEN
 
 export function normalizeReportStatus(status: string): ReportStatus | null {
   switch (status.replace(/\s/g, "").toLowerCase()) {
+    case "reported":
     case "pending": return "Pending";
     case "underreview": return "UnderReview";
     case "formenroreview": return "For MENRO Review";
@@ -45,10 +46,12 @@ export function canUpdateReport(
 }
 
 export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
-  Pending: "Pending",
+  Pending: "Reported",
   UnderReview: "Under Review",
-  "For MENRO Review": "Forward to MENRO",
-  "MENRO Under Review": "Start MENRO review",
-  Endorsed: "Schedule for collection",
-  Resolved: "Resolved after collection",
+  "For MENRO Review": "Under MENRO Review",
+  "MENRO Under Review": "Under MENRO Review",
+  Endorsed: "In Progress",
+  Resolved: "Resolved",
 };
+
+export const REPORT_ACTION_LABELS = { ...REPORT_STATUS_LABELS, UnderReview: "Start barangay review", "For MENRO Review": "Forward to MENRO", "MENRO Under Review": "Start MENRO review", Endorsed: "Schedule for collection", Resolved: "Resolve after collection" };

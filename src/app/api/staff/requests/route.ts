@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       const profile = profileSnap.data();
       if (staffRole(profile?.role) === "admin" || (staffRole(profile?.role) === "semi-admin" && profile?.accessStatus === "active")) throw new StaffAccessError("This account already has approved staff access.", 409);
       if (["suspended", "disabled", "activating"].includes(String(profile?.accessStatus))) throw new StaffAccessError("Contact MENRO about this account's staff access.", 409);
+      if (String(profile?.role).toLowerCase() === "resident" && !existing) throw new StaffAccessError("This email belongs to a resident account. Register a separate email for barangay staff access.", 409);
       if (existing?.status === "pending") {
         // A retry after a lost response must not create a second request or
         // overwrite the details that MENRO is already reviewing.
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
         throw new StaffAccessError("Your request is already awaiting MENRO review.", 409);
       }
       if (existing?.submittedAt?.toMillis && Date.now() - existing.submittedAt.toMillis() < 60 * 60 * 1000) throw new StaffAccessError("Wait one hour before submitting another request.", 429);
-      if (!profile) tx.set(profileRef, { name: details.name, email: identity.email, contact: details.contact, barangay: details.barangay, points: 0, role: "Resident", createdAt: FieldValue.serverTimestamp() });
+      if (!profile) tx.set(profileRef, { name: details.name, email: identity.email, contact: details.contact, barangay: details.barangay, points: 0, role: "Semi-Admin", accessStatus: "needs-review", createdAt: FieldValue.serverTimestamp() });
       tx.set(ref, { ...details, userId: identity.uid, email: identity.email, status: "pending", submittedAt: FieldValue.serverTimestamp() });
       tx.create(db.collection("audit_logs").doc(), { action: "staff.request", actor: identity.uid, target: identity.uid, barangay: details.barangay, at: FieldValue.serverTimestamp() });
     });
