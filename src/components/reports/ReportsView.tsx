@@ -4,7 +4,6 @@ import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { ReportEvidence } from "@/components/reports/ReportEvidence";
 
 import { useState } from "react";
-import { DetailPanel, useWideWorkspace } from "@/components/layout/DetailPanel";
 import { Search, FileText, Clock, CheckCircle2, AlertTriangle, Check, Send, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -31,9 +30,6 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   role: ReportRole; userBarangay: string | null;
   onUpdate: (report: CommunityReport, status: string, remarks: string, collected: boolean) => Promise<void>;
 }) {
-  const wideDetails = useWideWorkspace();
-  const DetailTitle = wideDetails ? "h2" : DialogTitle;
-  const DetailDescription = wideDetails ? "p" : DialogDescription;
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const [fullPhotoUrl, setFullPhotoUrl] = useState<string | null>(null);
@@ -52,7 +48,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const visibleReports = filterReportSummary(reports, summaryFilter, role).filter(report =>
     (!search.trim() || [report.id, report.type, report.description, report.location, report.reporterName].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
     && (barangayFilter === "all" || reportBarangayLabel(report.location) === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
-  const activeReport = visibleReports.find(report => report.id === activeReportId) || (wideDetails ? visibleReports[0] : undefined);
+  const activeReport = visibleReports.find(report => report.id === activeReportId);
   const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
   const canSave = !!activeReport && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
   const summaryLabels = { all: "All reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
@@ -169,7 +165,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           {role === "Semi-Admin" && <Link href="/reports-to-menro" className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-50"><Send className="h-4 w-4" />Reports to MENRO</Link>}
         </div>
 
-        <div className="tt-report-layout">
+        <div className="min-w-0">
 
           {/* Main Table Area */}
           <div id="reports-table" className="min-w-0 flex-1 tt-surface flex flex-col overflow-hidden">
@@ -197,14 +193,14 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
             </div>
           </div>
 
-          {/* Right Panel - Report Details */}
-          <DetailPanel wide={wideDetails} label="Report details" busy={isUpdating} empty={<div className="tt-detail-empty"><FileText aria-hidden="true" /><h2>Report details</h2><p>Select a report to review its evidence and status.</p></div>} open={!!activeReport} onOpenChange={open => { if (!open && !isUpdating) { setActiveReportId(null);setShowConfirm(false);setNewStatus("");setRemarks(""); } }}>
+          {/* Report details open only after a report is selected. */}
+          <Dialog open={!!activeReport} onOpenChange={open => { if (!open && !isUpdating) { setActiveReportId(null);setShowConfirm(false);setNewStatus("");setRemarks(""); } }}>
           {activeReport && (
-            <div key={activeReport.id}>
-              <DetailDescription className="sr-only">Review the submitted evidence, location and report status.</DetailDescription>
+            <DialogContent key={activeReport.id} className="tt-content tt-report-dialog gap-0 p-0 sm:max-w-3xl" showCloseButton={!isUpdating}>
+              <DialogDescription className="sr-only">Review the submitted evidence, location and report status.</DialogDescription>
               <div className="p-5 pr-12 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
                 <div className="flex flex-col">
-                  <DetailTitle className="font-bold text-slate-900">Report Details</DetailTitle>
+                  <DialogTitle className="font-bold text-slate-900">Report Details</DialogTitle>
                   <span className="text-xs font-bold text-slate-500 mt-1">ID: ...{activeReport.id.slice(-6)}</span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -322,9 +318,9 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                 </div>
 
               </div>
-            </div>
+            </DialogContent>
           )}
-          </DetailPanel>
+          </Dialog>
 
         </div>
 

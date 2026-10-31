@@ -177,6 +177,7 @@
 .tt-detail-empty svg { margin: 0 auto 16px; width: 38px; height: 38px; }
 .tt-dark-panel .tt-detail-empty { color: #b8cdb6; }
 .tt-report-review { padding: 20px; border-radius: 13px; }
+.tt-content.tt-report-dialog { position: fixed; flex: initial; padding: 0; background: #edf4e7; color: #183b30; }
 .tt-report-evidence:has(> div:only-child) { grid-template-columns: minmax(0,1fr); }
 .tt-report-guidance { padding: 0 4px; font-size: 12px; line-height: 1.65; color: #486c49; }
 .tt-report-item-copy strong { font-size: 14px; }
