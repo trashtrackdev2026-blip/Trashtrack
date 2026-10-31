@@ -16,7 +16,7 @@ Production assets, encoded once as WebP at quality 95:
 | `public/images/balete-lakeside-1920.webp` | 1920 × 1202 | 823,536 bytes |
 | `public/images/balete-lakeside-1280.webp` | 1280 × 801 | 344,268 bytes |
 
-The login and dashboard header use native responsive picture sources and serve these files directly, avoiding another image-optimizer encoding. Both load eagerly with high fetch priority. The login's `sizes` accounts for cover height on portrait screens. The dashboard header uses `sizes="100vw"` so collapsed navigation and high-density displays receive a sufficiently large source, up to the 2500-pixel original.
+The login, logout page, and dashboard header use native responsive picture sources and serve these files directly, avoiding another image-optimizer encoding. They load eagerly with high fetch priority. The login and logout `sizes` account for cover height on portrait screens. The logout photo stays sharp with no blur or backdrop-blur filter; its green fade is a separate color overlay. The dashboard header uses `sizes="100vw"` so collapsed navigation and high-density displays receive a sufficiently large source, up to the 2500-pixel original.
 
 The header uses a 12% vertical focal position to keep the mountain cap and horizon visible in its shallow frame. A lighter localized text overlay and modest display-only saturation/contrast replace the heavy green wash. These presentation changes do not regenerate, stretch, or alter the geography of the photograph.
 
