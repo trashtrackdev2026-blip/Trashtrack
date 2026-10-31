@@ -1,11 +1,11 @@
 "use client";
 
-import { Users, Search, User, Filter, MapPin, Eye, Calendar, UserCheck, Shield, ChevronLeft, ChevronRight, MoreHorizontal, SlidersHorizontal, CheckCircle2, Clock } from "lucide-react";
+import { Users, Search, User, Eye, Shield, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import { useState, useEffect, useMemo, useDeferredValue } from "react";
 import { collection, getDocs } from "firebase/firestore";
@@ -37,7 +37,7 @@ export default function UsersPage() {
   const [attempt, setAttempt] = useState(0);
   const [countsReady, setCountsReady] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
-  
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -76,10 +76,10 @@ export default function UsersPage() {
         const usersList: UserData[] = [];
         usersSnap.forEach((doc) => {
           const data = doc.data();
-          
+
           let userDate = "Recently";
           let userTime = "";
-          
+
           if (data.createdAt && typeof data.createdAt.toDate === 'function') {
             const dateObj = data.createdAt.toDate();
             userDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -127,10 +127,10 @@ export default function UsersPage() {
     <>
       <div className="space-y-6 max-w-[1400px] mx-auto">
         <DataState loading={loading} error={dataError} onRetry={() => setAttempt(value => value + 1)} />
-        <StaffManagement />
-        
+
+
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="tt-metric-strip three-metrics">
           <KpiCard 
             title="Total Users" 
             value={loading ? "—" : users.length.toString()}
@@ -157,8 +157,8 @@ export default function UsersPage() {
           />
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          
+        <div className="tt-people-layout"><div className="tt-surface overflow-hidden">
+
           {/* Filters Bar */}
           <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="relative w-full sm:max-w-md">
@@ -170,13 +170,13 @@ export default function UsersPage() {
                 className="pl-9 bg-slate-50 border-none rounded-xl h-10 focus-visible:ring-1 focus-visible:ring-[#2E7D32] focus-visible:bg-white transition-colors"
               />
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 ml-1">Barangay</span>
                 <Select value={barangayFilter} onValueChange={(val) => { setBarangayFilter(val ?? "all"); setCurrentPage(1); }}>
                   <SelectTrigger className="w-[160px] bg-white border-slate-200 rounded-xl h-9 text-sm">
-                    <SelectValue placeholder="All Barangays" />
+                    <SelectValue>{barangayFilter === "all" ? "All barangays" : barangayFilter}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Barangays</SelectItem>
@@ -189,7 +189,7 @@ export default function UsersPage() {
                 <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 ml-1">Account Status</span>
                 <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val ?? "all"); setCurrentPage(1); }}>
                   <SelectTrigger className="w-[160px] bg-white border-slate-200 rounded-xl h-9 text-sm">
-                    <SelectValue placeholder="All Statuses" />
+                    <SelectValue>{statusFilter === "all" ? "All statuses" : statusFilter.replaceAll("-"," ")}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
@@ -216,95 +216,19 @@ export default function UsersPage() {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 bg-slate-50/80 border-b border-slate-100">
-                <tr>
-                  <th className="font-semibold py-3 px-6 w-16">Profile</th>
-                  <th className="font-semibold py-3 px-2">Full Name</th>
-                  <th className="font-semibold py-3 px-4">Role <span className="inline-block ml-1">↕</span></th>
-                  <th className="font-semibold py-3 px-4">Barangay <span className="inline-block ml-1">↕</span></th>
-                  <th className="font-semibold py-3 px-4">Account Status <span className="inline-block ml-1">↕</span></th>
-                  <th className="font-semibold py-3 px-4">Registered Date <span className="inline-block ml-1">↕</span></th>
-                  <th className="font-semibold py-3 px-4 text-center">Reports Submitted <span className="inline-block ml-1">↕</span></th>
-                  <th className="font-semibold py-3 px-6 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500">No users found matching your filters</td>
-                  </tr>
-                ) : (
-                  filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((user) => (
-                    <tr key={user.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors group">
-                    <td className="py-3 px-6">
-                      <Avatar className="w-10 h-10 border border-slate-200">
-                        <AvatarFallback className="bg-[#E8F5E9] text-[#1B5E20] font-semibold">
-                          {user.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </td>
-                    <td className="py-3 px-2">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-900">{user.name}</span>
-                        <span className="text-[11px] text-slate-500">{user.email}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-[#E8F5E9] text-[#2E7D32]">
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center text-slate-700 font-medium">
-                        <MapPin className="w-3.5 h-3.5 mr-1.5 text-[#2E7D32]" />
-                        {user.barangay}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      {user.status === "active" || user.status === "Verified" ? (
-                        <div className="flex items-center text-xs px-2 py-1 rounded-full font-bold bg-[#E8F5E9] text-[#2E7D32] w-max border border-green-200/50">
-                          <CheckCircle2 className="w-3 h-3 mr-1" /> {user.status}
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-xs px-2 py-1 rounded-full font-bold bg-orange-50 text-orange-500 w-max border border-orange-200/50">
-                          <Clock className="w-3 h-3 mr-1" /> {user.status}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex flex-col">
-                        <div className="flex items-center text-slate-700 font-medium">
-                          <Calendar className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
-                          {user.date}
-                        </div>
-                        <span className="text-[10px] text-slate-400 ml-5">{user.time}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="font-bold text-slate-900">{countsReady ? user.reports : "—"}</span>
-                    </td>
-                    <td className="py-3 px-6 text-right">
-                      <Button onClick={() => setSelectedUser(user)} variant="outline" size="sm" className="h-8 text-[#2E7D32] border-slate-200 hover:bg-[#E8F5E9] hover:border-[#2E7D32] hover:text-[#1B5E20] rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                        <Eye className="w-3.5 h-3.5 mr-1.5" /> View Details
-                      </Button>
-                    </td>
-                  </tr>
-                )))}
-              </tbody>
-            </table>
+            <table className="w-full min-w-[640px] text-left"><thead><tr className="border-b"><th className="px-5 py-4">Name</th><th className="px-3 py-4">Barangay</th><th className="px-3 py-4">Role</th><th className="px-3 py-4">Status</th><th className="px-3 py-4">Joined</th><th className="px-4 py-4 text-right">Actions</th></tr></thead><tbody>{filteredUsers.slice((currentPage - 1) * itemsPerPage,currentPage * itemsPerPage).map(user=><tr key={user.id} className="border-b last:border-0"><td className="px-5 py-4"><button type="button" onClick={()=>setSelectedUser(user)} className="flex items-center gap-3 text-left"><span className="tt-avatar" aria-hidden="true">{user.name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join("").toUpperCase()}</span><span><strong className="block text-xs font-semibold">{user.name}</strong><small className="mt-1 block text-[10px] text-muted-foreground">{user.email}</small></span></button></td><td className="px-3 py-4 text-xs">{user.barangay || (user.role.toLowerCase()==="admin"?"All barangays":"Unassigned")}</td><td className="px-3 py-4 text-xs">{user.role}</td><td className="px-3 py-4"><span className="tt-status">{user.status}</span></td><td className="px-3 py-4 text-[11px] text-muted-foreground">{user.date}</td><td className="px-4 py-4 text-right"><Button variant="ghost" size="icon" aria-label={"View "+user.name} onClick={()=>setSelectedUser(user)}><Eye /></Button></td></tr>)}{!filteredUsers.length&&<tr><td colSpan={6} className="tt-empty">No users match your filters.</td></tr>}</tbody></table>
           </div>
-          
+
           {/* Pagination */}
           {(() => {
             const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
             const startItem = filteredUsers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
             const endItem = Math.min(currentPage * itemsPerPage, filteredUsers.length);
-            
+
             return (
               <div className="py-4 px-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between bg-white gap-4">
                 <span className="text-xs text-slate-500 font-medium">Showing {startItem} to {endItem} of {filteredUsers.length} users</span>
-                
+
                 <div className="flex items-center gap-1">
                   <Button 
                     variant="outline" 
@@ -315,14 +239,14 @@ export default function UsersPage() {
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
-                  
+
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum = currentPage;
                     if (totalPages <= 5) pageNum = i + 1;
                     else if (currentPage <= 3) pageNum = i + 1;
                     else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
                     else pageNum = currentPage - 2 + i;
-                    
+
                     return (
                       <Button 
                         key={pageNum}
@@ -335,7 +259,7 @@ export default function UsersPage() {
                       </Button>
                     );
                   })}
-                  
+
                   {totalPages > 5 && currentPage < totalPages - 2 && (
                     <>
                       <span className="px-1 text-slate-400">...</span>
@@ -360,7 +284,7 @@ export default function UsersPage() {
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
-                
+
                 <div className="flex items-center gap-2 hidden sm:flex">
                   <Select 
                     value={itemsPerPage.toString()} 
@@ -383,7 +307,7 @@ export default function UsersPage() {
               </div>
             );
           })()}
-        </div>
+        </div><aside className="tt-people-staff"><StaffManagement /></aside></div>
       </div>
       {/* User Details Modal */}
       {selectedUser && (
@@ -398,7 +322,7 @@ export default function UsersPage() {
                 &times;
               </button>
             </div>
-            
+
             <div className="p-6 flex flex-col gap-6">
               <div className="flex items-center gap-4">
                 <Avatar className="w-16 h-16 border-2 border-slate-100 shadow-sm">

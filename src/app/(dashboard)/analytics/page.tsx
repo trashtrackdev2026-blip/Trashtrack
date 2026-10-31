@@ -10,10 +10,8 @@ import {
   Calendar as CalendarIcon, 
   Map as MapIcon,
   BookOpen,
-  Eye,
-  PlayCircle,
   Maximize2,
-  X
+  X, Download
 } from "lucide-react";
 
 import dynamic from "next/dynamic";
@@ -43,6 +41,8 @@ const AnalyticsCharts = dynamic(() => import("@/components/analytics/AnalyticsCh
   ssr: false,
   loading: () => <div className="h-72 rounded-2xl bg-slate-100" role="status">Loading charts…</div>,
 });
+
+const ReportTrendChart = dynamic(() => import("@/components/analytics/AnalyticsCharts").then(module => module.ReportTrendChart), { ssr:false, loading:()=> <div className="tt-surface h-96" role="status">Loading report trend…</div> });
 
 export default function AnalyticsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
         const totalReports = reportsSnap.size;
         let resolvedReports = 0;
         let pendingReports = 0;
-        
+
         reportsSnap.forEach((doc) => {
           const status = doc.data().status?.toLowerCase();
           if (status === "resolved") resolvedReports++;
@@ -187,7 +187,7 @@ export default function AnalyticsPage() {
         const today = new Date();
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const last6Months: string[] = [];
-        
+
         for (let i = 5; i >= 0; i--) {
           const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
           last6Months.push(monthNames[d.getMonth()]);
@@ -199,7 +199,7 @@ export default function AnalyticsPage() {
         reportsSnap.forEach((doc) => {
           const data = doc.data();
           let rDate = null;
-          
+
           if (data.createdAt && typeof data.createdAt.toDate === 'function') {
             rDate = data.createdAt.toDate();
           } else if (data.timestamp) {
@@ -228,7 +228,7 @@ export default function AnalyticsPage() {
       }
     };
     fetchAnalyticsData();
-    return () => { cancelled = true; };
+  return () => { cancelled = true; };
   }, [user, role, authLoading, attempt]);
 
   useEffect(() => {
@@ -267,19 +267,26 @@ export default function AnalyticsPage() {
     })();
     return () => { cancelled = true; };
   }, [reportsData, user, role, authLoading]);
+  const exportReport = () => {
+    const rows=mapStats.filter(row=>selectedBarangay==="all-barangays"||row.name===selectedBarangay);
+    const csv=[['Barangay','Total reports','Resolved','Pending'],...rows.map(row=>[row.name,row.total,row.resolved,row.pending])].map(row=>row.map(value=>'"'+String(value).replaceAll('"','""')+'"').join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));const link=document.createElement('a');link.href=url;link.download='TrashTrack-Reports-'+new Date().toISOString().slice(0,10)+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+
   return (
     <>
       <div className="space-y-6 max-w-[1400px] mx-auto pb-8">
         <DataState loading={loading} error={dataError} onRetry={() => setAttempt(value => value + 1)} />
-        
+
         {/* Header */}
-        <div className="flex flex-col gap-2 mb-2">
+        <div className="tt-legacy-heading flex flex-col gap-2 mb-2">
           <h1 className="text-[26px] font-bold text-slate-900 leading-tight">Reports & Analytics</h1>
           <p className="text-sm text-slate-500">Monitor waste concerns, community participation, and environmental activities across Balete.</p>
         </div>
 
+        <div className="flex justify-end"><Button variant="outline" disabled={loading||gisLoading||!!dataError} onClick={exportReport}><Download aria-hidden="true" />Export CSV</Button></div>
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="tt-metric-strip">
           <KpiCard 
             title="Total Waste Reports" 
             value={loading || dataError ? "—" : stats.totalReports.toString()}
@@ -315,10 +322,10 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Second Row: Map and Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+
           {/* GIS Map Panel */}
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
+          <div className="tt-surface min-w-0 flex flex-col overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-900 flex items-center gap-2">
                 <MapIcon className="w-4 h-4 text-[#2E7D32]" /> GIS Waste Monitoring Map
@@ -332,7 +339,7 @@ export default function AnalyticsPage() {
                 <Maximize2 className="w-4 h-4" />
               </Button>
             </div>
-            
+
             <div className="p-4 bg-white flex flex-wrap gap-3">
               <Select value={selectedBarangay} onValueChange={value => {
                 if (value === "all-barangays" || BALETE_BARANGAYS.includes(value as BarangayName)) {
@@ -399,13 +406,16 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Table Panel */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+          <ReportTrendChart trendData={trendData} totalReports={stats.totalReports} resolvedReports={stats.resolvedReports} pendingReports={stats.pendingReports} />
+        </div>
+
+<div className="tt-surface flex flex-col">
             <div className="p-5 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[#2E7D32]" /> Waste Reports by Barangay
               </h3>
             </div>
-            
+
             <div className="p-0 overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50/50 border-b border-slate-100 text-xs">
@@ -438,48 +448,9 @@ export default function AnalyticsPage() {
               </table>
             </div>
           </div>
-        </div>
+        {!loading && !dataError && <AnalyticsCharts hideTrend trendData={trendData} categoryData={categoryData} eventData={eventData} stats={stats} />}
 
-        {!loading && !dataError && <AnalyticsCharts trendData={trendData} categoryData={categoryData} eventData={eventData} stats={stats} />}
-
-        {/* Fourth Row: Educational Resource Analytics */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mt-6">
-          <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-4">
-            <BookOpen className="w-4 h-4 text-[#2E7D32]" /> Educational Resource Analytics
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[#F1F8F5] rounded-xl p-4 flex items-center gap-4 border border-green-100">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm text-[#2E7D32]">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Resources Published</span>
-                <span className="text-xl font-bold text-slate-900">{stats.totalResources}</span>
-              </div>
-            </div>
-            
-            <div className="bg-blue-50 rounded-xl p-4 flex items-center gap-4 border border-blue-100">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm text-blue-500">
-                <Eye className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Most Viewed Guide</span>
-                <span className="text-sm font-bold text-slate-900 leading-tight">Proper Waste Segregation</span>
-              </div>
-            </div>
-
-            <div className="bg-purple-50 rounded-xl p-4 flex items-center gap-4 border border-purple-100">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm text-purple-500">
-                <PlayCircle className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Most Viewed Video</span>
-                <span className="text-sm font-bold text-slate-900 leading-tight">Plastic Pollution Awareness</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t pt-5 text-sm text-muted-foreground"><BookOpen className="h-4 w-4" aria-hidden="true" /><span>{stats.totalResources} learning resources available to the community</span></div>
 
       </div>
 
@@ -502,7 +473,7 @@ export default function AnalyticsPage() {
             </div>
             <div className="flex-1 w-full relative isolate bg-slate-50">
               <MapComponent barangayStats={mapStats} selectedBarangay={selectedBarangay} />
-              
+
               {/* Floating Legend for Expanded Map */}
               <div className="absolute bottom-6 left-6 bg-white/95 backdrop-blur-sm rounded-lg p-4 shadow-xl border border-slate-100 z-[1000]">
                  <h4 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">Legend</h4>

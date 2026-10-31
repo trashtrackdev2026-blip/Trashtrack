@@ -1,12 +1,11 @@
 "use client";
 
-import { Users, Search, MapPin, Calendar, CalendarCheck, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, MoreVertical, Plus, Download } from "lucide-react";
+import { Users, Search, MapPin, Calendar, CalendarCheck, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, MoreVertical, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Image from "next/image";
-import Link from "next/link";
 
 import { useState, useEffect } from "react";
 import { collection, deleteDoc, doc, query, where } from "firebase/firestore";
@@ -24,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Edit, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 interface EventData {
   id: string;
@@ -66,6 +65,14 @@ export default function EventsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [barangayFilter, setBarangayFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
+  const filteredEvents = events.filter(event => (!search.trim() || [event.title,event.barangay,event.description || ""].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
+    && (statusFilter === "all" || event.status.toLowerCase() === statusFilter)
+    && (barangayFilter === "all" || event.barangay === barangayFilter)
+    && (dateFilter === "all" || (event.dateISO || event.date || "").slice(0,7) === new Date().toISOString().slice(0,7)));
   // Derive activeEvent from the live events list so it always reflects real-time data
   const activeEvent = events.find(e => e.id === activeEventId) ?? null;
 
@@ -163,7 +170,7 @@ export default function EventsPage() {
     setActiveEventId(event.id);
     if (window.innerWidth < 1024) {
       setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        document.getElementById("event-detail")?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
       }, 100);
     }
   };
@@ -173,9 +180,9 @@ export default function EventsPage() {
       {certificatePreview && <CertificatePreview data={certificatePreview} onClose={() => setCertificatePreview(null)} />}
       <div className="space-y-6 max-w-[1400px] mx-auto">
         <DataState loading={loading} error={dataError} onRetry={retryData} />
-        
+
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="tt-metric-strip">
           <KpiCard 
             title="Total Events" 
             value={events.length.toString()} 
@@ -210,26 +217,26 @@ export default function EventsPage() {
           />
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="tt-event-layout">
           {/* Main Table Area */}
-          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-            
+          <div className="flex-1 tt-surface overflow-hidden flex flex-col">
+
             {/* Filters Bar */}
             <div className="p-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative w-full sm:w-64 shrink-0 mt-5">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input 
-                    placeholder="Search events..." 
+                    placeholder="Search events" aria-label="Search events" value={search} onChange={event => { setSearch(event.target.value);setCurrentPage(1); }}
                     className="pl-9 bg-slate-50 border-none rounded-xl h-9 text-sm focus-visible:ring-1 focus-visible:ring-[#2E7D32] focus-visible:bg-white transition-colors"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 ml-1">Status</span>
-                  <Select defaultValue="all">
+                  <Select value={statusFilter} onValueChange={value => { setStatusFilter(value || "all");setCurrentPage(1); }}>
                     <SelectTrigger className="w-[120px] bg-white border-slate-200 rounded-xl h-9 text-sm">
-                      <SelectValue placeholder="All Status" />
+                      <SelectValue>{statusFilter === "all" ? "All statuses" : statusFilter.charAt(0).toUpperCase()+statusFilter.slice(1)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
@@ -241,23 +248,22 @@ export default function EventsPage() {
 
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 ml-1">Barangay</span>
-                  <Select defaultValue="all">
+                  <Select value={barangayFilter} onValueChange={value => { setBarangayFilter(value || "all");setCurrentPage(1); }}>
                     <SelectTrigger className="w-[140px] bg-white border-slate-200 rounded-xl h-9 text-sm">
-                      <SelectValue placeholder="All Barangays" />
+                      <SelectValue>{barangayFilter === "all" ? "All barangays" : barangayFilter}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Barangays</SelectItem>
-                      <SelectItem value="poblacion">Poblacion</SelectItem>
-                      <SelectItem value="makina">Makina</SelectItem>
+                      {[...new Set(events.map(event => event.barangay))].filter(Boolean).sort().map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 ml-1">Date Range</span>
-                  <Select defaultValue="all">
+                  <Select value={dateFilter} onValueChange={value => { setDateFilter(value || "all");setCurrentPage(1); }}>
                     <SelectTrigger className="w-[120px] bg-white border-slate-200 rounded-xl h-9 text-sm">
-                      <SelectValue placeholder="All Time" />
+                      <SelectValue>{dateFilter === "all" ? "All time" : "This month"}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Time</SelectItem>
@@ -268,101 +274,30 @@ export default function EventsPage() {
               </div>
 
               <div className="flex flex-col justify-end pt-[20px]">
-                <Link href="/events/create">
-                  <Button className="h-9 px-4 bg-[#1B5E20] hover:bg-[#2E7D32] text-white rounded-xl shadow-sm">
-                    <Plus className="w-4 h-4 mr-1.5" />
-                    Create Event
-                  </Button>
-                </Link>
+
               </div>
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-sm text-left">
-                <thead className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 bg-slate-50/80 border-b border-slate-100">
-                  <tr>
-                    <th className="py-3 px-6">Event Title</th>
-                    <th className="py-3 px-4">Barangay</th>
-                    <th className="py-3 px-4">Date & Time <span className="inline-block ml-1">↑</span></th>
-                    <th className="py-3 px-4">Participants</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-6 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {events.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((event) => (
-                    <tr key={event.id} className={`border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors ${activeEvent?.id === event.id ? 'bg-[#E8F5E9]/30' : ''}`}>
-                      <td className="py-3 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-16 h-10 rounded overflow-hidden relative shrink-0">
-                            <Image src={event.img} alt={event.title} fill className="object-cover" />
-                          </div>
-                          <span className="font-bold text-slate-800 line-clamp-2 max-w-[150px] leading-tight">{event.title}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-slate-600 font-medium">{event.barangay}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex flex-col">
-                          <span className="text-slate-800 font-medium">{event.date}</span>
-                          <span className="text-[10px] text-slate-500">{event.time}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center text-slate-700 font-medium">
-                          <Users className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
-                          {event.participants}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                          event.status === 'Completed' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-blue-50 text-blue-500'
-                        }`}>
-                          {event.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button 
-                            onClick={() => handleView(event)}
-                            variant="outline" size="sm" className={`h-7 px-3 text-xs rounded-lg ${activeEvent?.id === event.id ? 'text-white bg-[#2E7D32] border-[#2E7D32]' : event.status.toLowerCase() === 'upcoming' ? 'text-blue-600 border-blue-200 hover:bg-blue-50' : 'text-[#2E7D32] border-green-200 hover:bg-[#E8F5E9]'}`}>
-                            View
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none">
-                              <MoreVertical className="w-4 h-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem className="cursor-pointer" onClick={() => alert("Edit coming soon!")}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                <span>Edit</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600" onClick={() => handleDeleteEvent(event.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                <span>Delete</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
+            <div className="tt-event-agenda">
+                {filteredEvents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(event => { const raw=event.dateISO || event.date;const date=new Date(raw + (/^\d{4}-\d{2}-\d{2}$/.test(raw) ? "T12:00:00" : ""));const valid=!Number.isNaN(date.getTime());return <article key={event.id} className={"tt-event-row" + (activeEvent?.id === event.id ? " is-selected" : "")}>
+                  <div className="tt-date-block"><strong>{valid ? date.getDate().toString().padStart(2,"0") : "—"}</strong><span>{valid ? date.toLocaleDateString("en-PH",{month:"short"}) : "Event"}</span></div>
+                  <button type="button" className="tt-event-main" onClick={() => handleView(event)} aria-pressed={activeEvent?.id === event.id}><strong>{event.title}</strong><small>{event.barangay}<br />{event.date} · {event.time}<br />{event.participants || 0} registered · {event.status}</small></button>
+                  <div className="tt-event-row-actions"><Button variant="outline" onClick={() => handleView(event)} aria-label={"View " + event.title}>View</Button><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+                </article>;})}
+                {!loading && filteredEvents.length === 0 && <p className="tt-empty">No events match your filters.</p>}
+              </div>
+
             {/* Pagination */}
             {(() => {
-              const totalPages = Math.max(1, Math.ceil(events.length / itemsPerPage));
-              const startItem = events.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
-              const endItem = Math.min(currentPage * itemsPerPage, events.length);
-              
+              const totalPages = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
+              const startItem = filteredEvents.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+              const endItem = Math.min(currentPage * itemsPerPage, filteredEvents.length);
+
               return (
                 <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <span className="text-xs text-slate-500">Showing {startItem} to {endItem} of {events.length} events</span>
-                  
+                  <span className="text-xs text-slate-500">Showing {startItem} to {endItem} of {filteredEvents.length} events</span>
+
                   <div className="flex items-center gap-1">
                     <Button 
                       variant="outline" 
@@ -373,14 +308,14 @@ export default function EventsPage() {
                     >
                       <ChevronLeft className="w-3 h-3" />
                     </Button>
-                    
+
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       let pageNum = currentPage;
                       if (totalPages <= 5) pageNum = i + 1;
                       else if (currentPage <= 3) pageNum = i + 1;
                       else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
                       else pageNum = currentPage - 2 + i;
-                      
+
                       return (
                         <Button 
                           key={pageNum}
@@ -393,7 +328,7 @@ export default function EventsPage() {
                         </Button>
                       );
                     })}
-                    
+
                     {totalPages > 5 && currentPage < totalPages - 2 && (
                       <>
                         <span className="px-1 text-slate-400">...</span>
@@ -418,7 +353,7 @@ export default function EventsPage() {
                       <ChevronRight className="w-3 h-3" />
                     </Button>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 hidden sm:flex">
                     <Select 
                       value={itemsPerPage.toString()} 
@@ -444,7 +379,7 @@ export default function EventsPage() {
 
           {/* Right Panel: Event Details */}
           {activeEvent && (
-          <div className="w-full lg:w-[320px] shrink-0 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col p-5">
+          <div id="event-detail" className="tt-surface min-w-0 scroll-mt-5 p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg text-slate-900">Event Details</h3>
               <div className="flex items-center gap-2">
@@ -457,19 +392,19 @@ export default function EventsPage() {
               </div>
             </div>
 
-            <div className="flex gap-4 mb-6">
-              <div className="w-20 h-20 rounded-lg overflow-hidden relative shrink-0">
+            <div className="mb-6 flex flex-col gap-4">
+              <div className="relative aspect-video w-full overflow-hidden rounded-xl">
                  <Image src={activeEvent.img} alt={activeEvent.title} fill className="object-cover" />
               </div>
               <div className="flex flex-col">
-                <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1">{activeEvent.title}</h4>
+                <h4 className="mb-2 font-outfit text-xl font-semibold leading-tight text-slate-800">{activeEvent.title}</h4>
                 <p className="text-[10px] text-slate-500 leading-tight">{activeEvent.description}</p>
               </div>
             </div>
 
             <div className="space-y-4 mb-6">
               <h5 className="font-bold text-sm text-slate-800 border-b border-slate-100 pb-2">Event Information</h5>
-              
+
               <div className="flex gap-3 items-start">
                 <Calendar className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
                 <div className="flex flex-col">
@@ -505,7 +440,7 @@ export default function EventsPage() {
 
             <div className="mt-auto">
               <AttendanceQr key={activeEvent.id} eventId={activeEvent.id} method={activeEvent.attendanceMethod} />
-              
+
               <div className="bg-green-50 p-3 rounded-lg flex items-start gap-2 border border-green-100/50">
                 <div className="w-4 h-4 rounded-full bg-[#2E7D32] text-white flex items-center justify-center shrink-0 mt-0.5">
                   <span className="text-[9px] font-bold">i</span>
@@ -566,7 +501,7 @@ export default function EventsPage() {
                 </div>
               )}
             </div>
-            
+
           </div>
           )}
         </div>

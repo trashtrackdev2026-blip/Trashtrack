@@ -67,9 +67,9 @@ export default function NotificationsPage() {
   const filteredNotifications = notifications.filter((notif) => {
     const matchesSearch = notif.title.toLowerCase().includes(search.toLowerCase()) || notif.message.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === "category" || notif.type.toLowerCase() === category;
-    
+
     const matchesStatus = status === "status" || (status === "sent" ? !notif.push || notif.pushStatus === "queued" : status === "failed" ? notif.pushStatus === "failed" : notif.push && ["pending", "sending"].includes(notif.pushStatus));
-    
+
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
@@ -142,15 +142,15 @@ export default function NotificationsPage() {
       <div className="space-y-6 max-w-[1400px] mx-auto">
         <DataState loading={loading} error={dataError} onRetry={retryData} />
         {deliveryError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{deliveryError}</p>}
-        
+
         {/* Header */}
-        <div className="flex flex-col gap-2 mb-2">
+        <div className="tt-legacy-heading flex flex-col gap-2 mb-2">
           <h1 className="text-[26px] font-bold text-slate-900 leading-tight">Notifications</h1>
           <p className="text-sm text-slate-500">Create and manage notifications sent to residents.</p>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="tt-metric-strip">
           <KpiCard 
             title="Total Notifications" 
             value={notifications.length.toString()} 
@@ -197,11 +197,11 @@ export default function NotificationsPage() {
                 className="pl-9 h-11 bg-slate-50 border-slate-200" 
               />
             </div>
-            
+
             <div className="flex gap-3">
               <Select value={category} onValueChange={(val) => { setCategory(val ?? "all"); setCurrentPage(1); }}>
                 <SelectTrigger className="w-[140px] h-11 bg-white border-slate-200">
-                  <SelectValue placeholder="Category" />
+                  <SelectValue>{category === "category" ? "All categories" : category.charAt(0).toUpperCase()+category.slice(1)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="category">Category (All)</SelectItem>
@@ -214,7 +214,7 @@ export default function NotificationsPage() {
 
               <Select value={status} onValueChange={(val) => { setStatus(val ?? "all"); setCurrentPage(1); }}>
                 <SelectTrigger className="w-[130px] h-11 bg-white border-slate-200">
-                  <SelectValue placeholder="Status" />
+                  <SelectValue>{status === "status" ? "All statuses" : status === "sent" ? "Sent" : status === "failed" ? "Phone failed" : "Phone pending"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="status">Status (All)</SelectItem>
@@ -236,16 +236,13 @@ export default function NotificationsPage() {
               </Select>
             </div>
           </div>
-          
-          <Link href="/notifications/create">
-            <Button className="w-full sm:w-auto h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm px-6">
-              <Plus className="w-4 h-4 mr-2" /> Create Notification
-            </Button>
-          </Link>
+
+
         </div>
 
+        <nav className="tt-tabs" aria-label="Announcements"><Link href="/notifications" aria-current="page">Notification history</Link><Link href="/notifications/create">Compose notification</Link></nav>
         {/* Table Area */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="tt-surface overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-slate-50/50 border-b border-slate-100">
@@ -311,17 +308,17 @@ export default function NotificationsPage() {
               </tbody>
             </table>
           </div>
-          
+
           {/* Pagination */}
           {(() => {
             const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / itemsPerPage));
             const startItem = filteredNotifications.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
             const endItem = Math.min(currentPage * itemsPerPage, filteredNotifications.length);
-            
+
             return (
               <div className="py-4 px-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between bg-white gap-4">
                 <span className="text-xs text-slate-500 font-medium">Showing {startItem} to {endItem} of {filteredNotifications.length} notifications</span>
-                
+
                 <div className="flex items-center gap-1">
                   <Button 
                     variant="outline" 
@@ -332,14 +329,14 @@ export default function NotificationsPage() {
                   >
                     <ChevronDown className="w-4 h-4 rotate-90" />
                   </Button>
-                  
+
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum = currentPage;
                     if (totalPages <= 5) pageNum = i + 1;
                     else if (currentPage <= 3) pageNum = i + 1;
                     else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
                     else pageNum = currentPage - 2 + i;
-                    
+
                     return (
                       <Button 
                         key={pageNum}
@@ -352,7 +349,7 @@ export default function NotificationsPage() {
                       </Button>
                     );
                   })}
-                  
+
                   {totalPages > 5 && currentPage < totalPages - 2 && (
                     <>
                       <span className="text-slate-400 px-1">...</span>
@@ -387,14 +384,14 @@ export default function NotificationsPage() {
       <Dialog open={selectedNotif !== null} onOpenChange={open => { if (!open) setSelectedNotif(null); }}>
       {selectedNotif && (
           <DialogContent className="sm:max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 gap-0 bg-white">
-            
+
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <DialogTitle className="text-lg font-bold text-slate-900">Notification Details</DialogTitle>
               <DialogDescription className="sr-only">Saved notification sent to {selectedNotif.recipients}</DialogDescription>
             </div>
 
             <div className="p-8 flex flex-col gap-6">
-              
+
               <div className="flex items-start gap-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${selectedNotif.type.toLowerCase() === 'report' ? 'bg-orange-50 text-orange-500' : selectedNotif.type.toLowerCase() === 'schedule' ? 'bg-blue-50 text-blue-500' : 'bg-[#E8F5E9] text-[#2E7D32]'}`}>
                   {selectedNotif.type.toLowerCase() === 'report' ? <AlertTriangle className="w-6 h-6" /> : selectedNotif.type.toLowerCase() === 'schedule' ? <CalendarDays className="w-6 h-6" /> : <Megaphone className="w-6 h-6" />}

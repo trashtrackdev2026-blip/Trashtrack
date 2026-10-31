@@ -32,7 +32,7 @@ export default function CreateEducationResourcePage() {
     fileName: "",
     description: "",
   });
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -78,7 +78,7 @@ export default function CreateEducationResourcePage() {
       alert("Title is required");
       return;
     }
-    
+
     if (isUploading) return;
     setUploadError("");
     setIsSubmitting(true);
@@ -113,9 +113,9 @@ export default function CreateEducationResourcePage() {
   return (
     <>
       <div className="space-y-8 max-w-[1400px] mx-auto">
-        
+
         {/* Header */}
-        <div className="flex flex-col gap-2">
+        <div className="tt-legacy-heading flex flex-col gap-2">
           <h1 className="text-[26px] font-bold text-slate-900 leading-tight">
             {isSuccess ? "Resource Published" : "Add Educational Resource"}
           </h1>
@@ -128,14 +128,14 @@ export default function CreateEducationResourcePage() {
 
         {/* Main Content Area */}
         <div className="flex flex-col lg:flex-row gap-8">
-          
-          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+
+          <div className="flex-1 tt-surface p-8">
             {isSuccess ? (
               <div className="flex flex-col items-center justify-center text-center py-12">
                 <div className="w-20 h-20 bg-[#E8F5E9] rounded-full flex items-center justify-center mb-6 relative">
                   <Send className="w-10 h-10 text-[#2E7D32]" />
                 </div>
-                
+
                 <h2 className="text-2xl font-bold text-[#2E7D32] mb-3">Resource Published Successfully!</h2>
                 <p className="text-sm text-slate-600 mb-10 max-w-md">
                   Your new educational material &quot;{form.title}&quot; is now live and accessible to all residents in the TrashTrack app.
@@ -151,7 +151,7 @@ export default function CreateEducationResourcePage() {
               </div>
             ) : (
               <div className="space-y-8">
-                
+
                 <div className="space-y-6 max-w-2xl">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Resource Title <span className="text-red-500">*</span></label>
@@ -214,7 +214,7 @@ export default function CreateEducationResourcePage() {
                       placeholder="Provide a brief summary or the content of the educational resource..."
                     />
                   </div>
-                  
+
                   {/* File Upload Section */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -260,7 +260,7 @@ export default function CreateEducationResourcePage() {
                           onChange={handleFileUpload} 
                           disabled={isUploading} 
                         />
-                        
+
                         {isUploading ? (
                           <div className="flex flex-col items-center justify-center z-10 bg-white/90 absolute inset-0">
                             <span className="text-xs font-semibold text-[#2E7D32] animate-pulse">Uploading media...</span>
@@ -338,7 +338,7 @@ export default function CreateEducationResourcePage() {
               </div>
             )}
           </div>
-          
+
         </div>
       </div>
     </>

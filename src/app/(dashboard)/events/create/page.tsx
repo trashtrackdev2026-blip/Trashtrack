@@ -17,7 +17,7 @@ import { certificateSettings, eventDate } from "@/lib/certificate-data";
 
 export default function CreateEventPage() {
   const [attendance, setAttendance] = useState<"qr" | "manual">("qr");
-  
+
   const [form, setForm] = useState({
     title: "",
     category: "Clean-up Drive",
@@ -70,7 +70,7 @@ export default function CreateEventPage() {
       alert("Please fill in all required fields.");
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       const settings = { certificateEnabled, certificateSignatory, certificatePosition, certificateOrganizer };
@@ -101,15 +101,15 @@ export default function CreateEventPage() {
       setIsSubmitting(false);
     }
   };
-  
+
   if (isSuccess) {
     return (
       <>
         <div className="space-y-8 max-w-[1400px] mx-auto">
-          <div className="flex flex-col gap-2">
+          <div className="tt-legacy-heading flex flex-col gap-2">
             <h1 className="text-[26px] font-bold text-slate-900 leading-tight">Event Created!</h1>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-12 flex flex-col items-center justify-center text-center">
+          <div className="tt-surface p-12 flex flex-col items-center justify-center text-center">
             <div className="w-20 h-20 bg-[#E8F5E9] rounded-full flex items-center justify-center mb-6">
               <CheckCircle2 className="w-10 h-10 text-[#2E7D32]" />
             </div>
@@ -132,27 +132,27 @@ export default function CreateEventPage() {
     <>
       {certificatePreview && <CertificatePreview data={certificatePreview} onClose={() => setCertificatePreview(null)} />}
       <div className="space-y-8 max-w-[1400px] mx-auto">
-        
+
         {/* Header */}
-        <div className="flex flex-col gap-2">
+        <div className="tt-legacy-heading flex flex-col gap-2">
           <h1 className="text-[26px] font-bold text-slate-900 leading-tight">Create Community Event</h1>
           <p className="text-sm text-slate-500">Create and publish an environmental community event.</p>
         </div>
 
         {/* Main Content Area */}
         <div className="flex flex-col lg:flex-row gap-8">
-          
+
           {/* Left Column - Form */}
-          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-            
+          <div className="flex-1 tt-surface p-8">
+
             <div className="space-y-10">
-              
+
               {/* Section 1 */}
               <div>
                 <h3 className="text-[15px] font-bold text-[#2E7D32] flex items-center gap-2 border-b border-slate-100 pb-3 mb-6">
                   1. Event Information
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5 md:col-span-1">
                     <label className="text-xs font-bold text-slate-700">Event Title <span className="text-red-500">*</span></label>
@@ -195,7 +195,7 @@ export default function CreateEventPage() {
                            <span className="text-xs font-semibold text-[#2E7D32]">Uploading...</span>
                         </div>
                       ) : null}
-                      
+
                       {form.image && form.image !== "/images/events/cleanup.jpg" ? (
                         form.image.endsWith(".pdf") || form.image.endsWith(".doc") || form.image.endsWith(".docx") ? (
                           <div className="flex flex-col items-center text-[#2E7D32]">
@@ -222,7 +222,7 @@ export default function CreateEventPage() {
                 <h3 className="text-[15px] font-bold text-[#2E7D32] flex items-center gap-2 border-b border-slate-100 pb-3 mb-6">
                   2. Date, Time & Location
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                   <div className="space-y-1.5 md:col-span-1">
                     <label className="text-xs font-bold text-slate-700">Event Date <span className="text-red-500">*</span></label>
@@ -245,7 +245,7 @@ export default function CreateEventPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5 md:col-span-1">
                     <label className="text-xs font-bold text-slate-700">Barangay <span className="text-red-500">*</span></label>
@@ -272,9 +272,9 @@ export default function CreateEventPage() {
                   3. Attendance Method
                 </h3>
                 <p className="text-xs text-slate-500 mb-4">Choose how you want to record participation in this event.</p>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  
+
                   {/* QR Code Option */}
                   <div 
                     className={`rounded-xl border-2 p-5 cursor-pointer transition-all ${attendance === 'qr' ? 'border-[#2E7D32] bg-[#F1F8F5]' : 'border-slate-200 bg-white hover:border-green-200'}`}
@@ -287,7 +287,7 @@ export default function CreateEventPage() {
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-slate-900 mb-1">QR Code Attendance</span>
                         <span className="text-xs text-slate-600 mb-4 leading-relaxed">Residents scan the QR code during the event to record attendance.</span>
-                        
+
                         {attendance === 'qr' && (
                           <div className="bg-[#E8F5E9] rounded-lg p-3 flex items-center gap-3 border border-green-100/50">
                             <div className="w-12 h-12 bg-white rounded flex items-center justify-center shrink-0 border border-slate-100">
@@ -309,11 +309,11 @@ export default function CreateEventPage() {
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 ${attendance === 'manual' ? 'border-[#2E7D32] bg-[#2E7D32]' : 'border-slate-300'}`}>
                         {attendance === 'manual' && <div className="w-2 h-2 rounded-full bg-white"></div>}
                       </div>
-                      <div className="flex flex-col w-full">
+                      <div className="flex min-w-0 flex-col w-full">
                         <span className="text-sm font-bold text-slate-900 mb-1">Manual Attendance</span>
                         <span className="text-xs text-slate-600 mb-4 leading-relaxed">Administrator will record attendance manually during the event.</span>
-                        
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+
+                        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50">
                           <table className="w-full text-left text-[10px]">
                             <thead className="bg-slate-100 border-b border-slate-200 text-slate-600">
                               <tr>
@@ -362,14 +362,14 @@ export default function CreateEventPage() {
                     4. Certificate (Optional)
                   </h3>
                 </div>
-                
-                <div className="flex items-start gap-8">
-                  <div className="flex items-center gap-3 shrink-0">
+
+                <div className="flex min-w-0 flex-col items-stretch gap-6">
+                  <div className="flex min-w-0 items-start gap-3">
                     <input id="enable-certificate" type="checkbox" checked={certificateEnabled} onChange={event => setCertificateEnabled(event.target.checked)} className="h-5 w-5 accent-green-800" />
                     <label htmlFor="enable-certificate" className="text-sm font-bold text-slate-800">Enable digital certificate for participants</label>
                   </div>
-                  
-                  <div className="flex-1 grid grid-cols-2 gap-4">
+
+                  <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-700">Certificate Signatory</label>
                       <Input value={certificateSignatory} onChange={event => setCertificateSignatory(event.target.value)} disabled={!certificateEnabled} maxLength={100} placeholder="Organizer's full name" className="h-9 bg-white border-slate-200 text-sm" />
@@ -378,11 +378,11 @@ export default function CreateEventPage() {
                       <label className="text-[11px] font-bold text-slate-700">Signatory Position</label>
                       <Input value={certificatePosition} onChange={event => setCertificatePosition(event.target.value)} disabled={!certificateEnabled} maxLength={100} placeholder="e.g. Lead Trainer" className="h-9 bg-white border-slate-200 text-sm" />
                     </div>
-                    <div className="col-span-2 space-y-1.5">
+                    <div className="space-y-1.5 sm:col-span-2">
                       <label className="text-[11px] font-bold text-slate-700">Organizing office</label>
                       <Input value={certificateOrganizer} onChange={event => setCertificateOrganizer(event.target.value)} disabled={!certificateEnabled} maxLength={160} />
                     </div>
-                    <p className="col-span-2 text-xs text-slate-500">Your gold and green Certificate of Appreciation template fills each attendee&apos;s name, the event title and event date automatically.</p>
+                    <p className="text-xs text-slate-500 sm:col-span-2">Your gold and green Certificate of Appreciation template fills each attendee&apos;s name, the event title and event date automatically.</p>
                     <Button type="button" variant="outline" disabled={!certificateEnabled} onClick={() => setCertificatePreview({
                       title: form.title, dateISO: form.date, certificateSignatory, certificatePosition, certificateOrganizer,
                     })}>Preview certificate</Button>
@@ -391,7 +391,7 @@ export default function CreateEventPage() {
               </div>
 
               {/* Form Actions */}
-              <div className="mt-12 flex justify-end items-center gap-4 pt-6 border-t border-slate-100">
+              <div className="mt-12 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-6">
                 <Link href="/events">
                   <Button variant="ghost" className="px-6 h-11 text-slate-600 font-semibold rounded-xl hover:bg-slate-50">
                     Cancel
@@ -410,13 +410,13 @@ export default function CreateEventPage() {
 
           {/* Right Column - Preview Box */}
           <div className="w-full lg:w-[380px] shrink-0 flex flex-col gap-6">
-            
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col">
+
+            <div className="tt-surface p-6 flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-slate-900">Event Preview</h3>
                 <span className="text-[10px] font-bold text-[#2E7D32] bg-[#E8F5E9] px-2 py-0.5 rounded-full uppercase tracking-wider border border-green-100">Preview</span>
               </div>
-              
+
               <div className="bg-slate-50 rounded-xl aspect-video w-full flex items-center justify-center border border-slate-100 mb-5 relative overflow-hidden">
                 {form.image && form.image !== "/images/events/cleanup.jpg" ? (
                   <img src={form.image} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
@@ -434,7 +434,7 @@ export default function CreateEventPage() {
               <div className="flex mb-6">
                 <span className="text-[10px] font-bold text-[#2E7D32] bg-[#E8F5E9] px-2 py-0.5 rounded uppercase tracking-wider">{form.category || "Category"}</span>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <CalendarIcon className="w-4 h-4 text-slate-400" />
@@ -467,10 +467,10 @@ export default function CreateEventPage() {
             </div>
 
             {attendance === 'qr' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col">
+              <div className="tt-surface p-6 flex flex-col">
                 <h3 className="font-bold text-slate-900 mb-2">QR Code Preview <span className="text-slate-400 font-normal">(Example)</span></h3>
                 <p className="text-xs text-slate-500 mb-6">This QR code will be used to record attendance when the event is active.</p>
-                
+
                 <div className="flex flex-col items-center justify-center">
                   <div className="bg-white p-2 border border-slate-200 rounded-xl mb-3 shadow-sm">
                     {/* Placeholder for QR code with logo */}

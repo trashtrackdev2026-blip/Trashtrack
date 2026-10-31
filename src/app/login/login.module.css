@@ -1,37 +1,32 @@
-.page { min-height: 100svh; width: 100%; display: flex; position: relative; background: #fff; color: #0e2332; }
-.panel { width: 44%; min-height: 100svh; padding: clamp(30px, 5vw, 80px) clamp(28px, 4.2vw, 76px) 32px; display: flex; flex-direction: column; position: relative; z-index: 2; background: #fff; }
-.panelArtwork { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
-.panelCurves { position: absolute; inset: 0; width: 100%; height: 100%; }
-.foliageLeft, .foliageRight { position: absolute; bottom: 0; background-image: url("/images/signin-corner-foliage.webp"); background-repeat: no-repeat; }
-.foliageLeft { left: 0; width: 28%; height: 17%; background-size: 220% 270%; background-position: left bottom; }
-.foliageRight { right: 0; width: 24%; height: 13%; background-size: 280% 400%; background-position: right bottom; }
-.brand { display: flex; align-items: center; gap: 11px; color: #197332; font-family: var(--font-outfit), sans-serif; font-weight: 750; font-size: 24px; }
-.brandMark { display: grid; place-items: center; width: 40px; height: 40px; background: linear-gradient(135deg, #0d6c36, #438f43); border-radius: 5px; color: #fff; font-size: 23px; font-family: var(--font-inter), sans-serif; font-weight: 600; }
-.content { width: 100%; max-width: 440px; margin: auto; padding: 55px 0 28px; }
-.content h1 { font-size: clamp(30px, 2.4vw, 44px); line-height: 1.08; font-weight: 750; letter-spacing: -.9px; margin-bottom: 16px; }
-.content h1 span { color: #0b6538; }
-.intro { color: #78869a; font-size: 17px; line-height: 1.35; margin-bottom: 32px; }
-.content form { font-size: 16px; }
-.content form label { color: #132737; font-size: 16px; font-weight: 500; }
-.content form input { height: 56px; border-radius: 14px; border-color: #d9dde3; box-shadow: none; font-size: 15px; background: #fff; }
-.content form input::placeholder { color: #89909b; }
-.content form button[type=submit] { min-height: 52px; border-radius: 13px; background: linear-gradient(110deg, #08703b, #096533); font-size: 17px; font-weight: 650; box-shadow: none; }
-.content form button[type=submit]:hover { background: #075c2d; }
-.content form button[type=submit]:disabled { opacity: .65; }
-.content form a { color: #096b2b; }
-.support { display: flex; align-items: center; gap: 13px; margin-top: 42px; padding: 14px 18px; border-radius: 15px; background: #f0f6ee; font-size: 13px; color: #677581; line-height: 1.5; }
-.support strong { color: #12602d; font-weight: 600; }
-.supportIcon { color: #126830; border-radius: 50%; background: #e6f0e3; width: 45px; height: 45px; display: grid; place-items: center; flex: 0 0 auto; }
-.copyright { color: #8693a7; font-size: 12px; text-align: center; }
-.hero { position: fixed; right: 0; top: 0; bottom: 0; width: 61%; overflow: hidden; clip-path: polygon(0 0, 100% 0, 100% 100%, 8% 100%); background: #a4bfa1; }
-.heroImage { object-fit: cover; object-position: 55% center; }
-.message { position: absolute; left: 9%; bottom: 5%; width: min(420px, 76%); padding: 25px 28px; color: white; border-radius: 24px; border: 1px solid #ffffff70; background: #3d503f66; backdrop-filter: blur(16px); box-shadow: 0 10px 40px #18362725; }
-.leaf { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; background: #ecf7e6dd; color: #326c37; margin-bottom: 12px; }
-.message h2 { font-weight: 750; font-size: clamp(28px, 1.9vw, 35px); line-height: 1.12; letter-spacing: -.7px; }
-.message p { font-size: 15px; line-height: 1.5; font-weight: 500; margin-top: 18px; }
-@media(min-width: 1700px) { .content { padding-top: 65px; } }
-@media(max-width: 1100px) { .panel { width: 48%; padding-left: 34px; padding-right: 34px; } .hero { width: 54%; } .message { left: 12%; width: 80%; padding: 24px; bottom: 18%; } .intro { font-size: 15px; } }
-@media(max-width: 899px) { .hero { display: none; } .panel { width: 100%; max-width: 600px; margin: auto; padding: 32px 28px 24px; } .content { padding: 55px 0 35px; } .content h1 { font-size: 36px; } .support { margin-top: 32px; } }
-@media(max-height: 760px) and (min-width: 900px) { .panel { padding-top: 30px; padding-bottom: 24px; } .content { padding-top: 30px; padding-bottom: 24px; } .support { margin-top: 28px; } .intro { margin-bottom: 24px; } }
-
-@media(min-width: 1101px) { .panel { clip-path: polygon(0 0, 90% 0, 100% 100%, 0 100%); } .hero { clip-path: none; } }
+.page{min-height:100svh;display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,460px);grid-template-rows:auto 1fr auto;column-gap:7%;padding:clamp(30px,5vw,80px) clamp(28px,6vw,110px) 30px;position:relative;isolation:isolate;overflow:hidden;color:#123b2e;background:#48634f}
+.background{object-fit:cover;object-position:center;z-index:-3}
+.shade{position:absolute;inset:0;z-index:-2;background:linear-gradient(90deg,rgba(8,34,25,.18),transparent 65%),linear-gradient(0deg,rgba(10,32,24,.27),transparent 65%);pointer-events:none}
+.brand{grid-column:1;grid-row:1;align-self:start;width:fit-content;padding:8px 15px 10px 0;text-shadow:0 1px 18px #fff8}
+.message{grid-column:1;grid-row:2;align-self:center;margin:50px 0;max-width:650px;color:#fffef1;text-shadow:0 2px 22px #0b271a66}
+.message h2{font-family:var(--font-outfit),sans-serif;font-size:clamp(42px,4.8vw,76px);font-weight:650;letter-spacing:-2.4px;line-height:1.03}
+.message p{font-size:clamp(15px,1.5vw,22px);margin-top:20px;line-height:1.6;max-width:450px}
+.panel{grid-column:2;grid-row:1/3;align-self:center;width:100%;padding:clamp(30px,3.5vw,52px);border:1px solid #ffffffa6;border-radius:28px;background:rgba(250,251,245,.83);backdrop-filter:blur(22px);box-shadow:0 20px 75px #17302126}
+.eyebrow{font-size:11px;font-weight:650;letter-spacing:.18em;text-transform:uppercase;color:#527564}
+.panel h1{font-family:var(--font-outfit),sans-serif;font-size:clamp(32px,3vw,44px);font-weight:650;letter-spacing:-1.4px;line-height:1.15;margin:14px 0 8px}
+.intro{color:#5b6c66;font-size:15px;line-height:1.6;margin-bottom:32px}
+.panel form{font-size:14px}
+.panel form label{font-size:13px;font-weight:500;color:#34544a}
+.panel form input{height:50px;border-radius:11px;background:rgba(255,255,252,.72);border-color:#ffffff90;box-shadow:none;font-size:15px;color:#123b2e}
+.panel form input::placeholder{color:#78867e}
+.panel form button[type=submit]{height:49px;min-height:49px;border-radius:11px;background:#134e3b;font-size:15px;font-weight:600;box-shadow:0 4px 16px #133e3020;margin-top:5px}
+.panel form button[type=submit]:hover{background:#0b3c2b}
+.panel form button[type=submit]:disabled{opacity:.6}
+.panel form a{color:#1e5641;font-size:12px}
+.panel form>a{display:block;text-align:right}
+.panel form>p{font-size:12px;text-align:center;margin-top:25px;padding-top:23px;border-top:1px solid #446a4129;color:#607067}
+.panel form>p a{font-size:12px}
+.support{display:flex;justify-content:center;gap:9px;align-items:flex-start;text-align:center;color:#405f51;font-size:11px;line-height:1.8;margin-top:28px}
+.support svg{flex:none;margin-top:2px}
+.support span{color:#64776b}
+.copyright{grid-column:2;grid-row:3;text-align:center;color:#fffdeb;font-size:11px;letter-spacing:.04em;text-shadow:0 1px 8px #0d2b19;margin-top:30px}
+.copyright span{display:block;margin-top:5px;font-size:10px;opacity:.8}
+@media(min-width:1500px){.panel{max-width:470px}.message{max-width:720px}}
+@media(max-width:1000px){.page{column-gap:5%;grid-template-columns:minmax(0,1fr) minmax(340px,420px);padding:35px}.message h2{font-size:clamp(36px,5vw,52px);letter-spacing:-1.5px}.panel{padding:32px}.intro{font-size:14px}}
+@media(max-width:760px){.page{grid-template-columns:1fr;padding:25px 22px 24px;row-gap:28px}.brand{grid-row:1}.message{grid-row:2;margin:12px 0 0;max-width:420px}.message h2{font-size:40px}.message p{font-size:14px;margin-top:12px}.panel{grid-column:1;grid-row:3;max-width:470px;justify-self:center;align-self:start;padding:30px;background:rgba(249,251,243,.92)}.copyright{grid-column:1;grid-row:4;margin:0}.background{object-position:35% center}.shade{background:linear-gradient(0deg,rgba(10,35,24,.45),rgba(20,40,25,.04))}.brand{background:rgba(250,250,239,.6);border-radius:14px;padding:9px 15px;backdrop-filter:blur(8px)}}
+@media(max-width:380px){.page{padding:20px 16px;row-gap:23px}.panel{padding:25px 22px}.message h2{font-size:35px}.message p{font-size:13px}.panel form input{font-size:16px}}
+@media(prefers-reduced-motion:reduce){.page *{scroll-behavior:auto!important;transition:none!important}}

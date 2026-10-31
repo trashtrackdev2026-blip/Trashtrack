@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Bell, Send, HelpCircle, Users, CalendarIcon, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
+import { Brand } from "@/components/layout/Brand";
 import { useRouter } from "next/navigation";
 import { collection, doc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -21,7 +21,7 @@ export default function CreateNotificationPage() {
   const [savedNotificationId, setSavedNotificationId] = useState<string | null>(null);
   const [notificationId] = useState(() => doc(collection(db, "notifications")).id);
   const [deliveryError, setDeliveryError] = useState("");
-  
+
   const [form, setForm] = useState({
     title: "Collection Schedule Update",
     category: "Collection Schedule",
@@ -56,23 +56,24 @@ export default function CreateNotificationPage() {
   return (
     <>
       <div className="space-y-8 max-w-[1400px] mx-auto relative">
-        
+
         {/* Header */}
-        <div className="flex flex-col gap-2">
+        <div className="tt-legacy-heading flex flex-col gap-2">
           <h1 className="text-[26px] font-bold text-slate-900 leading-tight">Create Notification</h1>
           <p className="text-sm text-slate-500">Compose and send a notification to residents.</p>
         </div>
 
+        <nav className="tt-tabs" aria-label="Announcements"><Link href="/notifications">Notification history</Link><Link href="/notifications/create" aria-current="page">Compose notification</Link></nav>
         {/* Main Content Area */}
-        <div className="flex flex-col lg:flex-row gap-8">
-          
+        <div className="tt-notification-compose">
+
           {/* Left Column - Form */}
           <div className="flex-1">
             <h2 className="font-bold text-lg text-slate-900 mb-1">Notification Information</h2>
             <p className="text-sm text-slate-500 mb-8">Provide the details of the notification you want to send.</p>
 
             <div className="space-y-6 max-w-2xl">
-              
+
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Title <span className="text-red-500">*</span></label>
                 <div className="relative">
@@ -118,7 +119,7 @@ export default function CreateNotificationPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Recipients <span className="text-red-500">*</span></label>
                   <Select value={form.recipients} disabled={isSending || savedNotificationId !== null}
@@ -180,7 +181,7 @@ export default function CreateNotificationPage() {
                   </Button>
                 </Link>
                 <Button disabled={isSending || !form.title.trim() || !form.message.trim()} onClick={() => setShowConfirm(true)} className="px-8 h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm">
-                  {savedNotificationId ? "Retry Phone Delivery" : "Send Notification"} <Send className="w-4 h-4 ml-2" />
+                  {savedNotificationId ? "Retry phone delivery" : "Review & send"} <Send className="w-4 h-4 ml-2" />
                 </Button>
               </div>
               {deliveryError && <div role="alert" className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">{deliveryError}</div>}
@@ -189,74 +190,14 @@ export default function CreateNotificationPage() {
           </div>
 
           {/* Right Column - Preview Box */}
-          <div className="w-full lg:w-[400px] shrink-0 flex flex-col gap-6">
-            
-            <div className="bg-slate-50/50 rounded-2xl border border-slate-100 p-6 flex flex-col">
-              <h3 className="font-bold text-slate-900 mb-2">Notification Preview</h3>
-              <p className="text-xs text-slate-500 mb-6">This is how residents will see your notification.</p>
-              
-              <div className="bg-white rounded-[20px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-100 overflow-hidden relative">
-                <div className="bg-[#E8F5E9]/50 px-4 py-3 border-b border-green-50 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full overflow-hidden relative bg-white border border-green-100 flex items-center justify-center p-0.5">
-                       <Image src="/images/logo.png" alt="TrashTrack" fill className="object-contain p-0.5" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700">TrashTrack</span>
-                  </div>
-                  <span className="text-[10px] text-slate-400">now</span>
-                </div>
-                
-                <div className="p-5 relative overflow-hidden">
-                  <h4 className="text-[15px] font-bold text-slate-800 mb-2 leading-tight pr-8">{form.title}</h4>
-                  <p className="text-[13px] text-slate-600 leading-snug pr-8">{form.message}</p>
-                  
-                  <div className="absolute right-[-10px] bottom-4 opacity-10 pointer-events-none">
-                    <CalendarIcon className="w-24 h-24 text-[#2E7D32]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-              <h3 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3">Notification Summary</h3>
-              
-              <div className="space-y-5 mt-5">
-                <div className="flex items-center">
-                  <span className="text-xs font-semibold text-slate-500 w-24 shrink-0">Category</span>
-                  <span className="text-[10px] font-bold text-[#2E7D32] bg-[#E8F5E9] px-2 py-0.5 rounded-full uppercase tracking-wider">{form.category}</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="text-xs font-semibold text-slate-500 w-24 shrink-0">Recipients</span>
-                  <span className="text-xs font-bold text-slate-800">{form.recipients}</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="text-xs font-semibold text-slate-500 w-24 shrink-0">Delivery via</span>
-                  <div className="flex items-center gap-1.5 text-slate-800">
-                    <Bell className="w-3.5 h-3.5" />
-                    <span className="text-xs font-bold">Push Notification</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#F1F8F5] p-5 rounded-2xl flex items-start gap-3 border border-green-100">
-              <div className="w-6 h-6 rounded-full bg-[#2E7D32] flex items-center justify-center text-white shrink-0 mt-0.5">
-                <span className="font-serif font-bold text-xs italic">i</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-800 mb-0.5">Important Reminder</span>
-                <span className="text-xs text-slate-600 leading-relaxed">Please review your notification carefully before sending it to residents.</span>
-              </div>
-            </div>
-
-          </div>
+          <aside className="tt-notification-preview"><h2>Resident preview</h2><p className="mb-5 text-xs text-muted-foreground">This is how the notification will appear to residents.</p><div className="tt-resident-notice"><Brand /><h3>{form.title || "Notification title"}</h3><p>{form.message || "Your message will appear here."}</p><span className="tt-status mt-5">{form.recipients}</span></div><div className="mt-6 space-y-5 border-t pt-5 text-sm"><h3>Delivery information</h3><div><p className="text-xs text-muted-foreground">Audience</p><p className="mt-1">{form.recipients}</p></div><div><p className="text-xs text-muted-foreground">Delivery</p><p className="mt-1">{form.push ? "In-app + phone notification" : "In-app notification history"}</p></div></div></aside>
         </div>
       </div>
 
       {/* Confirm Modal Overlay */}
       <Dialog open={showConfirm} onOpenChange={open => { if (!isSending) setShowConfirm(open); }}>
           <DialogContent className="sm:max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 gap-0 bg-white">
-            
+
             <div className="p-8 flex flex-col items-center text-center">
 
               <div className="w-16 h-16 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mb-6">

@@ -4,40 +4,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { User, Bell, Shield, Key, Camera, LogOut, Loader2 } from "lucide-react";
+import { Shield, Key, LogOut, Loader2, ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, getMultiFactorResolver, TotpMultiFactorGenerator, type MultiFactorError } from "firebase/auth";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { multiFactor, EmailAuthProvider, reauthenticateWithCredential, updatePassword, getMultiFactorResolver, TotpMultiFactorGenerator, type MultiFactorError } from "firebase/auth";
 
 export default function Settings() {
   const { user, role, name, barangay, signOut } = useAuth();
-  
+
   // Profile State
   const [profileName, setProfileName] = useState(name || "");
-  const [profileContact, setProfileContact] = useState("+63 912 345 6789");
+  const [profileContact, setProfileContact] = useState("");
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
+  const [profileLoading,setProfileLoading]=useState(true);
+  const [profileAttempt,setProfileAttempt]=useState(0);
+  const [profileLoadedUid,setProfileLoadedUid]=useState<string|null>(null);
+  const [message,setMessage]=useState("");
+  const [error,setError]=useState("");
+  useEffect(()=>{ if(!user)return;let cancelled=false;void getDoc(doc(db,"users",user.uid)).then(snapshot=>{if(cancelled)return;const profile=snapshot.data();setProfileName(typeof profile?.name==="string"?profile.name:name||"");setProfileContact(typeof profile?.contact==="string"?profile.contact:typeof profile?.phone==="string"?profile.phone:"");setProfileLoadedUid(user.uid);setError("");}).catch(()=>{if(!cancelled){setProfileLoadedUid(null);setError("Your profile could not be loaded. Please retry before saving.");}}).finally(()=>{if(!cancelled)setProfileLoading(false);});return()=>{cancelled=true;};},[user,name,profileAttempt]);
+  const hasAuthenticator=user?multiFactor(user).enrolledFactors.length>0:false;
   // Password State
   const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   const handleUpdateProfile = async () => {
-    if (!user) return;
-    setIsUpdatingProfile(true);
+    if (!user || profileLoadedUid !== user.uid || !profileName.trim() || profileLoading) return;
+    setIsUpdatingProfile(true);setError("");setMessage("");
     try {
       await updateDoc(doc(db, "users", user.uid), {
-        name: profileName,
-        contact: profileContact
+        name: profileName.trim(),
+        contact: profileContact.trim()
       });
-      alert("Profile updated successfully!");
+      setMessage("Profile saved.");
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile.");
+      setError("Your profile could not be saved. Please try again.");
     } finally {
       setIsUpdatingProfile(false);
     }
@@ -46,11 +51,11 @@ export default function Settings() {
   const handleUpdatePassword = async () => {
     if (!user || !user.email) return;
     if (passwords.new !== passwords.confirm) {
-      alert("New passwords do not match.");
+      setError("New passwords do not match.");
       return;
     }
-    if (passwords.new.length < 12) { alert("Use a password of at least 12 characters."); return; }
-    setIsUpdatingPassword(true);
+    if (passwords.new.length < 12) { setError("Use a password of at least 12 characters."); return; }
+    setIsUpdatingPassword(true);setMessage("");setError("");
     try {
       const credential = EmailAuthProvider.credential(user.email, passwords.current);
       try { await reauthenticateWithCredential(user, credential); }
@@ -63,181 +68,35 @@ export default function Settings() {
         await resolver.resolveSignIn(TotpMultiFactorGenerator.assertionForSignIn(hint.uid, code));
       }
       await updatePassword(user, passwords.new);
-      alert("Password updated successfully!");
+      setMessage("Password updated successfully.");
       setPasswords({ current: "", new: "", confirm: "" });
     } catch (error: unknown) {
       console.error("Error updating password:", error);
       const code = error && typeof error === "object" && "code" in error ? error.code : "";
       if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-        alert("Incorrect current password.");
+        setError("Incorrect current password.");
       } else {
-        alert("Failed to update password. " + (error instanceof Error ? error.message : "Try again."));
+        setError("Failed to update password. " + (error instanceof Error ? error.message : "Try again."));
       }
     } finally {
       setIsUpdatingPassword(false);
     }
   };
 
-  return (
-    <>
-      <div className="space-y-6 max-w-[1200px] mx-auto pb-8">
-        <div>
-          <h1 className="text-2xl font-bold font-outfit text-slate-900">Settings</h1>
-          <p className="text-slate-500 text-sm">Manage your profile and preferences.</p>
-          <Link href="/staff-account" className="mt-3 inline-block text-sm font-semibold text-green-800 underline">Manage authenticator and account security</Link>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6">
-          
-          {/* Profile Information */}
-          <Card className="border-slate-100 shadow-sm">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 text-[#1B5E20]">
-                <User className="w-5 h-5" />
-                <CardTitle className="text-lg">Profile Information</CardTitle>
-              </div>
-              <CardDescription>Update your account profile information.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-8">
-              <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-xs font-semibold text-slate-700">Full Name</Label>
-                  <Input id="fullName" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="bg-slate-50 border-slate-200 h-11" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-xs font-semibold text-slate-700">Email Address</Label>
-                  <Input id="email" type="email" value={user?.email || ""} disabled className="bg-slate-50 border-slate-200 h-11 text-slate-500" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contact" className="text-xs font-semibold text-slate-700">Contact Number</Label>
-                  <Input id="contact" value={profileContact} onChange={(e) => setProfileContact(e.target.value)} className="bg-slate-50 border-slate-200 h-11" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="barangay" className="text-xs font-semibold text-slate-700">Barangay</Label>
-                  <Input id="barangay" value={barangay || "All Barangays"} disabled className="bg-slate-50 border-slate-200 h-11 text-slate-500" />
-                </div>
-              </div>
-              
-              <div className="flex flex-col items-center justify-center space-y-3">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-green-50 relative">
-                    <Image src="/images/avatar.png" alt="Profile" fill className="object-cover" />
-                  </div>
-                  <button onClick={() => alert("Profile picture upload coming soon!")} className="absolute bottom-0 right-0 w-8 h-8 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-600 shadow-sm hover:text-[#1B5E20]">
-                    <Camera className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="text-center">
-                  <p className="font-bold text-slate-900 text-sm">{name || "Admin"}</p>
-                  <p className="text-xs text-slate-500">{role === "Semi-Admin" ? "Semi Administrator" : "System Administrator"}</p>
-                </div>
-                <p className="text-[10px] text-slate-400 text-center px-4">
-                  You can upload a new profile picture. JPG, PNG up to 2MB.
-                </p>
-              </div>
-              
-              <div className="md:col-span-4 flex justify-end">
-                <Button onClick={handleUpdateProfile} disabled={isUpdatingProfile} className="bg-[#1B5E20] hover:bg-[#2E7D32] text-white rounded-lg px-6 h-10 font-semibold shadow-sm">
-                  {isUpdatingProfile ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Save Changes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Change Password */}
-            <Card className="border-slate-100 shadow-sm">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-2 text-[#1B5E20]">
-                  <Key className="w-5 h-5" />
-                  <CardTitle className="text-lg">Change Password</CardTitle>
-                </div>
-                <CardDescription>Update your password to keep your account secure.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-700">Current Password</Label>
-                  <Input type="password" value={passwords.current} onChange={(e) => setPasswords({...passwords, current: e.target.value})} placeholder="Enter current password" className="bg-slate-50 border-slate-200 h-10" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-700">New Password</Label>
-                  <Input type="password" value={passwords.new} onChange={(e) => setPasswords({...passwords, new: e.target.value})} placeholder="Enter new password" className="bg-slate-50 border-slate-200 h-10" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-700">Confirm New Password</Label>
-                  <Input type="password" value={passwords.confirm} onChange={(e) => setPasswords({...passwords, confirm: e.target.value})} placeholder="Confirm new password" className="bg-slate-50 border-slate-200 h-10" />
-                </div>
-                <div className="pt-2 flex justify-end">
-                  <Button onClick={handleUpdatePassword} disabled={isUpdatingPassword} className="bg-[#1B5E20] hover:bg-[#2E7D32] text-white rounded-lg px-6 h-10 font-semibold shadow-sm">
-                    {isUpdatingPassword ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Update Password
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-6">
-              {/* Notification Preferences */}
-              <Card className="border-slate-100 shadow-sm">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center gap-2 text-[#1B5E20]">
-                    <Bell className="w-5 h-5" />
-                    <CardTitle className="text-lg">Notification Preferences</CardTitle>
-                  </div>
-                  <CardDescription>Choose how and what notifications you want to receive.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between py-1">
-                    <div>
-                      <p className="font-semibold text-slate-900 text-sm">Email Notifications</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Receive notifications via email</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <div>
-                      <p className="font-semibold text-slate-900 text-sm">Report Updates</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Get notified about updates to reports</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <div>
-                      <p className="font-semibold text-slate-900 text-sm">MENRO Responses</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Get notified when MENRO responds</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="pt-2 flex justify-end">
-                    <Button onClick={() => alert("Preferences saved!")} className="bg-[#1B5E20] hover:bg-[#2E7D32] text-white rounded-lg px-6 h-10 font-semibold shadow-sm">
-                      Save Preferences
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Session Management */}
-              <Card className="border-slate-100 shadow-sm border-l-4 border-l-red-500">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2 text-red-600">
-                    <Shield className="w-5 h-5" />
-                    <CardTitle className="text-lg text-slate-900">Session Management</CardTitle>
-                  </div>
-                  <CardDescription>Manage your active sessions and sign out when needed.</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-2 flex justify-between items-center">
-                  <p className="text-xs text-slate-500">You will be signed out from this device.</p>
-                  <Button onClick={signOut} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-semibold h-10">
-                    <LogOut className="w-4 h-4 mr-2" /> Sign Out
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </>
-  );
+  return <div className="space-y-5">
+    {message && <p role="status" className="rounded-xl bg-green-50 p-4 text-sm text-green-800">{message}</p>}
+    {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-800"><span>{error}</span><button type="button" onClick={()=>{setProfileLoading(true);setProfileAttempt(value=>value+1);}} className="font-semibold underline">Reload profile</button></div>}
+    <nav className="tt-tabs" aria-label="Account settings"><a href="#profile-information" aria-current="page">Profile</a><Link href="/staff-account">Account security</Link><a href="#change-password">Password</a></nav>
+    <div className="tt-settings-grid">
+      <Card className="tt-settings-profile" id="profile-information"><CardHeader><CardTitle>Profile information</CardTitle><CardDescription>Keep your account details up to date.</CardDescription></CardHeader><CardContent className="space-y-7">
+        <div className="flex items-center gap-4"><span className="tt-avatar h-16 w-16 text-xl" aria-hidden="true">{(profileName||"Admin").split(/\s+/).filter(Boolean).slice(0,2).map(value=>value[0]).join("").toUpperCase()}</span><div><strong className="font-outfit text-lg font-medium">{name||"Admin"}</strong><p className="mt-1 text-xs text-muted-foreground">{role==="Semi-Admin"?"Barangay staff":"MENRO Admin"}</p></div></div>
+        {profileLoading && <p role="status" className="text-sm text-muted-foreground">Loading your profile…</p>}
+        <div className="grid gap-5 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="fullName">Full name</Label><Input id="fullName" value={profileName} maxLength={120} disabled={profileLoading} onChange={event=>setProfileName(event.target.value)} autoComplete="name" /></div><div className="space-y-2"><Label htmlFor="email">Email address</Label><Input id="email" type="email" value={user?.email||""} disabled /></div><div className="space-y-2"><Label htmlFor="contact">Contact number</Label><Input id="contact" type="tel" value={profileContact} disabled={profileLoading} onChange={event=>setProfileContact(event.target.value)} placeholder="Your contact number" autoComplete="tel" /></div><div className="space-y-2"><Label htmlFor="barangay">Barangay</Label><Input id="barangay" value={barangay||"All barangays"} disabled /></div></div>
+        <p className="text-xs leading-relaxed text-muted-foreground">Your email and assigned barangay are managed through your account access.</p><Button disabled={isUpdatingProfile||profileLoading||profileLoadedUid!==user?.uid||!profileName.trim()} onClick={()=>void handleUpdateProfile()}>{isUpdatingProfile&&<Loader2 className="animate-spin" aria-hidden="true" />}{isUpdatingProfile?"Saving…":"Save changes"}</Button>
+        <div className="space-y-4 border-t pt-6"><h2>Session</h2><p className="text-sm text-muted-foreground">Sign out of TrashTrack on this device.</p><Button variant="outline" onClick={()=>void signOut()}><LogOut aria-hidden="true" />Sign out</Button></div>
+      </CardContent></Card>
+      <div className="space-y-5"><Card><CardHeader><CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" aria-hidden="true" />Account security</CardTitle><CardDescription>Protect your sign-in with an authenticator.</CardDescription></CardHeader><CardContent><div className="mb-5 flex items-center justify-between gap-3"><span className="text-sm">Authenticator</span><span className={"tt-status"+(hasAuthenticator?"":" tt-status-pending")}>{hasAuthenticator?"Configured":"Not configured"}</span></div><Link href="/staff-account" className="tt-text-link">{hasAuthenticator?"Manage authenticator":"Set up authenticator"}<ArrowUpRight aria-hidden="true" /></Link></CardContent></Card>
+      <Card id="change-password"><CardHeader><CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" aria-hidden="true" />Change password</CardTitle><CardDescription>Use at least 12 characters to keep your account secure.</CardDescription></CardHeader><CardContent><form onSubmit={event=>{event.preventDefault();void handleUpdatePassword();}} className="space-y-5"><div className="space-y-2"><Label htmlFor="current-password">Current password</Label><Input id="current-password" type="password" autoComplete="current-password" required value={passwords.current} onChange={event=>setPasswords({...passwords,current:event.target.value})} /></div><div className="space-y-2"><Label htmlFor="new-password">New password</Label><Input id="new-password" type="password" autoComplete="new-password" minLength={12} required value={passwords.new} onChange={event=>setPasswords({...passwords,new:event.target.value})} /></div><div className="space-y-2"><Label htmlFor="confirm-password">Confirm new password</Label><Input id="confirm-password" type="password" autoComplete="new-password" minLength={12} required value={passwords.confirm} onChange={event=>setPasswords({...passwords,confirm:event.target.value})} /></div><Button type="submit" disabled={isUpdatingPassword}>{isUpdatingPassword&&<Loader2 className="animate-spin" aria-hidden="true" />}{isUpdatingPassword?"Updating…":"Update password"}</Button></form></CardContent></Card></div>
+    </div>
+  </div>;
 }

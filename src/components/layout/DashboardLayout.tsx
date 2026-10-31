@@ -23,23 +23,27 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <ProtectedRoute allowedRoles={allowedRoles}>
-      <div className="flex h-dvh min-h-0 bg-slate-50 overflow-hidden">
-        <div className="hidden md:block"><Sidebar collapsed={collapsed} /></div>
+      <div className="tt-admin-stage">
+       <a href="#workspace-content" className="tt-skip-link">Skip to content</a>
+       <div className="tt-workspace-frame">
+        <div className="hidden min-h-0 md:flex"><Sidebar collapsed={collapsed} /></div>
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="left" className="data-[side=left]:w-[260px] max-w-[90vw] gap-0 p-0">
+          <SheetContent side="left" className="tt-mobile-navigation data-[side=left]:w-[280px] max-w-[90vw] gap-0 p-0">
             <SheetTitle className="sr-only">Admin navigation</SheetTitle>
             <SheetDescription className="sr-only">Choose a TrashTrack feature.</SheetDescription>
             <Sidebar collapsed={false} onNavigate={() => setMobileOpen(false)} />
           </SheetContent>
         </Sheet>
-        <div className="flex flex-col flex-1 min-h-0 w-0">
+        <div className="tt-main-scroll">
           <Header toggleSidebar={toggleSidebar} />
-          <main className="flex-1 relative isolate overflow-y-auto focus:outline-none">
-            <div className="py-6 px-4 sm:px-6 lg:px-8">
+          <main id="workspace-content" tabIndex={-1} className="tt-content" aria-labelledby="workspace-heading">
+            <div className="tt-page-content">
               {children}
             </div>
           </main>
+          <footer className="tt-workspace-footer"><span>Made for the people of Balete.</span><span>MENRO · Municipal workspace</span></footer>
         </div>
+       </div>
       </div>
     </ProtectedRoute>
   );

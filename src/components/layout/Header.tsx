@@ -1,117 +1,66 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { Menu, LogOut, User as UserIcon, Bell } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Menu, LogOut, UserRound, Bell, ChevronRight, Plus, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { subscribeWithDeadline } from "@/lib/live-data";
 
+type PageInfo = { title: string; subtitle: string; section: string; action?: { href: string; label: string } };
+const pages: Record<string, PageInfo> = {
+  "/": { section: "Overview", title: "A cleaner Balete, together.", subtitle: "Here’s what needs your attention today.", action: { href: "/schedules/create", label: "New schedule" } },
+  "/schedules": { section: "Collections", title: "Collection schedules", subtitle: "A clear plan for every barangay.", action: { href: "/schedules/create", label: "New schedule" } },
+  "/users": { section: "Residents & staff", title: "Residents & staff", subtitle: "People at the heart of a cleaner Balete." },
+  "/reports": { section: "Reports", title: "Community reports", subtitle: "Listen, validate, and help resolve local concerns." },
+  "/reports-to-menro": { section: "Reports to MENRO", title: "Reports to MENRO", subtitle: "Forward verified concerns and follow their progress." },
+  "/notifications": { section: "Announcements", title: "Announcements", subtitle: "Keep residents informed, wherever they are.", action: { href: "/notifications/create", label: "Compose notification" } },
+  "/events": { section: "Events", title: "Community events", subtitle: "Bring people together for a healthier community.", action: { href: "/events/create", label: "Create event" } },
+  "/education": { section: "Learning library", title: "Learning library", subtitle: "Useful knowledge for everyday environmental care.", action: { href: "/education/create", label: "Add resource" } },
+  "/analytics": { section: "Analytics", title: "Reports & analytics", subtitle: "See patterns. Focus care where it matters." },
+  "/settings": { section: "Settings", title: "Settings & security", subtitle: "A comfortable workspace. An account you can trust." },
+};
+const creationPages: Record<string, PageInfo> = {
+  "/schedules/create": { section: "Collections", title: "Plan a collection", subtitle: "Set the details, review, and share with your barangay." },
+  "/events/create": { section: "Events", title: "Create a community event", subtitle: "Make room for your community to come together." },
+  "/notifications/create": { section: "Announcements", title: "Compose a notification", subtitle: "A clear message, delivered to the right community." },
+  "/education/create": { section: "Learning library", title: "Add a learning resource", subtitle: "Share something useful with your community." },
+};
+
 export function Header({ toggleSidebar }: { toggleSidebar: () => void }) {
-  const { user, role } = useAuth();
+  const { user, name, role } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [pendingDeliveries, setPendingDeliveries] = useState(0);
   useEffect(() => {
     if (role !== "Admin") return;
     return subscribeWithDeadline(collection(db, "notifications"), snapshot => {
-      setPendingDeliveries(snapshot.docs.filter(doc => {
-        const notice = doc.data();
-        return notice.push === true && ["pending", "sending", "failed"].includes(notice.pushStatus ?? "pending");
-      }).length);
+      setPendingDeliveries(snapshot.docs.filter(doc => { const notice = doc.data(); return notice.push === true && ["pending", "sending", "failed"].includes(notice.pushStatus ?? "pending"); }).length);
     }, () => setPendingDeliveries(0));
   }, [role]);
-
-  // Simple mapping to get page title and subtitle
-  const getPageInfo = () => {
-    switch (pathname) {
-      case "/": return { title: "Dashboard", subtitle: "Overview of waste management operations." };
-      case "/users": return { title: "User Management", subtitle: "Monitor resident and administrator accounts, account statuses, and user access privileges." };
-      case "/schedules": return { title: "Collection Schedules", subtitle: "Manage and optimize waste collection routes and timings." };
-      case "/reports": return { title: role === "Semi-Admin" ? "Community Reports" : "Reports Management", subtitle: role === "Semi-Admin" ? "Verify community waste reports in your assigned barangay." : "Review and resolve community waste reports and concerns." };
-      case "/reports-to-menro": return { title: "Reports to MENRO", subtitle: "Forward verified reports to MENRO and track collection progress." };
-      case "/analytics": return { title: "Reports & Analytics", subtitle: "Visualize waste management data and generate official reports." };
-      case "/events": return { title: "Community Events", subtitle: "Manage and organize environmental events for the community." };
-      case "/settings": return { title: "Settings", subtitle: "Manage your account preferences and system settings." };
-      default: return { title: "TrashTrack", subtitle: "Admin Panel" };
-    }
-  };
-
-  const { title, subtitle } = getPageInfo();
-
-  return (
-    <header className="h-20 md:h-24 border-b border-slate-200 bg-white flex items-center justify-between gap-3 px-4 md:px-8 shrink-0 shadow-sm z-10">
-      <div className="flex min-w-0 items-center gap-3 md:gap-6">
-        <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-slate-600 hover:text-slate-900 bg-slate-100/50 hover:bg-slate-200/50 rounded-full h-10 w-10">
-          <Menu className="w-5 h-5" />
-          <span className="sr-only">Toggle Sidebar</span>
-        </Button>
-        <div className="flex min-w-0 flex-col">
-          <h1 className="text-lg md:text-[26px] font-bold text-slate-900 leading-tight">{title}</h1>
-          <p className="hidden md:block text-sm text-slate-500 mt-0.5">{subtitle}</p>
-        </div>
+  const page = pages[pathname] || creationPages[pathname] || { section: "Workspace", title: "TrashTrack", subtitle: "Care for your community." };
+  const displayName = name || user?.email?.split("@")[0] || "MENRO Admin";
+  const date = new Intl.DateTimeFormat("en-PH", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Manila" }).format(new Date());
+  return <header className={`tt-page-header${pathname === "/" ? " tt-page-header-home" : ""}`}>
+    <div className="tt-topbar">
+      <div className="tt-topbar-start"><button type="button" onClick={toggleSidebar} className="tt-icon-control" aria-label="Toggle navigation"><Menu aria-hidden="true" /></button>
+        <nav className="tt-breadcrumb" aria-label="Breadcrumb"><Link href={role === "Semi-Admin" ? "/reports" : "/"}>Workspace</Link><ChevronRight aria-hidden="true" /><span aria-current="page">{page.section}</span></nav>
       </div>
-
-      <div className="flex shrink-0 items-center gap-3 md:gap-6">
-        <button aria-label="Open notifications" onClick={() => router.push(role === "Admin" ? "/notifications" : "/reports")} className="relative text-slate-600 hover:text-slate-900 transition-colors">
-          <Bell className="w-6 h-6" />
-          {role === "Admin" && pendingDeliveries > 0 && <span aria-label={`${pendingDeliveries} phone deliveries need attention`} className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 bg-green-500 border-2 border-white rounded-full flex items-center justify-center text-[8px] text-white font-bold">{pendingDeliveries > 99 ? "99+" : pendingDeliveries}</span>}
-        </button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-3 hover:bg-slate-50 rounded-full p-1.5 pr-3 transition-colors focus:outline-none cursor-pointer">
-            <Avatar className="h-9 w-9 border border-slate-200">
-              <AvatarImage src="/images/avatar.png" alt="Profile Avatar" className="object-cover" />
-              <AvatarFallback className="bg-slate-100 text-slate-600 font-medium text-sm">
-                <UserIcon className="w-5 h-5" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex items-center gap-2 hidden sm:flex">
-              <span className="text-sm font-semibold text-slate-800">{user?.email?.split('@')[0] || "Admin User"}</span>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L5 5L9 1" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.email?.split('@')[0] || "Admin User"}</p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {user?.email}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/staff-account")} className="text-slate-700 cursor-pointer">
-              <UserIcon className="mr-2 h-4 w-4" />
-              <span>Profile Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => router.push('/logout')}
-              className="text-red-600 cursor-pointer focus:text-red-600"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </DropdownMenuItem>
+      <div className="tt-topbar-actions"><time suppressHydrationWarning>{date}</time>
+        <button type="button" className="tt-icon-control tt-notification-control" aria-label={pendingDeliveries ? `${pendingDeliveries} phone deliveries need attention` : "Open notifications"} onClick={() => router.push(role === "Admin" ? "/notifications" : "/reports")}><Bell aria-hidden="true" />{role === "Admin" && pendingDeliveries > 0 && <span className="tt-notification-dot" />}</button>
+        <DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label="Account menu"><UserRound aria-hidden="true" /></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60"><DropdownMenuGroup><DropdownMenuLabel>{displayName}<span className="mt-1 block break-all text-xs font-normal text-muted-foreground">{user?.email}</span></DropdownMenuLabel></DropdownMenuGroup>
+            <DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuItem onClick={() => router.push("/staff-account")}><ShieldCheck />Account security</DropdownMenuItem>{role === "Admin" && <DropdownMenuItem onClick={() => router.push("/settings")}><UserRound />Profile settings</DropdownMenuItem>}</DropdownMenuGroup>
+            <DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuItem onClick={() => router.push("/logout")}><LogOut />Log out</DropdownMenuItem></DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </header>
-  );
+    </div>
+    <div className="tt-page-heading"><div><h1 id="workspace-heading">{page.title}</h1><p>{page.subtitle}</p></div>
+      {page.action && role === "Admin" && <Link href={page.action.href} className="tt-primary-link"><Plus aria-hidden="true" />{page.action.label}</Link>}
+    </div>
+  </header>;
 }

@@ -2,7 +2,7 @@
 import { ReportEvidence } from "@/components/reports/ReportEvidence";
 
 import { useState } from "react";
-import { Search, FileText, Clock, CheckCircle2, AlertTriangle, Check, Send } from "lucide-react";
+import { Search, FileText, Clock, CheckCircle2, AlertTriangle, Check, Send, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -40,8 +40,13 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [summaryFilter, setSummaryFilter] = useState<ReportSummaryFilter>("all");
 
-  const visibleReports = filterReportSummary(reports, summaryFilter, role);
-  const activeReport = activeReportId ? visibleReports.find(report => report.id === activeReportId) : visibleReports[0];
+  const [search, setSearch] = useState("");
+  const [barangayFilter, setBarangayFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const visibleReports = filterReportSummary(reports, summaryFilter, role).filter(report =>
+    (!search.trim() || [report.id, report.type, report.description, report.location, report.reporterName].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
+    && (barangayFilter === "all" || report.location === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
+  const activeReport = visibleReports.find(report => report.id === activeReportId) || visibleReports[0];
   const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
   const canSave = !!activeReport && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
   const summaryLabels = { all: "All reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
@@ -67,12 +72,6 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     }
   };
 
-  const getTypeStyle = (type: string) => {
-    if (type.includes("Dump")) return { bg: "bg-red-50", text: "text-red-500" };
-    if (type.includes("Garbage")) return { bg: "bg-orange-50", text: "text-orange-500" };
-    if (type.includes("Bin")) return { bg: "bg-purple-50", text: "text-purple-500" };
-    return { bg: "bg-blue-50", text: "text-blue-500" };
-  };
 
   const handleUpdateStatus = async () => {
     if (!activeReport || !canSave || isUpdating) return;
@@ -98,7 +97,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
         <DataState loading={loading} error={error} onRetry={retry} />
         {/* Header */}
         <div className="flex flex-col gap-2 mb-2">
-          <h1 className="text-[26px] font-bold text-slate-900 leading-tight">
+          <h1 className="tt-legacy-heading text-[26px] font-bold text-slate-900 leading-tight">
             {role === "Semi-Admin" ? "Community Reports" : "Report Management"}
           </h1>
           <p className="text-sm text-slate-500">
@@ -110,7 +109,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="tt-metric-strip">
           <KpiCard
             {...cardFilter("all")}
             title="Total Reports"
@@ -161,70 +160,26 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           />
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="tt-report-layout">
 
           {/* Main Table Area */}
-          <div id="reports-table" className="min-w-0 flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
+          <div id="reports-table" className="min-w-0 flex-1 tt-surface flex flex-col overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 p-4">
               <h2 className="text-sm font-semibold text-slate-900">{summaryLabels[summaryFilter]}</h2>
               {summaryFilter !== "all" && <button type="button" onClick={() => selectSummary("all")} className="rounded text-xs font-semibold text-green-800 underline focus-visible:outline-2 focus-visible:outline-green-700">Show all reports</button>}
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50/50 border-b border-slate-100">
-                  <tr>
-                    <th className="py-4 px-4 text-[11px] font-bold text-slate-700 uppercase tracking-wider">Report ID</th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-slate-700 uppercase tracking-wider">Category</th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-slate-700 uppercase tracking-wider">Barangay</th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-slate-700 uppercase tracking-wider">Submitted By</th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-slate-700 uppercase tracking-wider">Date</th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-slate-700 uppercase tracking-wider">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {visibleReports.length === 0 && !loading && (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-500">{summaryFilter === "all" ? "No reports found" : "No reports in this category"}</td>
-                    </tr>
-                  )}
-                  {visibleReports.map((report) => {
-                    const typeStyle = getTypeStyle(report.type);
-                    return (
-                      <tr
-                        key={report.id}
-                        className={`hover:bg-slate-50 transition-colors cursor-pointer ${activeReport?.id === report.id ? 'bg-slate-50' : ''}`}
-                        onClick={() => { setActiveReportId(report.id); setNewStatus(""); setRemarks(""); setCollectionConfirmed(false); }}
-                      >
-                        <td className="py-4 px-4 font-bold text-slate-800 text-xs">...{report.id.slice(-6)}</td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${typeStyle.bg} ${typeStyle.text}`}>
-                              <AlertTriangle className="w-3 h-3" />
-                            </div>
-                            <span className="text-xs font-semibold text-slate-700">{report.type}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-xs font-semibold text-slate-700">{report.location}</span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-xs font-semibold text-slate-700">{report.reporterName}</span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-xs font-semibold text-slate-900">{report.date}</span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap ${getStatusColor(report.status)}`}>
-                            {report.status}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="tt-filter-bar mx-4 mt-4">
+              <label className="relative min-w-40 flex-1"><span className="sr-only">Search reports</span><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" /><input value={search} onChange={event => { setSearch(event.target.value);setActiveReportId(null); }} placeholder="Search reports" className="h-10 w-full rounded-lg border bg-white/50 pl-9 pr-3 text-sm" /></label>
+              <Select value={barangayFilter} onValueChange={value => { setBarangayFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report barangay" className="w-40"><SelectValue>{barangayFilter === "all" ? "All barangays" : barangayFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All barangays</SelectItem>{[...new Set(reports.map(report => report.location))].filter(Boolean).sort().map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
+              <Select value={typeFilter} onValueChange={value => { setTypeFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report category" className="w-40"><SelectValue>{typeFilter === "all" ? "All categories" : typeFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{[...new Set(reports.map(report => report.type))].filter(Boolean).sort().map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
+            </div>
+            <div className="px-4 pb-2">
+              {visibleReports.map(report => { const photo=report.imageUrl || report.attachments.find(item => item.type === "image")?.url;return <button key={report.id} type="button" className="tt-report-item" aria-pressed={activeReport?.id === report.id} onClick={() => { setActiveReportId(report.id);setNewStatus("");setRemarks("");setCollectionConfirmed(false);setUpdateError(null); }}>
+                <span className="tt-report-thumbnail">{photo ? <Image src={photo} alt="Report evidence" fill sizes="93px" className="object-cover" /> : <FileText aria-hidden="true" />}</span>
+                <span className="tt-report-item-copy"><strong>{report.type}</strong><small>…{report.id.slice(-6)}</small><small>{report.location} · {report.date || "Date not recorded"}</small></span><span className={"tt-status " + (report.status.toLowerCase() === "pending" ? "tt-status-pending" : "")}>{REPORT_STATUS_LABELS[report.status as keyof typeof REPORT_STATUS_LABELS] || report.status}</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </button>;})}
+              {!loading && visibleReports.length === 0 && <p className="tt-empty">No reports match this view.</p>}
             </div>
 
             {/* Pagination */}
@@ -235,7 +190,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
 
           {/* Right Panel - Report Details */}
           {activeReport && (
-            <div key={activeReport.id} className="w-full lg:w-[400px] shrink-0 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-max overflow-hidden">
+            <div key={activeReport.id} className="tt-report-detail tt-surface">
               <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex flex-col">
                   <span className="font-bold text-slate-900">Report Details</span>
@@ -249,6 +204,12 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
               </div>
 
               <div className="p-5 space-y-6">
+
+                {/* Evidence */}
+                <div>
+                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-3">Evidence photos and videos</h4>
+                  <ReportEvidence report={activeReport} />
+                </div>
 
                 {/* Report Information */}
                 <div>
@@ -296,12 +257,6 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                     </div>
                   </div>
                 )}
-
-                {/* Evidence */}
-                <div>
-                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-3">Evidence photos and videos</h4>
-                  <ReportEvidence report={activeReport} />
-                </div>
 
                 {activeReport.remarks && <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
                   <p className="font-semibold mb-1">Last review remarks</p>

@@ -54,12 +54,12 @@ export default function CreateSchedulePage() {
     <>
       <div className="space-y-8 max-w-[1400px] mx-auto">
         {deliveryError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{deliveryError}</p>}
-        
+
         {/* Header */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-[26px] font-bold text-slate-900 leading-tight">
-            {step === 1 ? "Create Collection Schedule" : step === 2 ? "Review Collection Schedule" : "Publish Collection Schedule"}
-          </h1>
+          <h2 className="text-[26px] font-bold text-slate-900 leading-tight">
+            {step === 1 ? "Schedule details" : step === 2 ? "Review Collection Schedule" : "Publish Collection Schedule"}
+          </h2>
           <p className="text-sm text-slate-500">
             {step === 1 
               ? "Set up a new waste collection schedule for a specific barangay." 
@@ -72,7 +72,7 @@ export default function CreateSchedulePage() {
         <div className="flex items-center justify-between max-w-3xl mx-auto mb-12 relative px-4">
           <div className="absolute left-8 right-8 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 z-0"></div>
           <div className="absolute left-8 top-1/2 -translate-y-1/2 h-0.5 bg-[#2E7D32] z-0 transition-all duration-500" style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : '100%' }}></div>
-          
+
           <div className="flex flex-col items-center gap-2 z-10">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-500 ${
               step >= 1 ? 'bg-[#E8F5E9] border-2 border-[#2E7D32] text-[#2E7D32]' : 'bg-white border-2 border-slate-200 text-slate-400'
@@ -103,9 +103,9 @@ export default function CreateSchedulePage() {
 
         {/* Main Content Area */}
         <div className="flex flex-col lg:flex-row gap-8">
-          
+
           {/* Left Column - Form / Review / Success Details */}
-          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+          <div className="flex-1 tt-surface p-8">
             {step === 3 ? (
               <div className="flex flex-col items-center justify-center text-center">
                 <div className="w-20 h-20 bg-[#E8F5E9] rounded-full flex items-center justify-center mb-6 relative">
@@ -115,7 +115,7 @@ export default function CreateSchedulePage() {
                   <div className="absolute top-4 right-0 w-1.5 h-1.5 bg-blue-400 rounded-full translate-x-6"></div>
                   <div className="absolute bottom-2 left-2 w-1.5 h-1.5 bg-yellow-400 rounded-full -translate-x-6"></div>
                 </div>
-                
+
                 <h2 className="text-2xl font-bold text-[#2E7D32] mb-3">Schedule Published Successfully!</h2>
                 <p className="text-sm text-slate-600 mb-10 max-w-md">
                   The waste collection schedule has been published and is now visible to residents. It will also appear on the collection calendar.
@@ -179,7 +179,7 @@ export default function CreateSchedulePage() {
                     </Button>
                   </Link>
                 </div>
-                
+
                 <div className="w-full max-w-2xl bg-blue-50/50 p-4 rounded-xl flex items-start gap-3 border border-blue-100/50 text-left mt-2">
                   <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
                     <Info className="w-3.5 h-3.5" />
@@ -262,7 +262,7 @@ export default function CreateSchedulePage() {
                       </div>
                       <span className="text-sm font-bold text-slate-900">{form.barangay}</span>
                     </div>
-                    
+
                     <div className="flex items-start justify-between p-4 border-b border-slate-100 bg-white">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-[#E8F5E9] flex items-center justify-center text-[#2E7D32]">
@@ -352,10 +352,10 @@ export default function CreateSchedulePage() {
 
           {/* Right Column - Preview Box or Summary */}
           <div className="w-full lg:w-[380px] shrink-0 flex flex-col gap-6">
-            
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col">
+
+            <div className="tt-surface p-6 flex flex-col">
               <h3 className="font-bold text-slate-900 mb-6">{step === 3 ? "Schedule Summary" : "Schedule Preview"}</h3>
-              
+
               {step === 1 ? (
                 <div className="flex-1 flex flex-col items-center justify-center py-12 px-6 text-center border-2 border-dashed border-slate-100 rounded-xl">
                   <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
@@ -367,14 +367,14 @@ export default function CreateSchedulePage() {
               ) : (
                 <div className="flex flex-col mb-4">
                   {step !== 3 && <p className="text-xs text-slate-500 mb-4">This is how the schedule will appear to residents.</p>}
-                  
+
                   <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                     <div className="bg-[#E8F5E9] py-3 text-center border-b border-slate-200">
                       <span className="text-xs font-bold text-[#1B5E20] uppercase tracking-wider">Waste Collection Schedule</span>
                     </div>
                     <div className="p-5 bg-white flex flex-col items-center">
                       <h4 className="text-lg font-bold text-[#2E7D32] mb-6">{form.barangay}</h4>
-                      
+
                       <div className="w-full space-y-4">
                         <div className="flex items-center gap-3">
                           <CalendarIcon className="w-4 h-4 text-slate-400" />
@@ -399,9 +399,9 @@ export default function CreateSchedulePage() {
             </div>
 
             {step === 3 ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+              <div className="tt-surface p-6">
                 <h3 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3">What&apos;s Next?</h3>
-                
+
                 <div className="space-y-6 mt-4">
                   <div className="flex items-start gap-4">
                     <div className="w-8 h-8 rounded-full bg-[#E8F5E9] flex items-center justify-center text-[#2E7D32] shrink-0">
@@ -433,9 +433,9 @@ export default function CreateSchedulePage() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+              <div className="tt-surface p-6">
                 <h3 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3">Summary</h3>
-                
+
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <span className="text-xs font-semibold text-slate-500">Barangay</span>
