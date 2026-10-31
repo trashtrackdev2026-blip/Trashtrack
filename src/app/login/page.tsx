@@ -15,7 +15,7 @@ export default function LoginPage() {
       <Image src="/images/balete-lakeside-hd.webp" alt="The real lakeside view of Balete, Batangas at sunset" fill unoptimized loading="eager" fetchPriority="high" className={styles.background} />
     </picture>
     <div className={styles.shade} aria-hidden="true" />
-    <div className={styles.brand}><Brand /></div>
+    <div className={styles.brand}><Brand light /></div>
     <section className={styles.message} aria-label="A cleaner Balete"><h2>A cleaner Balete<br />starts with us.</h2><p>One community. A little care, every day.</p></section>
     <section className={styles.panel} aria-labelledby="signin-title">
       <span className={styles.eyebrow}>Admin workspace</span>
