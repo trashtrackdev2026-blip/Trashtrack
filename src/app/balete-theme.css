@@ -1,5 +1,5 @@
 :root{--tt-forest:#174c39;--tt-ink:#183b30;--tt-muted:#64736b;--tt-line:#355d3221;--tt-pearl:#fcfcf5;--primary:#174c39;--primary-foreground:#fffef7;--accent:#e6eddf;--accent-foreground:#234d39;--ring:#6a9376;--foreground:#183b30;--muted-foreground:#64736b;--border:#dce2d5;--input:#d9dfd2;--radius:.75rem}
-.tt-admin-stage{height:100dvh;min-height:0;padding:24px;background:#617561 url('/images/balete-lakeside.webp') center/cover no-repeat;isolation:isolate;color:var(--tt-ink)}
+.tt-admin-stage{height:100dvh;min-height:0;padding:24px;background:#617561 url('/images/balete-lakeside-hd.webp') center/cover no-repeat;isolation:isolate;color:var(--tt-ink)}
 .tt-workspace-frame{height:100%;min-height:0;display:flex;overflow:hidden;border:1px solid #ffffffa8;border-radius:28px;background:#f8faf130;box-shadow:0 18px 70px #1a352b30;max-width:1800px;margin:auto}
 .tt-main-scroll{min-width:0;min-height:0;flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b8c4b0 #fafbf033;display:flex;flex-direction:column}
 .tt-sidebar{width:242px;height:100%;min-height:0;flex-shrink:0;display:flex;flex-direction:column;padding:30px 18px 19px;background:#f3f6eddd;backdrop-filter:blur(22px);border-right:1px solid #ffffff70;transition:width .22s ease}
