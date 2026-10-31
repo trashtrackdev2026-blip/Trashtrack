@@ -292,10 +292,12 @@ export default function EventsPage() {
             {/* Table */}
             <div className="tt-event-agenda">
                 {filteredEvents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(event => { const raw=event.dateISO || event.date;const date=new Date(raw + (/^\d{4}-\d{2}-\d{2}$/.test(raw) ? "T12:00:00" : ""));const valid=!Number.isNaN(date.getTime());return <article key={event.id} className={"tt-event-row" + (activeEvent?.id === event.id ? " is-selected" : "")}>
-                  <div className="tt-date-block"><strong>{valid ? date.getDate().toString().padStart(2,"0") : "—"}</strong><span>{valid ? date.toLocaleDateString("en-PH",{month:"short"}) : "Event"}</span></div>
-                  {event.img && <div className="tt-event-thumbnail"><Image src={event.img} alt="" fill sizes="(max-width:767px) 80px, 126px" /></div>}
-                  <button type="button" disabled={busyAttendance !== null} className="tt-event-main" onClick={() => handleView(event)} aria-pressed={activeEvent?.id === event.id}><strong>{event.title}</strong><small>{event.barangay}<br />{event.date} · {event.time?.split(" - ").map(collectionTimeLabel).join(" – ")}<br />{event.participants || 0} registered · {event.status}</small></button>
-                  <div className="tt-event-row-actions"><Button variant="outline" onClick={() => handleView(event)} aria-label={"View " + event.title}>View</Button><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end">{event.status.toLowerCase() !== "completed" && <DropdownMenuItem onClick={() => {if(event.status === "Draft")router.push("/events/create?draft="+encodeURIComponent(event.id));else setEditingEvent(event);}}><Pencil />{event.status === "Draft"?"Continue draft":"Edit event"}</DropdownMenuItem>}<DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+                  <button type="button" disabled={busyAttendance !== null} className="tt-event-main" onClick={() => handleView(event)} aria-label={"Open event: " + event.title} aria-pressed={activeEvent?.id === event.id} aria-haspopup={wideDetails ? undefined : "dialog"}>
+                    <span className="tt-date-block"><strong>{valid ? date.getDate().toString().padStart(2,"0") : "—"}</strong><span>{valid ? date.toLocaleDateString("en-PH",{month:"short"}) : "Event"}</span></span>
+                    <span className="tt-event-thumbnail" aria-hidden="true">{event.img ? <Image src={event.img} alt="" fill sizes="(max-width:480px) 48px, (max-width:767px) 80px, 126px" /> : <Calendar />}</span>
+                    <span className="tt-event-copy"><strong>{event.title}</strong><small>{event.barangay}</small><small>{event.date} · {event.time?.split(" - ").map(collectionTimeLabel).join(" – ")}</small><small>{event.participants || 0} registered · {event.status}</small></span>
+                  </button>
+                  <div className="tt-event-row-actions"><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end">{event.status.toLowerCase() !== "completed" && <DropdownMenuItem onClick={() => {if(event.status === "Draft")router.push("/events/create?draft="+encodeURIComponent(event.id));else setEditingEvent(event);}}><Pencil />{event.status === "Draft"?"Continue draft":"Edit event"}</DropdownMenuItem>}<DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
                 </article>;})}
                 {!loading && filteredEvents.length === 0 && <p className="tt-empty">No events match your filters.</p>}
               </div>
@@ -407,8 +409,8 @@ export default function EventsPage() {
             </div>
 
             <div className="mb-6 flex flex-col gap-4">
-              <div className="relative aspect-video w-full overflow-hidden rounded-xl">
-                 <Image src={activeEvent.img} alt={activeEvent.title} fill className="object-cover" />
+              <div className="tt-event-hero">
+                 {activeEvent.img ? <Image src={activeEvent.img} alt={activeEvent.title} fill sizes="(max-width:767px) 90vw, (max-width:1279px) 720px, 42vw" /> : <Calendar aria-hidden="true" />}
               </div>
               <div className="flex flex-col">
                 <h4 className="mb-2 font-outfit text-xl font-semibold leading-tight text-slate-800">{activeEvent.title}</h4>

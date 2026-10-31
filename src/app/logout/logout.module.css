@@ -8,18 +8,18 @@
   width: 100%;
   padding: clamp(28px, 3.2vw, 64px);
   overflow: hidden;
-  background: #123d2e;
+  background: #0b2f24;
   color: #f6f0db;
 }
 
-.backgroundPicture { position: absolute; inset: 0; z-index: -3; pointer-events: none; }
-.background { object-fit: cover; object-position: center top; filter: saturate(1.08); }
+.backgroundPicture { position: absolute; inset: 0 auto 0 0; width: 78%; z-index: -3; pointer-events: none; }
+.background { object-fit: cover; object-position: left top; filter: brightness(1.14) contrast(1.12) saturate(1.32) sepia(.06); }
 .shade {
   position: absolute;
   inset: 0;
   z-index: -2;
   pointer-events: none;
-  background: linear-gradient(90deg, #0a261510 25%, #0d31282e 43%, #0b3029c7 63%, #092c23eb 100%), linear-gradient(180deg, #102b2326, transparent 35%, #071f1840);
+  background: linear-gradient(90deg, transparent 28%, #0b2f241a 43%, #0b2f24bf 64%, #0b2f24 78%), linear-gradient(0deg, #061c181a, transparent 35%);
 }
 
 .brand { grid-column: 1 / -1; grid-row: 1; width: fit-content; }
@@ -63,6 +63,7 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1100px) {
+  .backgroundPicture { width: 100%; }
   .page { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
   .shade { background: linear-gradient(90deg, #0c2c201c 10%, #0c30266b 38%, #0a2d24e6 75%); }
   .confirmation h1 { font-size: clamp(40px, 4.8vw, 54px); }
