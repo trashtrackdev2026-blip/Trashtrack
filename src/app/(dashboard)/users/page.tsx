@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState, useEffect, useMemo, useDeferredValue } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { StaffRequestsSummary } from "@/components/auth/StaffRequestsSummary";
 import { StaffManagement } from "@/components/auth/StaffManagement";
 import { STAFF_BARANGAYS } from "@/lib/staff-access";
 import { useAuth } from "@/context/AuthContext";
@@ -131,7 +132,7 @@ export default function UsersPage() {
 
   return (
     <>
-      <div className="space-y-6 max-w-[1400px] mx-auto">
+      <div className="space-y-6 ">
         <DataState loading={loading} error={dataError} onRetry={() => setAttempt(value => value + 1)} />
 
 
@@ -164,7 +165,7 @@ export default function UsersPage() {
         </div>
 
         <nav className="tt-tabs" aria-label="Account group">{[{id:"resident",label:"Residents"},{id:"semi-admin",label:"Barangay staff"},{id:"admin",label:"MENRO admins"},{id:"approvals",label:"Staff approvals"}].map(group => <button key={group.id} type="button" aria-pressed={accountGroup === group.id} onClick={() => {setAccountGroup(group.id);setCurrentPage(1);setSelectedUser(null);setStatusFilter("all");}}>{group.label}</button>)}</nav>
-        {accountGroup === "approvals" ? <StaffManagement /> : <div className="tt-surface overflow-hidden">
+        {accountGroup === "approvals" ? <StaffManagement /> : <div className="tt-people-layout"><div className="tt-surface overflow-hidden">
 
           {/* Filters Bar */}
           <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -314,7 +315,7 @@ export default function UsersPage() {
               </div>
             );
           })()}
-        </div>}
+        </div><StaffRequestsSummary onReview={() => { setAccountGroup("approvals");setSelectedUser(null); }} /></div>}
       </div>
       {/* User Details Modal */}
       <Dialog open={!!selectedUser} onOpenChange={open => { if (!open) setSelectedUser(null); }}>

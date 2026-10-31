@@ -208,7 +208,7 @@ export default function NotificationsPage() {
               />
             </div>
 
-            <div className="flex gap-3">
+            <div className="tt-filter-options flex flex-wrap gap-3">
               <Select value={category} onValueChange={(val) => { setCategory(val ?? "all"); setCurrentPage(1); }}>
                 <SelectTrigger className="w-[140px] h-11 bg-white border-slate-200">
                   <SelectValue>{category === "category" ? "All categories" : category.charAt(0).toUpperCase()+category.slice(1)}</SelectValue>

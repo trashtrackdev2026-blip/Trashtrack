@@ -1,6 +1,6 @@
 "use client";
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 type Trend = { name: string; value: number }[];
 type Props = { trendData: Trend; categoryData: { name: string; value: number; color: string }[]; eventData: { name: string; value: number }[]; stats: { totalReports: number; totalEvents: number; eventParticipants: number }; hideTrend?: boolean };
@@ -8,10 +8,10 @@ type Props = { trendData: Trend; categoryData: { name: string; value: number; co
 export function ReportTrendChart({ trendData, totalReports = 0, resolvedReports = 0, pendingReports = 0 }: { trendData: Trend; totalReports?: number; resolvedReports?: number; pendingReports?: number }) {
   const unresolved = Math.max(0, totalReports - resolvedReports - pendingReports);
   const parts = [{ name: "Resolved", value: resolvedReports, color: "#326b48" }, { name: "Pending", value: pendingReports, color: "#c5a15d" }, { name: "Other unresolved", value: unresolved, color: "#a5b39b" }];
-  return <section className="tt-surface min-w-0 p-5" aria-label="Report trends and resolution">
+  return <section className="tt-surface tt-dark-panel min-w-0 p-5" aria-label="Report trends and resolution">
     <h2>Reports over time</h2><p className="mt-1 text-xs text-muted-foreground">Submitted reports by month</p>
     <div className="mt-5 h-64 w-full" role="img" aria-label={`Monthly report trend. ${trendData.map(point => `${point.name}: ${point.value}`).join(", ") || "No report data yet."}`}>
-      <ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ top: 12, right: 12, left: -18, bottom: 5 }}><CartesianGrid vertical={false} stroke="#dce4d6" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6a7d64" }} minTickGap={18} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6a7d64" }} /><Tooltip contentStyle={{ background: "#fffef7", border: "1px solid #dce3d5", borderRadius: 10, color: "#234c33", fontSize: 12 }} /><Line isAnimationActive={false} type="monotone" dataKey="value" name="Reports" stroke="#326b48" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 0, fill: "#326b48" }} activeDot={{ r: 5 }} /></LineChart></ResponsiveContainer>
+      <ResponsiveContainer width="100%" height="100%"><BarChart data={trendData} margin={{ top: 12, right: 12, left: -18, bottom: 5 }}><CartesianGrid vertical={false} stroke="#b6cda12b" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#c2d5b9" }} minTickGap={18} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#c2d5b9" }} /><Tooltip cursor={{ fill: "#c8ddaf15" }} contentStyle={{ background: "#edf4e2", border: "1px solid #b7cca3", borderRadius: 10, color: "#234c33", fontSize: 12 }} /><Bar isAnimationActive={false} dataKey="value" name="Reports" radius={[4,4,0,0]} maxBarSize={46}>{trendData.map((point,index) => <Cell key={point.name} fill={index === trendData.length-1 ? "#e9ba54" : "#b8d3a5"} />)}</Bar></BarChart></ResponsiveContainer>
     </div>
     <div className="mt-6 border-t pt-4"><h3 className="text-sm font-semibold">Resolution breakdown</h3><div className="mt-4 grid grid-cols-3 gap-3">{parts.map(part => <div key={part.name}><span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: part.color }} />{part.name}</span><strong className="mt-1 block font-outfit text-xl font-medium">{part.value}</strong></div>)}</div><div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-[#e8eddf]" aria-label={`${resolvedReports} resolved, ${pendingReports} pending, ${unresolved} other unresolved reports`}>{parts.map(part => <div key={part.name} style={{ width: `${totalReports ? part.value / totalReports * 100 : 0}%`, backgroundColor: part.color }} />)}</div></div>
   </section>;

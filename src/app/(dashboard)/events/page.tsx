@@ -1,4 +1,6 @@
 "use client";
+import { DetailPanel, useWideWorkspace } from "@/components/layout/DetailPanel";
+
 
 import { Users, Search, MapPin, Calendar, CalendarCheck, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, MoreVertical, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -51,6 +53,9 @@ interface EventData {
 }
 
 export default function EventsPage() {
+  const wideDetails = useWideWorkspace();
+  const DetailTitle = wideDetails ? "h2" : DialogTitle;
+  const DetailDescription = wideDetails ? "p" : DialogDescription;
   const { role } = useAuth();
   const router = useRouter();
   const [events, setEvents] = useState<EventData[]>([]);
@@ -59,12 +64,11 @@ export default function EventsPage() {
   const [attempt, setAttempt] = useState(0);
   const retryData = () => { setLoading(true); setDataError(null); setAttempt(value => value + 1); };
   const [editingEvent, setEditingEvent] = useState<EditableEvent | null>(null);
-  const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const [selectedEventId, setActiveEventId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<{id: string; userId: string; userName: string; barangay: string; registeredAt: number; attended: boolean}[]>([]);
   const [participantsEventId, setParticipantsEventId] = useState<string | null>(null);
   const [participantsError, setParticipantsError] = useState<string | null>(null);
   const [participantsAttempt, setParticipantsAttempt] = useState(0);
-  const loadingParticipants = activeEventId !== participantsEventId || !!participantsError;
   const [actionError, setActionError] = useState("");
   const [busyAttendance, setBusyAttendance] = useState<string | null>(null);
   const [downloadingCertificate, setDownloadingCertificate] = useState<string | null>(null);
@@ -83,6 +87,8 @@ export default function EventsPage() {
     && (barangayFilter === "all" || event.barangay === barangayFilter)
     && (dateFilter === "all" || (event.dateISO || event.date || "").slice(0,7) === new Date().toISOString().slice(0,7)));
   // Derive activeEvent from the live events list so it always reflects real-time data
+  const activeEventId = filteredEvents.some(event => event.id === selectedEventId) ? selectedEventId : (wideDetails ? filteredEvents[0]?.id || null : null);
+  const loadingParticipants = activeEventId !== participantsEventId || !!participantsError;
   const activeEvent = events.find(e => e.id === activeEventId) ?? null;
 
 
@@ -183,7 +189,7 @@ export default function EventsPage() {
   return (
     <>
       {certificatePreview && <CertificatePreview data={certificatePreview} onClose={() => setCertificatePreview(null)} />}
-      <div className="space-y-6 max-w-[1400px] mx-auto">
+      <div className="space-y-6 ">
         <DataState loading={loading} error={dataError} onRetry={retryData} />
 
         {/* KPI Cards */}
@@ -222,7 +228,7 @@ export default function EventsPage() {
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="tt-event-layout">
           {/* Main Table Area */}
           <div className="flex-1 tt-surface overflow-hidden flex flex-col">
 
@@ -287,7 +293,8 @@ export default function EventsPage() {
             <div className="tt-event-agenda">
                 {filteredEvents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(event => { const raw=event.dateISO || event.date;const date=new Date(raw + (/^\d{4}-\d{2}-\d{2}$/.test(raw) ? "T12:00:00" : ""));const valid=!Number.isNaN(date.getTime());return <article key={event.id} className={"tt-event-row" + (activeEvent?.id === event.id ? " is-selected" : "")}>
                   <div className="tt-date-block"><strong>{valid ? date.getDate().toString().padStart(2,"0") : "—"}</strong><span>{valid ? date.toLocaleDateString("en-PH",{month:"short"}) : "Event"}</span></div>
-                  <button type="button" className="tt-event-main" onClick={() => handleView(event)} aria-pressed={activeEvent?.id === event.id}><strong>{event.title}</strong><small>{event.barangay}<br />{event.date} · {event.time?.split(" - ").map(collectionTimeLabel).join(" – ")}<br />{event.participants || 0} registered · {event.status}</small></button>
+                  {event.img && <div className="tt-event-thumbnail"><Image src={event.img} alt="" fill sizes="(max-width:767px) 80px, 126px" /></div>}
+                  <button type="button" disabled={busyAttendance !== null} className="tt-event-main" onClick={() => handleView(event)} aria-pressed={activeEvent?.id === event.id}><strong>{event.title}</strong><small>{event.barangay}<br />{event.date} · {event.time?.split(" - ").map(collectionTimeLabel).join(" – ")}<br />{event.participants || 0} registered · {event.status}</small></button>
                   <div className="tt-event-row-actions"><Button variant="outline" onClick={() => handleView(event)} aria-label={"View " + event.title}>View</Button><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end">{event.status.toLowerCase() !== "completed" && <DropdownMenuItem onClick={() => {if(event.status === "Draft")router.push("/events/create?draft="+encodeURIComponent(event.id));else setEditingEvent(event);}}><Pencil />{event.status === "Draft"?"Continue draft":"Edit event"}</DropdownMenuItem>}<DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
                 </article>;})}
                 {!loading && filteredEvents.length === 0 && <p className="tt-empty">No events match your filters.</p>}
@@ -383,12 +390,12 @@ export default function EventsPage() {
           </div>
 
           {/* Right Panel: Event Details */}
-          <Dialog open={!!activeEvent} onOpenChange={open => { if (!open) setActiveEventId(null); }}>
+          <DetailPanel wide={wideDetails} dark label="Event details" empty={<div className="tt-detail-empty"><Calendar aria-hidden="true" /><h2>Community events</h2><p>Select an event to view attendance and certificates.</p></div>} open={!!activeEvent} onOpenChange={open => { if (!open) setActiveEventId(null); }}>
           {activeEvent && (
-          <DialogContent id="event-detail" className="sm:max-w-3xl">
-            <DialogDescription className="sr-only">Event information, attendance and certificates.</DialogDescription>
+          <div id="event-detail" className="p-5">
+            <DetailDescription className="sr-only">Event information, attendance and certificates.</DetailDescription>
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3 pr-8">
-              <DialogTitle className="font-bold text-lg text-slate-900">Event Details</DialogTitle>
+              <DetailTitle className="font-bold text-lg text-slate-900">Event Details</DetailTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${activeEvent.status.toLowerCase() === 'completed' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-blue-50 text-blue-500'}`}>{activeEvent.status}</span>
                 {!["completed","draft"].includes(activeEvent.status.toLowerCase()) && (
@@ -509,9 +516,9 @@ export default function EventsPage() {
               )}
             </div>
 
-          </DialogContent>
+          </div>
           )}
-          </Dialog>
+          </DetailPanel>
         </div>
       </div>
       {editingEvent && <EditEventDialog key={editingEvent.id} event={editingEvent} onClose={() => setEditingEvent(null)} />}

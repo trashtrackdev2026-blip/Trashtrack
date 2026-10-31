@@ -60,7 +60,7 @@ export function Header({ toggleSidebar }: { toggleSidebar: () => void }) {
       </div>
     </div>
     <div className="tt-page-heading"><div><h1 id="workspace-heading">{page.title}</h1><p>{page.subtitle}</p></div>
-      {page.action && role === "Admin" && <Link href={page.action.href} className="tt-primary-link"><Plus aria-hidden="true" />{page.action.label}</Link>}
+      {pathname !== "/" && page.action && role === "Admin" && <Link href={page.action.href} className="tt-primary-link"><Plus aria-hidden="true" />{page.action.label}</Link>}
     </div>
   </header>;
 }

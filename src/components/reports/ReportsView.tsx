@@ -4,6 +4,7 @@ import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { ReportEvidence } from "@/components/reports/ReportEvidence";
 
 import { useState } from "react";
+import { DetailPanel, useWideWorkspace } from "@/components/layout/DetailPanel";
 import { Search, FileText, Clock, CheckCircle2, AlertTriangle, Check, Send, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,9 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   role: ReportRole; userBarangay: string | null;
   onUpdate: (report: CommunityReport, status: string, remarks: string, collected: boolean) => Promise<void>;
 }) {
+  const wideDetails = useWideWorkspace();
+  const DetailTitle = wideDetails ? "h2" : DialogTitle;
+  const DetailDescription = wideDetails ? "p" : DialogDescription;
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const [fullPhotoUrl, setFullPhotoUrl] = useState<string | null>(null);
@@ -48,12 +52,13 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const visibleReports = filterReportSummary(reports, summaryFilter, role).filter(report =>
     (!search.trim() || [report.id, report.type, report.description, report.location, report.reporterName].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
     && (barangayFilter === "all" || reportBarangayLabel(report.location) === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
-  const activeReport = visibleReports.find(report => report.id === activeReportId);
+  const activeReport = visibleReports.find(report => report.id === activeReportId) || (wideDetails ? visibleReports[0] : undefined);
   const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
   const canSave = !!activeReport && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
   const summaryLabels = { all: "All reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
     review: role === "Semi-Admin" ? "For MENRO Review" : "Under Review", resolved: role === "Semi-Admin" ? "Resolved" : "Resolved Reports" };
   const selectSummary = (filter: ReportSummaryFilter) => {
+    if (isUpdating) return;
     setSummaryFilter(filter); setActiveReportId(null); setNewStatus(""); setRemarks(""); setCollectionConfirmed(false); setUpdateError(null);
   };
   const cardFilter = (filter: ReportSummaryFilter) => ({
@@ -94,21 +99,11 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
 
   return (
     <>
-      <div className="space-y-6 max-w-[1400px] mx-auto pb-8 relative">
+      <div className="space-y-6 pb-8 relative">
 
         <DataState loading={loading} error={error} onRetry={retry} />
         {/* Header */}
-        <div className="flex flex-col gap-2 mb-2">
-          <h1 className="tt-legacy-heading text-[26px] font-bold text-slate-900 leading-tight">
-            {role === "Semi-Admin" ? "Community Reports" : "Report Management"}
-          </h1>
-          <p className="text-sm text-slate-500">
-            {role === "Semi-Admin"
-              ? "Review reports in your barangay, verify the location, and forward confirmed reports to MENRO."
-              : "Receive verified reports from Barangay Captains, schedule collection, and resolve reports after collection."}
-          </p>
-          {role === "Semi-Admin" && <Link href="/reports-to-menro" className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-50"><Send className="h-4 w-4" />Reports to MENRO</Link>}
-        </div>
+
 
         {/* KPI Cards */}
         <div className="tt-metric-strip">
@@ -162,7 +157,19 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="tt-report-guidance">
+          <h1 className="tt-legacy-heading text-[26px] font-bold text-slate-900 leading-tight">
+            {role === "Semi-Admin" ? "Community Reports" : "Report Management"}
+          </h1>
+          <p className="text-sm text-slate-500">
+            {role === "Semi-Admin"
+              ? "Review reports in your barangay, verify the location, and forward confirmed reports to MENRO."
+              : "Receive verified reports from Barangay Captains, schedule collection, and resolve reports after collection."}
+          </p>
+          {role === "Semi-Admin" && <Link href="/reports-to-menro" className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-50"><Send className="h-4 w-4" />Reports to MENRO</Link>}
+        </div>
+
+        <div className="tt-report-layout">
 
           {/* Main Table Area */}
           <div id="reports-table" className="min-w-0 flex-1 tt-surface flex flex-col overflow-hidden">
@@ -177,7 +184,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
               <Select value={typeFilter} onValueChange={value => { setTypeFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report category" className="w-40"><SelectValue>{typeFilter === "all" ? "All categories" : typeFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{[...new Set(reports.map(report => report.type))].filter(Boolean).sort().map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
             </div>
             <div className="px-4 pb-2">
-              {visibleReports.map(report => { const photo=report.imageUrl || report.attachments.find(item => item.type === "image")?.url;return <button key={report.id} type="button" className="tt-report-item" aria-pressed={activeReport?.id === report.id} onClick={() => { setActiveReportId(report.id);setNewStatus("");setRemarks("");setCollectionConfirmed(false);setUpdateError(null); }}>
+              {visibleReports.map(report => { const photo=report.imageUrl || report.attachments.find(item => item.type === "image")?.url;return <button key={report.id} type="button" disabled={isUpdating} className="tt-report-item" aria-pressed={activeReport?.id === report.id} onClick={() => { setActiveReportId(report.id);setNewStatus("");setRemarks("");setCollectionConfirmed(false);setUpdateError(null); }}>
                 <span className="tt-report-thumbnail">{photo ? <Image src={photo} alt="Report evidence" fill sizes="93px" className="object-cover" /> : <FileText aria-hidden="true" />}</span>
                 <span className="tt-report-item-copy"><strong>{report.type}</strong><small>…{report.id.slice(-6)}</small><small>{report.location} · {report.date || "Date not recorded"}</small></span><span className={"tt-status " + (report.status.toLowerCase() === "pending" ? "tt-status-pending" : "")}>{REPORT_STATUS_LABELS[report.status as keyof typeof REPORT_STATUS_LABELS] || report.status}</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               </button>;})}
@@ -191,13 +198,13 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           </div>
 
           {/* Right Panel - Report Details */}
-          <Dialog open={!!activeReport} onOpenChange={open => { if (!open && !isUpdating) { setActiveReportId(null);setShowConfirm(false);setNewStatus("");setRemarks(""); } }}>
+          <DetailPanel wide={wideDetails} label="Report details" busy={isUpdating} empty={<div className="tt-detail-empty"><FileText aria-hidden="true" /><h2>Report details</h2><p>Select a report to review its evidence and status.</p></div>} open={!!activeReport} onOpenChange={open => { if (!open && !isUpdating) { setActiveReportId(null);setShowConfirm(false);setNewStatus("");setRemarks(""); } }}>
           {activeReport && (
-            <DialogContent key={activeReport.id} className="gap-0 p-0 sm:max-w-3xl" showCloseButton={!isUpdating}>
-              <DialogDescription className="sr-only">Review the submitted evidence, location and report status.</DialogDescription>
+            <div key={activeReport.id}>
+              <DetailDescription className="sr-only">Review the submitted evidence, location and report status.</DetailDescription>
               <div className="p-5 pr-12 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
                 <div className="flex flex-col">
-                  <DialogTitle className="font-bold text-slate-900">Report Details</DialogTitle>
+                  <DetailTitle className="font-bold text-slate-900">Report Details</DetailTitle>
                   <span className="text-xs font-bold text-slate-500 mt-1">ID: ...{activeReport.id.slice(-6)}</span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -267,7 +274,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                   <p className="whitespace-pre-wrap">{activeReport.remarks}</p>
                 </div>}
                 {/* Update Status Form */}
-                <div className="border-t border-slate-100 pt-5 mt-2">
+                <div className="tt-dark-panel tt-report-review mt-2">
                   <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-4">Update Status</h4>
 
                   <div className="space-y-4">
@@ -315,9 +322,9 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                 </div>
 
               </div>
-            </DialogContent>
+            </div>
           )}
-          </Dialog>
+          </DetailPanel>
 
         </div>
 

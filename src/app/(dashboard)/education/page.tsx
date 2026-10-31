@@ -1,5 +1,6 @@
 "use client";
 
+import { useWideWorkspace } from "@/components/layout/DetailPanel";
 import { ResourcePreview } from "@/components/education/ResourcePreview";
 import { learningResourceType } from "@/lib/learning-resource";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -46,6 +47,8 @@ interface ResourceData {
 }
 
 export default function EducationPage() {
+  const wideDetails = useWideWorkspace();
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const { role } = useAuth();
   const [resources, setResources] = useState<ResourceData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +83,9 @@ export default function EducationPage() {
     return matchesSearch && matchesCategory && matchesType && matchesStatus;
   });
 
+  const previewResource = filteredResources.find(item => item.id === previewId) || filteredResources[0];
+  const selectPreview = (item: ResourceData) => { setPreviewId(item.id); if (!wideDetails) setActiveResource(item); };
+
   useEffect(() => {
     if (role !== "Admin") return;
     return subscribeWithDeadline(collection(db, "educational_resources"), querySnapshot => {
@@ -106,7 +112,7 @@ export default function EducationPage() {
 
   return (
     <>
-      <div className="space-y-6 max-w-[1400px] mx-auto">
+      <div className="space-y-6 ">
         <DataState loading={loading} error={dataError} onRetry={retryData} />
 
         {/* Header */}
@@ -151,9 +157,9 @@ export default function EducationPage() {
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="tt-library-layout">
 
-          <div className="flex-1 space-y-4">
+          <div className="min-w-0 space-y-4">
             {/* Action Bar */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -167,7 +173,7 @@ export default function EducationPage() {
                   />
                 </div>
 
-                <div className="flex gap-3">
+                <div className="tt-filter-options flex flex-wrap gap-3">
                   <Select value={category} onValueChange={(val) => { setCategory(val ?? "all"); setCurrentPage(1); }}>
                     <SelectTrigger className="w-[140px] h-11 bg-white border-slate-200">
                       <SelectValue>{category === "all-categories" ? "All categories" : category.replaceAll("-"," ")}</SelectValue>
@@ -209,9 +215,9 @@ export default function EducationPage() {
             {/* Table Area */}
             <div className="tt-surface overflow-hidden">
               <div>
-                {filteredResources.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(item => { const source=item.fileUrl || item.videoUrl || item.image || "";const kind=learningResourceType(source,item.fileName,item.type);return <article key={item.id} className={"tt-resource-row" + (activeResource?.id === item.id ? " is-selected" : "")}>
-                  <button type="button" className="tt-resource-image" onClick={() => setActiveResource(item)} aria-label={"Preview " + item.title}>{kind === "image" && source ? <Image src={source} alt="" fill sizes="(max-width:767px) 90px, 150px" className="object-cover" /> : kind === "video" ? <PlayCircle className="h-10 w-10" aria-hidden="true" /> : <FileText className="h-10 w-10" aria-hidden="true" />}</button>
-                  <div className="tt-resource-copy"><h2>{item.title}</h2><p>{item.category} · {item.type}<br />{item.status}{item.date ? " · " + item.date : ""}</p><div className="tt-resource-actions"><Button variant="outline" onClick={() => setActiveResource(item)}><Eye aria-hidden="true" />Preview</Button><Button variant="ghost" onClick={() => openEdit(item)} aria-label={"Edit " + item.title}><Pencil /></Button><Button variant="ghost" aria-label={"Delete " + item.title} onClick={() => void handleDelete(item.id)}><Trash2 className="text-red-700" /></Button></div></div>
+                {filteredResources.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(item => { const source=item.fileUrl || item.videoUrl || item.image || "";const kind=learningResourceType(source,item.fileName,item.type);return <article key={item.id} className={"tt-resource-row" + (wideDetails && previewResource?.id === item.id ? " is-selected" : "")}>
+                  <button type="button" className="tt-resource-image" onClick={() => selectPreview(item)} aria-label={"Preview " + item.title}>{kind === "image" && source ? <Image src={source} alt="" fill sizes="(max-width:767px) 90px, 150px" className="object-cover" /> : kind === "video" ? <PlayCircle className="h-10 w-10" aria-hidden="true" /> : <FileText className="h-10 w-10" aria-hidden="true" />}</button>
+                  <div className="tt-resource-copy"><h2>{item.title}</h2><p>{item.category} · {item.type}<br />{item.status}{item.date ? " · " + item.date : ""}</p><div className="tt-resource-actions"><Button variant="outline" onClick={() => selectPreview(item)}><Eye aria-hidden="true" />Preview</Button><Button variant="ghost" onClick={() => openEdit(item)} aria-label={"Edit " + item.title}><Pencil /></Button><Button variant="ghost" aria-label={"Delete " + item.title} onClick={() => void handleDelete(item.id)}><Trash2 className="text-red-700" /></Button></div></div>
                 </article>;})}
                 {!loading && filteredResources.length === 0 && <p className="tt-empty">No resources match your filters.</p>}
               </div>
@@ -301,7 +307,15 @@ export default function EducationPage() {
             </div>
           </div>
 
-          {/* Right Panel - Resource Details */}
+          {wideDetails && previewResource && <aside className="tt-surface tt-dark-panel tt-resource-preview" aria-label="Selected resource preview">
+            <h2>Resource preview</h2>
+            <div className="tt-resource-image mt-5">{previewResource.image && learningResourceType(previewResource.image) === "image" ? <Image src={previewResource.image} alt="" fill sizes="310px" className="object-cover" /> : <FileText className="h-16 w-16" aria-hidden="true" />}</div>
+            <h3>{previewResource.title}</h3>
+            <dl><dt>Category</dt><dd>{previewResource.category}</dd><dt>Type</dt><dd>{previewResource.type}</dd><dt>Status</dt><dd><span className="tt-status">{previewResource.status}</span></dd></dl>
+            {previewResource.fileName && <p className="mb-5 break-words text-xs text-muted-foreground">{previewResource.fileName}</p>}
+            <div className="flex flex-wrap gap-3"><Button onClick={() => setActiveResource(previewResource)}><Eye aria-hidden="true" />Open resource</Button><Button variant="outline" onClick={() => openEdit(previewResource)}><Pencil aria-hidden="true" />Edit details</Button></div>
+          </aside>}
+          {/* Resource reader */}
           <Dialog open={!!activeResource} onOpenChange={open => { if (!open) setActiveResource(null); }}>
           {activeResource && (
           <DialogContent className="sm:max-w-3xl">

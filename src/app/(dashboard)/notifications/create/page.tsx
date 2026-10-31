@@ -55,7 +55,7 @@ export default function CreateNotificationPage() {
 
   return (
     <>
-      <div className="space-y-8 max-w-[1400px] mx-auto relative">
+      <div className="space-y-8 relative">
 
         {/* Header */}
         <div className="tt-legacy-heading flex flex-col gap-2">
@@ -68,7 +68,7 @@ export default function CreateNotificationPage() {
         <div className="tt-notification-compose">
 
           {/* Left Column - Form */}
-          <div className="flex-1">
+          <div className="tt-compose-form">
             <h2 className="font-bold text-lg text-slate-900 mb-1">Notification Information</h2>
             <p className="text-sm text-slate-500 mb-8">Provide the details of the notification you want to send.</p>
 
@@ -190,7 +190,7 @@ export default function CreateNotificationPage() {
           </div>
 
           {/* Right Column - Preview Box */}
-          <aside className="tt-notification-preview"><h2>Resident preview</h2><p className="mb-5 text-xs text-muted-foreground">This is how the notification will appear to residents.</p><div className="tt-resident-notice"><Brand /><h3>{form.title || "Notification title"}</h3><p>{form.message || "Your message will appear here."}</p><span className="tt-status mt-5">{form.recipients}</span></div><div className="mt-6 space-y-5 border-t pt-5 text-sm"><h3>Delivery information</h3><div><p className="text-xs text-muted-foreground">Audience</p><p className="mt-1">{form.recipients}</p></div><div><p className="text-xs text-muted-foreground">Delivery</p><p className="mt-1">{form.push ? "In-app + phone notification" : "In-app notification history"}</p></div></div></aside>
+          <aside className="tt-notification-preview tt-dark-panel"><h2>Resident preview</h2><p className="mb-5 text-xs text-muted-foreground">This is how the notification will appear to residents.</p><div className="tt-resident-notice"><Brand /><h3>{form.title || "Notification title"}</h3><p>{form.message || "Your message will appear here."}</p><span className="tt-status mt-5">{form.recipients}</span></div><div className="mt-6 space-y-5 border-t pt-5 text-sm"><h3>Delivery information</h3><div><p className="text-xs text-muted-foreground">Audience</p><p className="mt-1">{form.recipients}</p></div><div><p className="text-xs text-muted-foreground">Delivery</p><p className="mt-1">{form.push ? "In-app + phone notification" : "In-app notification history"}</p></div></div></aside>
         </div>
       </div>
 
