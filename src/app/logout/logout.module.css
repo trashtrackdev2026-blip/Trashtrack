@@ -8,7 +8,7 @@
   width: 100%;
   padding: clamp(28px, 3.2vw, 64px);
   overflow: hidden;
-  background: #0b2f24;
+  background: #3a6554;
   color: #f6f0db;
 }
 
@@ -19,7 +19,7 @@
   inset: 0;
   z-index: -2;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent 28%, #0b2f241a 43%, #0b2f24bf 64%, #0b2f24 78%), linear-gradient(0deg, #061c181a, transparent 35%);
+  background: linear-gradient(90deg, transparent 35%, #3a655414 48%, #3a6554f2 60%, #3a6554 78%);
 }
 
 .brand { grid-column: 1 / -1; grid-row: 1; width: fit-content; }
@@ -30,10 +30,10 @@
 
 .confirmation { grid-column: 2; grid-row: 2; align-self: center; width: 100%; max-width: 680px; padding: 44px 0; }
 .exitIcon { width: clamp(52px, 4.2vw, 72px); height: clamp(52px, 4.2vw, 72px); margin: 0 0 24px; color: #f2ecd2; }
-.eyebrow { margin: 0 0 22px; color: #c1d2af; font-size: clamp(12px, .96vw, 16px); font-weight: 500; line-height: 1.5; letter-spacing: .2em; text-transform: uppercase; }
+.eyebrow { margin: 0 0 22px; color: #e0e8d2; font-size: clamp(12px, .96vw, 16px); font-weight: 500; line-height: 1.5; letter-spacing: .2em; text-transform: uppercase; }
 .confirmation h1 { margin: 0; color: #fbf5df; font-family: Georgia, "Times New Roman", serif; font-size: clamp(40px, 4.3vw, 78px); font-weight: 700; line-height: 1.08; letter-spacing: -.035em; }
 .thanks { margin: 22px 0 0; color: #faf2dc; font-family: Georgia, "Times New Roman", serif; font-size: clamp(20px, 1.9vw, 34px); line-height: 1.4; }
-.description { margin: 12px 0 0; color: #d3dec4; font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 1.4vw, 24px); line-height: 1.55; }
+.description { margin: 12px 0 0; color: #f0f2e5; font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 1.4vw, 24px); line-height: 1.55; }
 .actions { display: grid; grid-template-columns: 1fr 1.1fr; gap: 22px; margin-top: 38px; }
 .stayButton, .logoutButton {
   display: inline-flex;
@@ -65,7 +65,7 @@
 @media (max-width: 1100px) {
   .backgroundPicture { width: 100%; }
   .page { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
-  .shade { background: linear-gradient(90deg, #0c2c201c 10%, #0c30266b 38%, #0a2d24e6 75%); }
+  .shade { background: linear-gradient(90deg, #3a655414 10%, #3a6554e6 38%, #3a6554f2 75%); }
   .confirmation h1 { font-size: clamp(40px, 4.8vw, 54px); }
   .actions { gap: 14px; }
   .stayButton, .logoutButton { padding-inline: 12px; gap: 10px; }
@@ -73,7 +73,7 @@
 @media (max-width: 700px) {
   .page { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; padding: 26px 24px; }
   .background { object-position: 30% center; }
-  .shade { background: linear-gradient(180deg, #0b2d2633, #0a3027d9 37%, #082b23f0 85%); }
+  .shade { background: linear-gradient(180deg, #3a655426, #3a6554e6 37%, #3a6554f2 85%); }
   .brand :global(.tt-brand-mark) { width: 62px; height: 62px; }
   .brand :global(.tt-brand-copy strong) { font-size: 30px; }
   .brand :global(.tt-brand-copy small) { font-size: 9px; }

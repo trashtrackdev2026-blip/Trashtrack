@@ -20,6 +20,6 @@ The login, logout page, and dashboard header use native responsive picture sourc
 
 The header uses a taller scenic frame and an 18% vertical focal position to show the mountain, shoreline, and lake together. Display-only brightness, contrast, saturation, and a slight warm tint bring out the original sunset colors; a localized text overlay keeps the scene clear.
 
-On wide logout screens, the photo covers the left 78% before blending into the forest background. This lets it show more of the original scene at a smaller scale, rather than enlarging the photo across the entire viewport. Tablet and mobile backgrounds retain full coverage. These presentation changes do not regenerate, stretch, blur, or alter the geography of the photograph.
+On wide logout screens, the photo covers the left 78% before blending into a lighter forest background (`#3a6554`). The fade starts later so the central lake stays clear; the right side uses the lighter green instead of a near-black block. Brighter supporting text maintains contrast. This layout shows more of the original scene at a smaller scale. Tablet and mobile backgrounds retain full photo coverage with matching lighter overlays. These presentation changes do not regenerate, stretch, blur, or alter the geography of the photograph.
 
 The local lossless master is `D:/Trashtrack/output/balete-hd/balete-lakeside-hd-master.png`; browser and pixel-preservation verification are in the same output directory. Both application copies contain identical production assets and rendering changes.
