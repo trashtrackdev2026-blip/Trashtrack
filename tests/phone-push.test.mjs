@@ -5,13 +5,14 @@ import { buildPhonePush } from "../src/lib/phone-push.ts";
 
 const record = { title: "Collection update", message: "Collection starts tomorrow at 8 AM.", type: "schedule", recipients: "All Barangays" };
 
-test("distinct phone updates are non-collapsible and contain everything needed for the tray and inbox", () => {
+test("phone updates include a system-visible background notification and foreground/tap data", () => {
   const message = buildPhonePush("notice-1", record, BALETE_BARANGAYS);
-  assert.equal(message.notification, undefined);
+  assert.deepEqual(message.notification, {title:record.title,body:record.message});
   assert.equal(message.topic, "trashtrack_residents_v1");
   assert.equal(message.android.priority, "high");
   assert.equal(message.android.collapseKey, undefined);
   assert.equal(message.android.ttl, 7 * 24 * 60 * 60 * 1000);
+  assert.deepEqual(message.android.notification, {channelId:"trashtrack_updates",tag:"trashtrack:notice-1",icon:"ic_notification",color:"#216B26",sound:"default",defaultVibrateTimings:true});
   assert.deepEqual(message.data, { notificationId: "notice-1", openNotifications: "true", type: "schedule",
     title: record.title, message: record.message, recipients: "All Barangays" });
 });
@@ -40,5 +41,7 @@ test("a retry uses the same Android tag and notification ID instead of creating 
   const first = buildPhonePush("stable-notice", record, BALETE_BARANGAYS);
   const retry = buildPhonePush("stable-notice", record, BALETE_BARANGAYS);
   assert.equal(first.data.notificationId, retry.data.notificationId);
+  assert.equal(first.android.notification.tag, retry.android.notification.tag);
+  assert.notEqual(first.android.notification.tag, buildPhonePush("another-notice", record, BALETE_BARANGAYS).android.notification.tag);
   assert.notEqual(first.data.notificationId, buildPhonePush("another-notice", record, BALETE_BARANGAYS).data.notificationId);
 });
