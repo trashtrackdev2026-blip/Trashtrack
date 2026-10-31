@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { Menu, LogOut, UserRound, Bell, ChevronRight, Plus, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -45,6 +46,10 @@ export function Header({ toggleSidebar }: { toggleSidebar: () => void }) {
   const displayName = name || user?.email?.split("@")[0] || "MENRO Admin";
   const date = new Intl.DateTimeFormat("en-PH", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Manila" }).format(new Date());
   return <header className={`tt-page-header${pathname === "/" ? " tt-page-header-home" : ""}`}>
+    <picture className="tt-header-photo" aria-hidden="true">
+      <source type="image/webp" srcSet="/images/balete-lakeside-1280.webp 1280w, /images/balete-lakeside-1920.webp 1920w, /images/balete-lakeside-hd.webp 2500w" sizes="100vw" />
+      <Image src="/images/balete-lakeside-hd.webp" alt="" fill unoptimized loading="eager" fetchPriority="high" className="tt-header-image" />
+    </picture>
     <div className="tt-topbar">
       <div className="tt-topbar-start"><button type="button" onClick={toggleSidebar} className="tt-icon-control" aria-label="Toggle navigation"><Menu aria-hidden="true" /></button>
         <nav className="tt-breadcrumb" aria-label="Breadcrumb"><Link href={role === "Semi-Admin" ? "/reports" : "/"}>Workspace</Link><ChevronRight aria-hidden="true" /><span aria-current="page">{page.section}</span></nav>

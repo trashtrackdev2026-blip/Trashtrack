@@ -41,7 +41,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               {children}
             </div>
           </main>
-          <footer className="tt-workspace-footer"><span>Made for the people of Balete.</span><span>MENRO · Municipal workspace</span></footer>
         </div>
        </div>
       </div>

@@ -16,6 +16,8 @@ Production assets, encoded once as WebP at quality 95:
 | `public/images/balete-lakeside-1920.webp` | 1920 × 1202 | 823,536 bytes |
 | `public/images/balete-lakeside-1280.webp` | 1280 × 801 | 344,268 bytes |
 
-The login uses a native responsive picture source and serves these files directly, avoiding another image-optimizer encoding. Its `sizes` accounts for the image's cover height on portrait screens, so a tall phone screen does not receive a narrow low-resolution landscape. The background loads eagerly with high fetch priority. The dashboard uses the full-resolution asset directly.
+The login and dashboard header use native responsive picture sources and serve these files directly, avoiding another image-optimizer encoding. Both load eagerly with high fetch priority. The login's `sizes` accounts for cover height on portrait screens. The dashboard header uses `sizes="100vw"` so collapsed navigation and high-density displays receive a sufficiently large source, up to the 2500-pixel original.
+
+The header uses a 12% vertical focal position to keep the mountain cap and horizon visible in its shallow frame. A lighter localized text overlay and modest display-only saturation/contrast replace the heavy green wash. These presentation changes do not regenerate, stretch, or alter the geography of the photograph.
 
 The local lossless master is `D:/Trashtrack/output/balete-hd/balete-lakeside-hd-master.png`; browser and pixel-preservation verification are in the same output directory. Both application copies contain identical production assets and rendering changes.

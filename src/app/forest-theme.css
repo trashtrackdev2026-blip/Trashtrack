@@ -40,16 +40,22 @@
 
 .tt-page-header {
   position: relative;
+  isolation: isolate;
   padding: 0 30px 40px;
-  background: linear-gradient(90deg, #052d22ad, #0d3a2233 65%, #133f1814), url('/images/balete-lakeside-hd.webp') center 23% / cover no-repeat;
+  background: #4a6754;
   color: #fffef4;
 }
+.tt-header-photo { position: absolute; inset: 0; z-index: -2; overflow: hidden; pointer-events: none; }
+.tt-header-image { object-fit: cover; object-position: 50% 12%; filter: saturate(1.14) contrast(1.06); }
+.tt-page-header:before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, #062b205e, #0b302314 55%, transparent 85%); }
 .tt-topbar { min-height: 62px; }
 .tt-topbar .tt-icon-control { color: #f0f6e8; }
 .tt-topbar .tt-icon-control:hover { background: #eff6db26; color: #fff; }
 .tt-breadcrumb, .tt-breadcrumb a { color: #d6e6ce; }
 .tt-breadcrumb span, .tt-topbar time { color: #fffef1; }
 .tt-topbar time { text-shadow: 0 1px 5px #0d301e; }
+.tt-topbar-actions .tt-icon-control, .tt-topbar-actions time { color: #123e2f; text-shadow: 0 1px 7px #fff8; }
+.tt-topbar-actions .tt-icon-control:hover { color: #123e2f; background: #f5f8e755; }
 .tt-topbar button:focus-visible, .tt-page-header a:focus-visible { outline-color: #fffbd7; }
 .tt-page-heading { padding: 30px 0 5px; min-height: 150px; align-items: center; }
 .tt-page-heading h1 { color: #fffef5; font-size: clamp(32px, 3.2vw, 50px); font-weight: 650; text-shadow: 0 2px 18px #0e2e2259; }
@@ -248,7 +254,8 @@
   .tt-community-feature-copy { width: 65%; }
 }
 @media(max-width:767px) {
-  .tt-page-header { padding: 0 20px 38px; background-position: 30% 23%; }
+  .tt-page-header { padding: 0 20px 38px; }
+  .tt-header-image { object-position: 30% 12%; }
   .tt-page-heading { padding-top: 20px; gap: 20px; min-height: 0; }
   .tt-page-heading h1 { font-size: 33px; }
   .tt-page-heading p { font-size: 14px; }

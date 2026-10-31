@@ -96,6 +96,5 @@ export default function Dashboard() {
         <div><h2>{nextEvent?.title || "Care for our community, together."}</h2><p>{nextEvent ? `${nextEvent.location}${nextEvent.time ? ` · ${nextEvent.time}` : ""}` : "Discover community events and environmental activities in Balete."}</p><Link href="/events" className="tt-text-link">{nextEvent ? "View event" : "Explore events"} <ArrowUpRight aria-hidden="true" /></Link></div>
       </div>
     </section>
-    <div className="tt-overview-links"><Link href="/notifications">{value(stats.recentNotifications)} announcements</Link><Link href="/events">{value(stats.upcomingEvents)} upcoming events</Link><Link href="/analytics" className="tt-text-link">Explore analytics <ArrowUpRight aria-hidden="true" /></Link></div>
   </div>;
 }
