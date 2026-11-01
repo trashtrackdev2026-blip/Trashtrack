@@ -1,6 +1,7 @@
 import { communityPublication } from "./community-publication.ts";
 import { StaffAccessError } from "./staff-access.ts";
 import { eventDate } from "./certificate-data.ts";
+import { assertFutureSchedule } from "./scheduling-time.ts";
 
 export function eventEditorTime(value: string, index = 0): string {
   const match = [...value.matchAll(/(\d{1,2}):(\d{2})\s*(AM|PM)?/gi)][index];
@@ -21,5 +22,6 @@ export function eventEditFields(body: Record<string, unknown>, current: Record<s
   // Attendance, participant counts, status and certificate settings are never
   // overwritten by the general details form.
   const { title, barangay, date, dateISO, time, startTime, endTime, location, description, category } = validated;
+  assertFutureSchedule(dateISO, startTime);
   return { title, barangay, date, dateISO, time, startTime, endTime, location, description, category };
 }

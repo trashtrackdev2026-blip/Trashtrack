@@ -6,6 +6,7 @@ import { communityPublication } from "@/lib/community-publication";
 import { queuePhoneNotification } from "@/lib/notification-delivery";
 import { assertCollectionAvailable } from "@/lib/schedule-policy";
 import { CertificateError } from "@/lib/certificate-data";
+import { assertFutureSchedule } from "@/lib/scheduling-time";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
@@ -29,6 +30,9 @@ export async function POST(request: Request) {
         if (postSnap.data()?.createdBy !== identity.uid || postSnap.data()?.publicationHash !== hash || !noticeSnap.exists) throw new StaffAccessError("This publication already exists with different details. Open the saved post.", 409);
         return;
       }
+      // Retry an already committed publication even after its start has passed;
+      // only new posts and publishing drafts are new scheduling actions.
+      assertFutureSchedule("dateISO" in publication.post ? publication.post.dateISO : publication.post.date, "startTime" in publication.post ? publication.post.startTime : publication.post.time);
       if (body.kind === "schedule" && "date" in publication.post) {
         const dayRef = db.collection("schedule_days").doc(publication.post.date);
         const [day, schedules] = await Promise.all([tx.get(dayRef), tx.get(db.collection("schedules").where("date", "==", publication.post.date))]);

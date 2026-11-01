@@ -4,8 +4,10 @@ import { CertificateError, certificateSettings, eventDate, validId } from "@/lib
 import { requireCertificateSecurity } from "@/lib/certificate-security";
 import { timingSafeEqual } from "node:crypto";
 import { parseAttendanceQr, assertQrCheckIn } from "@/lib/event-qr-data";
-import { eventEditFields } from "@/lib/event-edit";
+import { eventEditFields, eventEditorTime } from "@/lib/event-edit";
 import { eventRegistrationClosed } from "@/lib/event-lifecycle";
+import { assertFutureSchedule } from "@/lib/scheduling-time";
+import { normalizedEventTime } from "@/lib/event-form";
 
 export const runtime = "nodejs";
 
@@ -90,6 +92,11 @@ export async function POST(request: Request) {
         tx.update(eventRef, { ...eventEditFields(body, event), updatedBy: identity.uid, updatedAt: FieldValue.serverTimestamp() });
       } else if (body.action === "certificateSettings") {
         const date = eventDate({ dateISO: body.dateISO, date: event.date });
+        // Certificate metadata may describe a completed historical event, but
+        // this secondary editor must not backdate an upcoming event.
+        if (event.status !== "Completed" && date.iso !== eventDate(event).iso) {
+          assertFutureSchedule(date.iso, normalizedEventTime(event.startTime) || eventEditorTime(String(event.time || "")));
+        }
         const settings = body.certificateEnabled === false ? {
           certificateEnabled: false,
           certificateSignatory: String(body.certificateSignatory || "").trim().slice(0, 100),

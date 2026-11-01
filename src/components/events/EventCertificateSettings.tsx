@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { eventDate } from "@/lib/certificate-data";
 import { eventRequest } from "@/lib/event-client";
+import { schedulingBounds } from "@/lib/scheduling-time";
+import { useSchedulingClock } from "@/lib/use-scheduling-clock";
 
 type CertificateEvent = {
-  id: string; title: string; date: string; dateISO?: string;
+  id: string; title: string; date: string; dateISO?: string; status?: string;
   certificateEnabled?: boolean; certificateSignatory?: string;
   certificatePosition?: string; certificateOrganizer?: string;
 };
@@ -14,6 +16,7 @@ type CertificateEvent = {
 export function EventCertificateSettings({ event, onPreview }: {
   event: CertificateEvent; onPreview: (data: Record<string, unknown>) => void;
 }) {
+  const now = useSchedulingClock();
   const [form, setForm] = useState(() => {
     let dateISO = "";
     try { dateISO = eventDate({ dateISO: event.dateISO, date: event.date }).iso; } catch { dateISO = ""; }
@@ -39,7 +42,7 @@ export function EventCertificateSettings({ event, onPreview }: {
       Enable certificates for confirmed attendees
     </label>
     <label className="block text-xs">Event date
-      <Input type="date" value={form.dateISO} onChange={e => setForm({ ...form, dateISO: e.target.value })} className="mt-1" />
+      <Input type="date" min={event.status === "Completed" ? undefined : schedulingBounds(form.dateISO, now).minDate} value={form.dateISO} onChange={e => setForm({ ...form, dateISO: e.target.value })} className="mt-1" />
     </label>
     <label className="block text-xs">Signatory name
       <Input value={form.certificateSignatory} maxLength={100} onChange={e => setForm({ ...form, certificateSignatory: e.target.value })} className="mt-1" placeholder="Organizer's full name" />

@@ -9,8 +9,10 @@ import * as certificates from "../src/lib/certificate-data.ts";
 import { buildPhonePush } from "../src/lib/phone-push.ts";
 import { eventRegistrationClosed } from "../src/lib/event-lifecycle.ts";
 import { notificationPublication, phoneDeliveryDue } from "../src/lib/notification-publication.ts";
-import { eventFormFields } from "../src/lib/event-form.ts";
+import { eventFormFields, normalizedEventTime } from "../src/lib/event-form.ts";
 import { notificationEdit } from "../src/lib/notification-edit.ts";
+import * as clock from "../src/lib/scheduling-time.ts";
+import { collectionOutcomeNotice } from "../src/lib/collection-outcome-notice.ts";
 const require = createRequire(import.meta.url), ts = require("typescript");
 const compile = path => ts.transpileModule(fs.readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const routeCode = compile("../src/app/api/community/publish/route.ts");
@@ -19,6 +21,7 @@ const sendCode = compile("../src/app/api/notifications/send/route.ts");
 const createNoticeCode = compile("../src/app/api/notifications/create/route.ts");
 const draftCode = compile("../src/app/api/events/drafts/route.ts");
 const editNoticeCode = compile("../src/app/api/notifications/manage/route.ts");
+const manageScheduleCode = compile("../src/app/api/schedules/manage/route.ts");
 const schedule = { kind: "schedule", id: "test-schedule", barangay: "Sala", date: "2099-10-17", time: "08:00", description: "Roadside pickup" };
 
 function fixture(options = {}) {
@@ -28,12 +31,14 @@ function fixture(options = {}) {
   let failed = false;
   class Timestamp { constructor(value = Date.now()) { this.value = value; } toMillis() { return this.value; } }
   const ref = path => ({ path, id: path.split("/").at(-1), get: async () => ({ data: () => records.get(path) }), update: async value => { records.set(path, { ...records.get(path), ...value }); } });
-  const db = { collection: name => ({ doc: id => ref(name + "/" + id), where:(field,op,value) => ({collection:name,field,value}) }), async runTransaction(callback) {
+  let sequence = 0;
+  const db = { collection: name => ({ doc: id => ref(name + "/" + (id || "fixture-" + (++sequence))), where:(field,op,value) => ({collection:name,field,value}) }), async runTransaction(callback) {
     const working = new Map([...records].map(([key, value]) => [key, { ...value }]));
-    const result = await callback({ get: async target => target.collection ? ({docs:[...working].filter(([path,value]) => path.startsWith(target.collection+"/") && value[target.field] === target.value).map(([path,value]) => ({id:path.split("/")[1],data:()=>value}))}) : ({ exists: working.has(target.path), data: () => working.get(target.path) }),
-      set: (target,value, options) => {working.set(target.path,options?.merge ? {...working.get(target.path),...value} : value);},
-      create: (target, value) => { assert.equal(working.has(target.path), false); working.set(target.path, value); },
-      update: (target, value) => { assert.ok(working.has(target.path)); working.set(target.path, { ...working.get(target.path), ...value }); } });
+    let wrote = false;
+    const result = await callback({ get: async target => { assert.equal(wrote,false,"All transaction reads must precede writes");return target.collection ? ({docs:[...working].filter(([path,value]) => path.startsWith(target.collection+"/") && value[target.field] === target.value).map(([path,value]) => ({id:path.split("/")[1],data:()=>value}))}) : ({ exists: working.has(target.path), data: () => working.get(target.path) });},
+      set: (target,value, options) => {wrote=true;working.set(target.path,options?.merge ? {...working.get(target.path),...value} : value);},
+      create: (target, value) => { wrote=true;assert.equal(working.has(target.path), false); working.set(target.path, value); },
+      update: (target, value) => { wrote=true;assert.ok(working.has(target.path)); working.set(target.path, { ...working.get(target.path), ...value }); } });
     records.clear(); for (const [key, value] of working) records.set(key, value);
     return result;
   } };
@@ -45,7 +50,8 @@ function fixture(options = {}) {
       pushes.push(payload); if (options.failFirstPush && !failed) { failed = true; throw new Error("Messaging unavailable"); } return "test-message";
     } }) }, "./barangay-geofence": { BALETE_BARANGAYS: policy.STAFF_BARANGAYS }, "./phone-push": { buildPhonePush }, "./staff-access": policy,
     "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/schedule-policy": schedules, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates,
-    "@/lib/notification-publication": { notificationPublication }, "@/lib/event-form": {eventFormFields}, "@/lib/notification-edit": {notificationEdit} };
+    "@/lib/notification-publication": { notificationPublication }, "@/lib/event-form": {eventFormFields,normalizedEventTime}, "@/lib/notification-edit": {notificationEdit},
+    "@/lib/scheduling-time":clock,"@/lib/collection-outcome-notice":{collectionOutcomeNotice} };
   const delivery = {}; new Function("require","exports",deliveryCode)(name => modules[name] || require(name), delivery);
   modules["@/lib/notification-delivery"] = delivery;
   const route = {}; new Function("require","exports",routeCode)(name => modules[name] || require(name), route);
@@ -53,8 +59,9 @@ function fixture(options = {}) {
   const createNotice = {}; new Function("require","exports",createNoticeCode)(name => modules[name] || require(name), createNotice);
   const draft = {}; new Function("require","exports",draftCode)(name => modules[name] || require(name), draft);
   const edit = {}; new Function("require","exports",editNoticeCode)(name => modules[name] || require(name), edit);
+  const manageSchedule = {}; new Function("require","exports",manageScheduleCode)(name => modules[name] || require(name), manageSchedule);
   const invoke = async (route,body,expected) => {const response=await route.POST(new Request("https://example.invalid/api/test",{method:"POST",body:JSON.stringify(body)}));const result=await response.json();assert.equal(response.status,expected,result.error);return result;};
-  return { records, pushes, draft:(body,expected=200)=>invoke(draft,body,expected), edit:(body,expected=200)=>invoke(edit,body,expected), async create(body, expected = 200) {
+  return { records, pushes, manage:(body,expected=200)=>invoke(manageSchedule,body,expected), draft:(body,expected=200)=>invoke(draft,body,expected), edit:(body,expected=200)=>invoke(edit,body,expected), async create(body, expected = 200) {
     const response = await createNotice.POST(new Request("https://example.invalid/api/notifications/create", { method:"POST", body:JSON.stringify(body) }));
     const result = await response.json(); assert.equal(response.status, expected, result.error || "Expected response"); return result;
   }, async post(body = schedule, expected = 200, retryOnly = false) {
@@ -195,4 +202,84 @@ test("Notification edits keep the delivery record and audience, detect stale edi
   await app.edit({id:notice.id,expectedRevision:1,title:"Different audience",message:"Copy",type:"schedule",recipients:"Looc"},400);
   updated.pushStatus="sending";await app.edit({id:notice.id,expectedRevision:1,title:"Wait",message:"Copy",type:"schedule"},409);
   for(const profile of [{role:"Semi-Admin",barangay:"Sala"},{accessStatus:"suspended"}]){const denied=fixture({profile});await denied.edit({id:notice.id,expectedRevision:0},403);assert.equal(denied.records.size,1);}
+});
+
+test("New collections, event publication and drafts cannot backdate or use elapsed Philippine start times", async t => {
+  t.mock.method(Date,"now",()=>Date.parse("2026-11-02T13:30:25+08:00"));
+  for(const [date,time] of [["2026-11-01","23:59"],["2026-11-02","13:29"],["2026-11-02","13:30"]]) {
+    const app=fixture();await app.post({...schedule,date,time},400);assert.equal(app.records.size,1);assert.equal(app.pushes.length,0);
+    const event={id:"new-event",title:"Cleanup",barangay:"Sala",certificateEnabled:false,dateISO:date,startTime:time};
+    await app.post({...event,kind:"event"},400);await app.draft(event,400);assert.equal(app.records.size,1);assert.equal(app.pushes.length,0);
+  }
+  const future=fixture();await future.post({...schedule,date:"2026-11-02",time:"13:31"});assert.equal(future.pushes.length,1);
+  const draft=fixture();await draft.draft({id:"later",title:"Cleanup",barangay:"Sala",dateISO:"2026-11-03",startTime:"07:00",certificateEnabled:false});assert.equal(draft.pushes.length,0);
+});
+
+test("Publishing an expired saved draft fails, while retrying a committed publication remains safe", async t => {
+  let now=Date.parse("2026-11-02T13:30:00+08:00");t.mock.method(Date,"now",()=>now);
+  const app=fixture(),details={id:"expiring",title:"Cleanup",barangay:"Sala",dateISO:"2026-11-02",startTime:"13:31",certificateEnabled:false};
+  await app.draft(details);now+=120_000;await app.post({...details,kind:"event"},400);
+  assert.equal(app.records.get("events/expiring").status,"Draft");assert.equal(app.pushes.length,0);
+  now-=120_000;await app.post({...details,kind:"event"});now+=120_000;await app.post({...details,kind:"event"});assert.equal(app.pushes.length,1);
+});
+
+const outcome={id:"collection",changeId:"intent-one",expectedRevision:0,expectedStatus:"Active",status:"Failed",notes:"Road blocked"};
+const savedCollection={barangay:"Sala",date:"2026-11-01",time:"13:00",status:"Active",description:"Bring sorted bags"};
+
+test("Each collection outcome atomically saves the actual audience's inbox notice and visible phone push", async()=>{
+  for(const status of ["Completed","Failed","Unfinished","Inactive","Active"]) {
+    for(const barangay of ["Sala","All Barangays"]) {
+      const app=fixture();app.records.set("schedules/collection",{...savedCollection,barangay,date:status==="Active"?"2099-11-01":savedCollection.date,status:status==="Active"?"Inactive":"Active"});
+      const result=await app.manage({...outcome,status,expectedStatus:status==="Active"?"Inactive":"Active",recipients:"Looc"});
+      assert.equal(result.saved,true);assert.equal(result.notified,true);assert.equal(result.queued,true);
+      const saved=app.records.get("schedules/collection"),notice=app.records.get("notifications/"+result.notificationId);
+      assert.equal(saved.status,status);assert.equal(saved.statusRevision,1);assert.equal(saved.description,savedCollection.description);
+      assert.equal(notice.recipients,barangay);assert.equal(notice.sourceId,"collection");assert.equal(notice.pushStatus,"queued");
+      assert.equal(app.pushes.length,1);assert.ok(app.pushes[0].notification.body.includes(status.toLowerCase()));
+      assert.equal(app.pushes[0].topic,barangay==="Sala"?"trashtrack_barangay_sala_v1":"trashtrack_residents_v1");
+    }
+  }
+});
+
+test("Outcome retries and no-op saves do not duplicate notices, audit records or queued phone pushes", async()=>{
+  const app=fixture();app.records.set("schedules/collection",{...savedCollection});
+  const first=await app.manage(outcome),size=app.records.size;
+  await app.manage(outcome);assert.equal(app.records.size,size);assert.equal(app.pushes.length,1);
+  await app.manage({...outcome,notes:"A different request"},409);
+  const unchanged=await app.manage({...outcome,changeId:"intent-two",expectedStatus:"Failed",expectedRevision:1});
+  assert.equal(unchanged.notified,false);assert.equal(app.records.size,size);assert.equal(app.pushes.length,1);
+  await app.manage({...outcome,changeId:"intent-three",expectedStatus:"Failed",expectedRevision:1,status:"Completed",notes:"Road cleared"});
+  const laterSize=app.records.size;await app.manage(outcome);
+  assert.equal(app.records.size,laterSize);assert.equal(app.records.get("schedules/collection").status,"Completed");assert.equal(app.pushes.length,2);
+  assert.ok(app.records.has("notifications/"+first.notificationId));
+});
+
+test("A failed outcome push preserves the committed status/inbox and can retry the same notice",async()=>{
+  const app=fixture({failFirstPush:true});app.records.set("schedules/collection",{...savedCollection});
+  const result=await app.manage(outcome);assert.equal(result.saved,true);assert.equal(result.queued,false);assert.ok(result.deliveryError);
+  assert.equal(app.records.get("schedules/collection").status,"Failed");assert.equal(app.records.get("notifications/"+result.notificationId).pushStatus,"failed");
+  const size=app.records.size;assert.equal((await app.manage(outcome)).queued,true);assert.equal(app.records.size,size);assert.equal(app.pushes.length,2);
+});
+
+test("Stale revisions, invalid audiences and revoked outcome actors cannot create a status or notification",async()=>{
+  for(const [options,body,saved,code] of [
+    [{signedOut:true},outcome,savedCollection,401],
+    [{profile:{role:"Semi-Admin",barangay:"Sala"}},outcome,savedCollection,403],
+    [{profile:{accessStatus:"suspended"}},outcome,savedCollection,403],
+    [{},{...outcome,expectedRevision:2},savedCollection,409],
+    [{},outcome,{...savedCollection,barangay:"Unrecognized"},400],
+    [{},{...outcome,notes:""},savedCollection,400],
+  ]) {
+    const app=fixture(options);app.records.set("schedules/collection",{...saved});const before=[...app.records].map(([path,value])=>[path,{...value}]);
+    await app.manage(body,code);assert.deepEqual([...app.records],before);assert.equal(app.pushes.length,0);
+  }
+});
+
+test("Historical outcomes can be recorded, but a dated collection cannot be reactivated in the past",async t=>{
+  t.mock.method(Date,"now",()=>Date.parse("2026-11-02T13:30:25+08:00"));
+  const app=fixture();app.records.set("schedules/collection",{...savedCollection,status:"Failed"});
+  await app.manage({...outcome,expectedStatus:"Failed",status:"Active"},400);
+  assert.equal(app.records.get("schedules/collection").status,"Failed");assert.equal(app.pushes.length,0);
+  await app.manage({...outcome,expectedStatus:"Failed",status:"Completed",notes:"Collection finished"});
+  assert.equal(app.records.get("schedules/collection").status,"Completed");assert.equal(app.pushes.length,1);
 });

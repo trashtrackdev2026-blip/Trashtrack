@@ -19,9 +19,9 @@ export function eventFormFields(body: Record<string, unknown>, draft = false) {
   if (!title) throw new StaffAccessError("Enter the event title before saving.",400);
   if (!(STAFF_BARANGAYS as readonly string[]).includes(barangay) && barangay !== "All Barangays") throw new StaffAccessError("Select the event barangay.",400);
   const startTime = normalizedEventTime(body.startTime), endTime = normalizedEventTime(body.endTime);
-  if (!draft && !startTime) throw new StaffAccessError("Choose a valid event start time, including AM or PM.",400);
-  if (!draft && String(body.endTime || "").trim() && !endTime) throw new StaffAccessError("Choose a valid event end time, including AM or PM.",400);
-  if (!draft && endTime && endTime <= startTime) throw new StaffAccessError("The end time must be later than the start time on the event date. Check AM and PM.",400);
+  if ((!draft || String(body.startTime || "").trim()) && !startTime) throw new StaffAccessError("Choose a valid event start time, including AM or PM.",400);
+  if (String(body.endTime || "").trim() && !endTime) throw new StaffAccessError("Choose a valid event end time, including AM or PM.",400);
+  if (startTime && endTime && endTime <= startTime) throw new StaffAccessError("The end time must be later than the start time on the event date. Check AM and PM.",400);
   const date = draft && !body.dateISO ? {iso:"",display:""} : eventDate({dateISO:body.dateISO});
   const settings = draft || body.certificateEnabled === false ? {
     certificateEnabled:body.certificateEnabled !== false, certificateSignatory:text("certificateSignatory",100),

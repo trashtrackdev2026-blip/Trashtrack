@@ -3,6 +3,7 @@ import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/s
 import { StaffAccessError, staffAccessProblem } from "@/lib/staff-access";
 import { eventFormFields } from "@/lib/event-form";
 import { CertificateError } from "@/lib/certificate-data";
+import { assertFutureSchedule } from "@/lib/scheduling-time";
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
       const [actor,current] = await Promise.all([tx.get(db.collection("users").doc(identity.uid)),tx.get(ref)]);
       if (staffAccessProblem(actor.data() || {},identity as unknown as Record<string,unknown>) || String(actor.data()?.role).toLowerCase() !== "admin") throw new StaffAccessError("Your MENRO access changed. Sign in again.");
       if (current.exists && (current.data()?.status !== "Draft" || current.data()?.createdBy !== identity.uid)) throw new StaffAccessError("This event is already published or belongs to another official.",409);
+      assertFutureSchedule(fields.dateISO, fields.startTime, Date.now(), true);
       tx.set(ref,{...fields,status:"Draft",createdBy:identity.uid,participants:0,
         ...(!current.exists ? {createdAt:FieldValue.serverTimestamp()} : {}),updatedAt:FieldValue.serverTimestamp()},{merge:true});
     });

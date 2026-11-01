@@ -6,6 +6,9 @@ import * as policy from "../src/lib/staff-access.ts";
 import * as schedules from "../src/lib/schedule-policy.ts";
 import * as certificates from "../src/lib/certificate-data.ts";
 import * as edits from "../src/lib/event-edit.ts";
+import * as clock from "../src/lib/scheduling-time.ts";
+import * as eventForm from "../src/lib/event-form.ts";
+import { collectionOutcomeNotice } from "../src/lib/collection-outcome-notice.ts";
 const require = createRequire(import.meta.url), ts = require("typescript");
 const compile = file => ts.transpileModule(fs.readFileSync(new URL(file,import.meta.url),"utf8"), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const scheduleRoute = compile("../src/app/api/schedules/manage/route.ts");
@@ -15,8 +18,8 @@ function fixture(options = {}) {
   const identity = {uid:"menro",staffRole:"admin",email_verified:true,auth_time:Math.floor(Date.now()/1000)};
   const records = new Map([
     ["users/menro",{role:"Admin",accessStatus:"active",...options.actor}],
-    ["schedules/one",{date:"2099-10-31",barangay:"Sala",status:"Active",...options.schedule}],
-    ["events/one",{title:"Original event",barangay:"Sala",status:"Upcoming",participants:27,availableSlots:13,certificateEnabled:true,attendanceMethod:"qr",certificateSignatory:"Test Signatory",...options.event}],
+    ["schedules/one",{date:"2099-10-31",time:"08:00",barangay:"Sala",status:"Active",...options.schedule}],
+    ["events/one",{title:"Original event",barangay:"Sala",dateISO:"2099-11-01",time:"07:00 - 09:00",status:"Upcoming",participants:27,availableSlots:13,certificateEnabled:true,attendanceMethod:"qr",certificateSignatory:"Test Signatory",...options.event}],
     ...(options.extra || []),
   ]);
   let sequence=0;
@@ -36,12 +39,13 @@ function fixture(options = {}) {
     "firebase-admin/firestore":{FieldValue:{serverTimestamp:()=>"server-time"}},
     "@/lib/staff-auth":{authenticatedStaff:async(request,adminOnly)=>{check();assert.equal(adminOnly,true);return {db,identity};},requireStaffSecurity:async()=>{},staffApiError:errorResponse},
     "@/lib/staff-access":policy,"@/lib/schedule-policy":schedules,"@/lib/certificate-data":certificates,"@/lib/event-edit":edits,
+    "@/lib/scheduling-time":clock,"@/lib/event-form":eventForm,"@/lib/collection-outcome-notice":{collectionOutcomeNotice},"@/lib/notification-delivery":{queuePhoneNotification:async()=>{}},
     "@/lib/firebase-request-auth":{authenticatedResident:async(request,adminOnly)=>{check();assert.equal(adminOnly,true);return {db,identity,profile:records.get("users/menro")};},certificateApiError:errorResponse},
     "@/lib/certificate-security":{requireCertificateSecurity:async()=>{}},"@/lib/event-qr-data":{},"@/lib/event-lifecycle":{},
   };
   const load = code => {const exports={};new Function("require","exports",code)(name=>modules[name]||require(name),exports);return exports;};
   const endpoints={schedules:load(scheduleRoute),events:load(eventRoute)};
-  return {records, async post(kind,body,expected=200){const result=await endpoints[kind].POST(new Request("http://localhost/api/"+kind+"/manage",{method:"POST",body:JSON.stringify(body)}));const payload=await result.json();assert.equal(result.status,expected,payload.error);return payload;}};
+  return {records, async post(kind,body,expected=200){const result=await endpoints[kind].POST(new Request("http://localhost/api/"+kind+"/manage",{method:"POST",body:JSON.stringify({...(kind==="schedules"?{changeId:"fixture-change",expectedRevision:0}:{}),...body})}));const payload=await result.json();assert.equal(result.status,expected,payload.error);return payload;}};
 }
 
 test("Collection outcomes save audit and date reservation without overwriting the schedule", async () => {
@@ -78,4 +82,19 @@ test("Event edit endpoint keeps attendance and certificates while applying valid
   await app.post("events",{...details,endTime:"06:00"},400);
   assert.equal(app.records.get("events/one").time,"07:00 - 09:00");
   await fixture({event:{status:"Completed"}}).post("events",details,409);
+});
+
+test("Event edits and certificate date changes cannot bypass the Philippine scheduling clock", async t => {
+  t.mock.method(Date,"now",()=>Date.parse("2026-11-02T13:30:25+08:00"));
+  const app=fixture(),before=structuredClone([...app.records]);
+  const details={action:"edit",eventId:"one",title:"Cleanup",barangay:"Sala",dateISO:"2026-11-01",startTime:"07:00",certificateEnabled:false};
+  await app.post("events",details,400);
+  await app.post("events",{...details,dateISO:"2026-11-02",startTime:"13:30"},400);
+  await app.post("events",{action:"certificateSettings",eventId:"one",dateISO:"2026-11-01",certificateEnabled:false},400);
+  assert.deepEqual([...app.records],before);
+  await app.post("events",{...details,dateISO:"2026-11-02",startTime:"13:31"});
+  assert.equal(app.records.get("events/one").startTime,"13:31");
+  const completed=fixture({event:{status:"Completed",dateISO:"2026-10-30"}});
+  await completed.post("events",{action:"certificateSettings",eventId:"one",dateISO:"2026-10-31",certificateEnabled:false});
+  assert.equal(completed.records.get("events/one").dateISO,"2026-10-31");
 });
