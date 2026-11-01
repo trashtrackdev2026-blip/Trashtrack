@@ -11,7 +11,7 @@ const operations = [
   { name: "Overview", href: "/", icon: House },
   { name: "Collections", href: "/schedules", icon: CalendarDays },
   { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Residents & staff", href: "/users", icon: Users },
+  { name: "User Management", href: "/users", icon: Users },
 ];
 const community = [
   { name: "Announcements", href: "/notifications", icon: Bell },

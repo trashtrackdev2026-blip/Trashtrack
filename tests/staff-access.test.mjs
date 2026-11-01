@@ -32,8 +32,8 @@ test("Required authenticator cannot be bypassed by a password-only or phone chal
   assert.equal(staffAccessProblem(profile, { ...claims, firebase: { sign_in_second_factor: "totp" } }, now), null);
 });
 test("Public requests cannot select a master role or inject security fields", () => {
-  const input = { name: "  Juan   dela Cruz ", barangay: "Sala", position: "Official", contact: "09123456789", role: "Admin", mfaRequired: false, accessStatus: "active" };
-  assert.deepEqual(requestFields(input), { name: "Juan dela Cruz", barangay: "Sala", position: "Official", contact: "09123456789" });
+  const input = { name: "  Juan   dela Cruz ", barangay: "Sala", position: "Secretary", contact: "09123456789", role: "Admin", mfaRequired: false, accessStatus: "active" };
+  assert.deepEqual(requestFields(input), { name: "Juan dela Cruz", barangay: "Sala", position: "Secretary", contact: "09123456789" });
   assert.throws(() => requestFields({ ...input, barangay: "Poblacion 2" }));
   assert.throws(() => requestFields({ ...input, position: "" }));
 });

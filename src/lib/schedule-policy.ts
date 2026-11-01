@@ -1,10 +1,10 @@
 import { StaffAccessError } from "./staff-access.ts";
 
-export const COLLECTION_STATUSES = ["Active", "Completed", "Unfinished", "Failed", "Inactive"] as const;
-export type CollectionStatus = typeof COLLECTION_STATUSES[number];
+export const COLLECTION_STATUSES = ["Active", "Completed", "Unfinished", "Failed"] as const;
+export type CollectionStatus = typeof COLLECTION_STATUSES[number] | "Inactive";
 
 export function collectionStatus(value: unknown): CollectionStatus | null {
-  return COLLECTION_STATUSES.find(status => status.toLowerCase() === String(value).trim().toLowerCase()) || null;
+  return [...COLLECTION_STATUSES, "Inactive" as const].find(status => status.toLowerCase() === String(value).trim().toLowerCase()) || null;
 }
 
 // A collection occupies its barangay's date, even when a different start time
@@ -23,7 +23,7 @@ export function assertCollectionAvailable(
 export function collectionStatusUpdate(body: Record<string, unknown>) {
   const status = collectionStatus(body.status);
   const notes = typeof body.notes === "string" ? body.notes.trim() : "";
-  if (!status || notes.length > 2000) throw new StaffAccessError("Choose a valid collection status and notes up to 2,000 characters.", 400);
+  if (!status || status === "Inactive" || notes.length > 2000) throw new StaffAccessError("Choose Active, Completed, Unfinished or Failed, and notes up to 2,000 characters. Inactive is retained only on historical records.", 400);
   if (["Failed", "Unfinished"].includes(status) && !notes) throw new StaffAccessError("Explain why this collection failed or remains unfinished.", 400);
   return { status, statusNotes: notes };
 }

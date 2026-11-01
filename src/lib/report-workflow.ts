@@ -25,10 +25,10 @@ export function nextReportStatuses(role: ReportRole, status: string): ReportStat
   const current = normalizeReportStatus(status);
   if (role === "Semi-Admin") {
     if (current === "Pending") return ["UnderReview"];
-    if (current === "UnderReview") return ["For MENRO Review"];
+    if (current === "UnderReview") return ["Resolved", "For MENRO Review"];
   }
   if (role === "Admin") {
-    if (current === "For MENRO Review") return ["MENRO Under Review", "Endorsed"];
+    if (current === "For MENRO Review") return ["MENRO Under Review"];
     if (current === "MENRO Under Review") return ["Endorsed"];
     if (current === "Endorsed") return ["Resolved"];
   }
@@ -54,4 +54,4 @@ export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
   Resolved: "Resolved",
 };
 
-export const REPORT_ACTION_LABELS = { ...REPORT_STATUS_LABELS, UnderReview: "Start barangay review", "For MENRO Review": "Forward to MENRO", "MENRO Under Review": "Start MENRO review", Endorsed: "Schedule for collection", Resolved: "Resolve after collection" };
+export const REPORT_ACTION_LABELS = { ...REPORT_STATUS_LABELS, UnderReview: "Start barangay review", "For MENRO Review": "Forward major report to MENRO", "MENRO Under Review": "Start MENRO review", Endorsed: "Plan response action", Resolved: "Confirm resolution" };

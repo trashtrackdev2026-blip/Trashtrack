@@ -8,6 +8,7 @@ import { eventRequest } from "@/lib/event-client";
 import { eventEditorTime, eventEditorDate } from "@/lib/event-edit";
 import { assertFutureSchedule, schedulingBounds, schedulingError } from "@/lib/scheduling-time";
 import { useSchedulingClock } from "@/lib/use-scheduling-clock";
+import { EVENT_CATEGORIES, canonicalEventCategory } from "@/lib/event-categories";
 
 export type EditableEvent = { id: string; title: string; barangay: string; date: string; dateISO?: string; time: string; startTime?: string; endTime?: string; location?: string; category?: string; description: string };
 export function EditEventDialog({ event, onClose }: { event: EditableEvent; onClose: () => void }) {
@@ -16,7 +17,7 @@ export function EditEventDialog({ event, onClose }: { event: EditableEvent; onCl
     dateISO: eventEditorDate(event.dateISO, event.date),
     startTime: event.startTime || eventEditorTime(event.time),
     endTime: event.endTime || eventEditorTime(event.time, 1),
-    location: event.location || "", category: event.category || "", description: event.description || "" }));
+    location: event.location || "", category: canonicalEventCategory(event.category) || "Other", description: event.description || "" }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   async function save(e: React.FormEvent) {
@@ -37,7 +38,7 @@ export function EditEventDialog({ event, onClose }: { event: EditableEvent; onCl
       <p className="text-xs text-muted-foreground">Choose a future start in Philippine time. The end must be later on the same date.</p>
       {dateTimeError && <p role="alert" className="text-red-700">{dateTimeError}</p>}
       <label className="block">Location<Input maxLength={240} value={form.location} onChange={e => field("location", e.target.value)} /></label>
-      <label className="block">Category<Input maxLength={80} value={form.category} onChange={e => field("category", e.target.value)} /></label>
+      <label className="block">Category<select aria-label="Event category" required value={form.category} onChange={e => field("category", e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border p-2">{!(EVENT_CATEGORIES as readonly string[]).includes(form.category) && <option value={form.category}>{form.category} (existing)</option>}{EVENT_CATEGORIES.map(category => <option key={category}>{category}</option>)}</select></label>
       <label className="block">Description<textarea className="mt-1 w-full rounded-lg border p-3" rows={4} maxLength={5000} value={form.description} onChange={e => field("description", e.target.value)} /></label>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       <div className="flex justify-end gap-3"><Button type="button" variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save event"}</Button></div>

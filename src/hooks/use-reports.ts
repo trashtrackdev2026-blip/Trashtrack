@@ -25,6 +25,14 @@ export interface CommunityReport {
   verifiedByName: string;
   forwardedByName: string;
   forwardedAt: string;
+  statusRevision?: number;
+  resolvedByRole?: string;
+  resolvedByName?: string;
+  resolvedAt?: string;
+  actionKind?: string;
+  actionNotes?: string;
+  actionDate?: string;
+  actionTime?: string;
 }
 
 export function useReports() {
@@ -63,6 +71,8 @@ export function useReports() {
               verifiedByName: typeof data.verifiedByName === "string" ? data.verifiedByName : "",
               forwardedByName: typeof data.forwardedByName === "string" ? data.forwardedByName : "",
               forwardedAt: data.forwardedAt?.toDate?.().toISOString() || "",
+              statusRevision: Number(data.statusRevision || 0), resolvedByRole: data.resolvedByRole || "", resolvedByName: data.resolvedByName || "", resolvedAt: data.resolvedAt?.toDate?.().toISOString() || "",
+              actionKind: data.actionKind || "", actionNotes: data.actionNotes || "", actionDate: data.actionDate || "", actionTime: data.actionTime || "",
             } satisfies CommunityReport;
           }).sort((a, b) => b.date.localeCompare(a.date));
       setState({ owner, reports, loading: false, error: null });

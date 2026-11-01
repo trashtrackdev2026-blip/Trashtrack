@@ -15,7 +15,7 @@ type PageInfo = { title: string; subtitle: string; section: string; action?: { h
 const pages: Record<string, PageInfo> = {
   "/": { section: "Overview", title: "A cleaner Balete, together.", subtitle: "Here’s what needs your attention today." },
   "/schedules": { section: "Collections", title: "Collection schedules", subtitle: "A clear plan for every barangay.", action: { href: "/schedules/create", label: "New schedule" } },
-  "/users": { section: "Residents & staff", title: "Residents & staff", subtitle: "People at the heart of a cleaner Balete." },
+  "/users": { section: "User Management", title: "User Management", subtitle: "People at the heart of a cleaner Balete." },
   "/reports": { section: "Reports", title: "Community reports", subtitle: "Listen, validate, and help resolve local concerns." },
   "/reports-to-menro": { section: "Reports to MENRO", title: "Reports to MENRO", subtitle: "Forward verified concerns and follow their progress." },
   "/notifications": { section: "Announcements", title: "Announcements", subtitle: "Keep residents informed, wherever they are.", action: { href: "/notifications/create", label: "Create notification" } },
@@ -46,7 +46,7 @@ export function Header({ toggleSidebar }: { toggleSidebar: () => void }) {
   const displayName = name || user?.email?.split("@")[0] || "MENRO Admin";
   const date = new Intl.DateTimeFormat("en-PH", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Manila" }).format(new Date());
   return <header className={`tt-page-header${pathname === "/" ? " tt-page-header-home" : ""}`}>
-    <picture className="tt-header-photo" aria-hidden="true">
+    <picture className="tt-header-photo">
       <source type="image/webp" srcSet="/images/balete-lakeside-1280.webp 1280w, /images/balete-lakeside-1920.webp 1920w, /images/balete-lakeside-hd.webp 2500w" sizes="100vw" />
       <Image src="/images/balete-lakeside-hd.webp" alt="" fill unoptimized loading="eager" fetchPriority="high" className="tt-header-image" />
     </picture>

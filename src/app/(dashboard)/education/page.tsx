@@ -2,7 +2,7 @@
 
 import { useWideWorkspace } from "@/components/layout/DetailPanel";
 import { ResourcePreview } from "@/components/education/ResourcePreview";
-import { learningResourceType } from "@/lib/learning-resource";
+import { learningResourceType, learningCover } from "@/lib/learning-resource";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,7 @@ interface ResourceData {
   date: string;
   status: string;
   image: string;
+  coverUrl?: string;
   fileUrl?: string;
   videoUrl?: string;
   fileName?: string;
@@ -216,7 +217,7 @@ export default function EducationPage() {
             <div className="tt-surface overflow-hidden">
               <div>
                 {filteredResources.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(item => { const source=item.fileUrl || item.videoUrl || item.image || "";const kind=learningResourceType(source,item.fileName,item.type);return <article key={item.id} className={"tt-resource-row" + (wideDetails && previewResource?.id === item.id ? " is-selected" : "")}>
-                  <button type="button" className="tt-resource-image" onClick={() => selectPreview(item)} aria-label={"Preview " + item.title}>{kind === "image" && source ? <Image src={source} alt="" fill sizes="(max-width:767px) 90px, 150px" className="object-cover" /> : kind === "video" ? <PlayCircle className="h-10 w-10" aria-hidden="true" /> : <FileText className="h-10 w-10" aria-hidden="true" />}</button>
+                  <button type="button" className="tt-resource-image" onClick={() => selectPreview(item)} aria-label={"Preview " + item.title}>{learningCover(item) ? <Image src={learningCover(item)!} alt="" fill sizes="(max-width:767px) 90px, 150px" className="object-cover" /> : kind === "video" ? <PlayCircle className="h-10 w-10" aria-hidden="true" /> : <FileText className="h-10 w-10" aria-hidden="true" />}</button>
                   <div className="tt-resource-copy"><h2>{item.title}</h2><p>{item.category} · {item.type}<br />{item.status}{item.date ? " · " + item.date : ""}</p><div className="tt-resource-actions"><Button variant="outline" onClick={() => selectPreview(item)}><Eye aria-hidden="true" />Preview</Button><Button variant="ghost" onClick={() => openEdit(item)} aria-label={"Edit " + item.title}><Pencil /></Button><Button variant="ghost" aria-label={"Delete " + item.title} onClick={() => void handleDelete(item.id)}><Trash2 className="text-red-700" /></Button></div></div>
                 </article>;})}
                 {!loading && filteredResources.length === 0 && <p className="tt-empty">No resources match your filters.</p>}
@@ -309,7 +310,7 @@ export default function EducationPage() {
 
           {wideDetails && previewResource && <aside className="tt-surface tt-dark-panel tt-resource-preview" aria-label="Selected resource preview">
             <h2>Resource preview</h2>
-            <div className="tt-resource-image mt-5">{previewResource.image && learningResourceType(previewResource.image) === "image" ? <Image src={previewResource.image} alt="" fill sizes="310px" className="object-cover" /> : <FileText className="h-16 w-16" aria-hidden="true" />}</div>
+            <div className="mt-4"><ResourcePreview key={previewResource.id} resource={previewResource} /></div>
             <h3>{previewResource.title}</h3>
             <dl><dt>Category</dt><dd>{previewResource.category}</dd><dt>Type</dt><dd>{previewResource.type}</dd><dt>Status</dt><dd><span className="tt-status">{previewResource.status}</span></dd></dl>
             {previewResource.fileName && <p className="mb-5 break-words text-xs text-muted-foreground">{previewResource.fileName}</p>}
@@ -323,7 +324,7 @@ export default function EducationPage() {
             <div className="min-w-0">
 
               <DialogTitle className="mb-4 pr-8">Resource Details</DialogTitle>
-              <ResourcePreview resource={activeResource} />
+              <ResourcePreview key={activeResource.id} resource={activeResource} />
 
               <h4 className="text-xl font-bold text-slate-900 mb-3 leading-tight">{activeResource.title}</h4>
 

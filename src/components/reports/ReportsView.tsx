@@ -3,6 +3,10 @@ import { reportBarangayLabel } from "@/lib/report-location-label";
 import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { ReportEvidence } from "@/components/reports/ReportEvidence";
 
+import { ReportActionFields } from "./ReportActionFields";
+import { reportActionFields, type ReportActionInput } from "@/lib/report-action";
+import type { ReportUpdateInput } from "@/lib/update-report";
+import { normalizeReportStatus } from "@/lib/report-workflow";
 import { useState } from "react";
 import { Search, FileText, Clock, CheckCircle2, AlertTriangle, Check, Send, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
@@ -28,7 +32,7 @@ const ReportMap = dynamic(() => import("@/components/ReportMap"), {
 export function ReportsView({ reports, loading, error, retry, role, userBarangay, onUpdate }: {
   reports: CommunityReport[]; loading: boolean; error: string | null; retry: () => void;
   role: ReportRole; userBarangay: string | null;
-  onUpdate: (report: CommunityReport, status: string, remarks: string, collected: boolean) => Promise<void>;
+  onUpdate: (report: CommunityReport, status: string, remarks: string, collected: boolean, details: ReportUpdateInput) => Promise<{deliveryError?:string}|void>;
 }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
@@ -39,7 +43,10 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const [remarks, setRemarks] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [collectionConfirmed, setCollectionConfirmed] = useState(false);
+  const [actionInput, setActionInput] = useState<ReportActionInput>({});
+  const [openedVersion, setOpenedVersion] = useState({expectedStatus:"",expectedRevision:0});
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [saveMessage,setSaveMessage]=useState("");
   const [summaryFilter, setSummaryFilter] = useState<ReportSummaryFilter>("all");
 
   const [search, setSearch] = useState("");
@@ -50,7 +57,10 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     && (barangayFilter === "all" || reportBarangayLabel(report.location) === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
   const activeReport = visibleReports.find(report => report.id === activeReportId);
   const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
-  const canSave = !!activeReport && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
+  let actionValid = true;
+  try { const next=normalizeReportStatus(newStatus);if(next)reportActionFields(role,next,{...actionInput,remarks}); } catch { actionValid=false; }
+  const canSave = !!activeReport && actionValid && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
+  const openReport = (report: CommunityReport) => {setActiveReportId(report.id);setNewStatus("");setRemarks("");setCollectionConfirmed(false);setActionInput({});setOpenedVersion({expectedStatus:report.status,expectedRevision:report.statusRevision||0});setUpdateError(null);};
   const summaryLabels = { all: "All reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
     review: role === "Semi-Admin" ? "For MENRO Review" : "Under Review", resolved: role === "Semi-Admin" ? "Resolved" : "Resolved Reports" };
   const selectSummary = (filter: ReportSummaryFilter) => {
@@ -81,7 +91,8 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     setIsUpdating(true);
     setUpdateError(null);
     try {
-      await onUpdate(activeReport, newStatus, remarks, collectionConfirmed);
+      const result=await onUpdate(activeReport, newStatus, remarks, collectionConfirmed, {...actionInput,...openedVersion});
+      setSaveMessage(result?.deliveryError ? "Report action and schedule saved. Phone delivery is pending; retry the saved notice in Announcements." : "Report update saved.");
       setShowConfirm(false);
       setNewStatus("");
       setRemarks("");
@@ -98,6 +109,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
       <div className="space-y-6 pb-8 relative">
 
         <DataState loading={loading} error={error} onRetry={retry} />
+        {saveMessage&&<p role="status" className="rounded-xl bg-green-50 p-4 text-sm text-green-900">{saveMessage}</p>}
         {/* Header */}
 
 
@@ -180,7 +192,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
               <Select value={typeFilter} onValueChange={value => { setTypeFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report category" className="w-40"><SelectValue>{typeFilter === "all" ? "All categories" : typeFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{[...new Set(reports.map(report => report.type))].filter(Boolean).sort().map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
             </div>
             <div className="px-4 pb-2">
-              {visibleReports.map(report => { const photo=report.imageUrl || report.attachments.find(item => item.type === "image")?.url;return <button key={report.id} type="button" disabled={isUpdating} className="tt-report-item" aria-pressed={activeReport?.id === report.id} onClick={() => { setActiveReportId(report.id);setNewStatus("");setRemarks("");setCollectionConfirmed(false);setUpdateError(null); }}>
+              {visibleReports.map(report => { const photo=report.imageUrl || report.attachments.find(item => item.type === "image")?.url;return <button key={report.id} type="button" disabled={isUpdating} className="tt-report-item" aria-pressed={activeReport?.id === report.id} onClick={() => openReport(report)}>
                 <span className="tt-report-thumbnail">{photo ? <Image src={photo} alt="Report evidence" fill sizes="93px" className="object-cover" /> : <FileText aria-hidden="true" />}</span>
                 <span className="tt-report-item-copy"><strong>{report.type}</strong><small>…{report.id.slice(-6)}</small><small>{report.location} · {report.date || "Date not recorded"}</small></span><span className={"tt-status " + (report.status.toLowerCase() === "pending" ? "tt-status-pending" : "")}>{REPORT_STATUS_LABELS[report.status as keyof typeof REPORT_STATUS_LABELS] || report.status}</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               </button>;})}
@@ -265,6 +277,10 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                   </div>
                 )}
 
+                {(activeReport.resolvedByName || activeReport.actionKind) && <div className="rounded-lg bg-green-50 p-3 text-sm text-green-900">
+                  {activeReport.resolvedByName && <p>Resolved by {activeReport.resolvedByName} ({activeReport.resolvedByRole === "Semi-Admin" ? "Barangay" : "MENRO"})</p>}
+                  {activeReport.actionKind && <><p className="font-semibold">Response: {activeReport.actionKind}</p><p>{activeReport.actionNotes}</p><p>{activeReport.actionDate} {activeReport.actionTime}</p></>}
+                </div>}
                 {activeReport.remarks && <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
                   <p className="font-semibold mb-1">Last review remarks</p>
                   <p className="whitespace-pre-wrap">{activeReport.remarks}</p>
@@ -276,7 +292,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                   <div className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-700">Status <span className="text-red-500">*</span></label>
-                      <Select value={newStatus} disabled={allowedStatuses.length === 0} onValueChange={(val) => { setActiveReportId(activeReport.id); setNewStatus(val || ""); setCollectionConfirmed(false); }}>
+                      <Select value={newStatus} disabled={allowedStatuses.length === 0} onValueChange={(val) => { setActiveReportId(activeReport.id); setNewStatus(val || ""); setCollectionConfirmed(false);setActionInput({}); }}>
                         <SelectTrigger aria-label="New report status" className="w-full h-10 bg-white border-slate-200 font-semibold">
                           <SelectValue placeholder="Select new status" />
                         </SelectTrigger>
@@ -291,19 +307,20 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                     {allowedStatuses.length === 0 && <p className="text-xs text-slate-600">
                       {role === "Semi-Admin" ? "Forwarded reports are handled by MENRO. Resolved reports remain available for reference." : "MENRO can schedule a report after the Barangay Captain verifies and forwards it."}
                     </p>}
+                    <ReportActionFields role={role} status={newStatus} value={actionInput} onChange={setActionInput} disabled={isUpdating} />
                     {newStatus === "Resolved" && <label className="flex gap-2 items-start text-xs text-slate-700">
                       <input type="checkbox" checked={collectionConfirmed} onChange={event => setCollectionConfirmed(event.target.checked)} className="mt-0.5" />
-                      I confirm the reported garbage has been collected.
+                      I confirm the reported concern has been addressed and the action is complete.
                     </label>}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700">Review Remarks (Optional)</label>
+                      <label className="text-[11px] font-bold text-slate-700">Findings / action taken (required for barangay resolution or forwarding)</label>
                       <textarea
-                        aria-label="Review remarks"
+                        aria-label="Review remarks" maxLength={2000}
                         rows={3}
                         value={remarks}
                         onChange={(e) => setRemarks(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#2E7D32] resize-none"
-                        placeholder="Add internal remarks about this update..."
+                        placeholder="Describe your verified findings and action taken or reason for forwarding..."
                       />
                     </div>
 

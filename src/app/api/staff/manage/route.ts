@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       const profile = profileSnap.data() || {};
       return Response.json({ account: { id: account.uid, email: account.email || email.trim(), emailVerified: account.emailVerified,
         disabled: account.disabled, name: profile.name || account.displayName || "", barangay: profile.barangay || "",
-        contact: profile.contact || "", position: profile.position || "", role: profile.role || "Resident",
+        contact: profile.contact || profile.phone || requestSnap.data()?.contact || "", position: profile.position || requestSnap.data()?.position || "", role: profile.role || "Resident",
         accessStatus: profile.accessStatus || "needs-review", requestStatus: requestSnap.data()?.status || null } },
       { headers: { "Cache-Control": "private, no-store" } });
     }
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       }),
       staff: users.docs.filter(doc => ["admin", "semi-admin"].includes(String(doc.data().role).toLowerCase())).map(doc => ({
         id: doc.id, name: doc.data().name, email: doc.data().email || "", role: doc.data().role,
-        barangay: doc.data().barangay || "", accessStatus: doc.data().accessStatus || "needs-review",
+        contact: doc.data().contact || doc.data().phone || "", position: doc.data().position || "", barangay: doc.data().barangay || "", accessStatus: doc.data().accessStatus || "needs-review",
       })),
       logs: logs.docs.map(doc => ({ id: doc.id, action: doc.data().action, actor: doc.data().actor, target: doc.data().target,
         role: doc.data().role || "", barangay: doc.data().barangay || "", at: doc.data().at?.toDate?.().toISOString() || "" })),

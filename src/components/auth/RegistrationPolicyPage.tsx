@@ -1,0 +1,6 @@
+import Link from "next/link";
+import policies from "@/lib/registration-policies.json";
+export function RegistrationPolicyPage({document}:{document:"terms"|"privacy"}) {
+  const policy=policies.documents[document];
+  return <main className="min-h-screen bg-[#f8f5eb] px-5 py-10 text-[#12372f]"><article className="mx-auto max-w-3xl space-y-6 rounded-3xl border bg-[#fffcf4] p-6 sm:p-10"><Link href="/login" className="text-sm font-semibold underline">TrashTrack sign in</Link><h1 className="text-3xl font-bold">{policy.title}</h1><p className="text-sm">Version {policies.version}</p>{policy.sections.map(section=><section key={section.heading} className="space-y-3"><h2 className="text-lg font-bold">{section.heading}</h2><p className="whitespace-pre-wrap text-sm leading-7">{section.body}</p></section>)}{document==="privacy"&&<a href={policies.legalReference.url} target="_blank" rel="noopener noreferrer" className="block text-sm font-semibold underline">Read {policies.legalReference.title} on the National Privacy Commission website</a>}<p className="border-t pt-5 text-sm"><Link href={document==="terms"?"/privacy":"/terms"} className="underline">Read {document==="terms"?"Privacy Policy":"Terms and Conditions"}</Link></p></article></main>;
+}

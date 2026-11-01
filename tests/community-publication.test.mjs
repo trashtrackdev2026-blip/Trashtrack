@@ -47,7 +47,7 @@ function fixture(options = {}) {
     staffApiError: error => Response.json({ error: error.message }, { status: error.status || 500 }) };
   const modules = { "firebase-admin/firestore": { Timestamp, FieldValue: { serverTimestamp: () => new Timestamp() } },
     "firebase-admin/messaging": { getMessaging: () => ({ send: async payload => {
-      pushes.push(payload); if (options.failFirstPush && !failed) { failed = true; throw new Error("Messaging unavailable"); } return "test-message";
+      pushes.push(payload); if ((options.failFirstPush && !failed) || (options.failSecondPush && pushes.length===2)) { failed = true; throw new Error("Messaging unavailable"); } return "test-message";
     } }) }, "./barangay-geofence": { BALETE_BARANGAYS: policy.STAFF_BARANGAYS }, "./phone-push": { buildPhonePush }, "./staff-access": policy,
     "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/schedule-policy": schedules, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates,
     "@/lib/notification-publication": { notificationPublication }, "@/lib/event-form": {eventFormFields,normalizedEventTime}, "@/lib/notification-edit": {notificationEdit},
@@ -61,7 +61,7 @@ function fixture(options = {}) {
   const edit = {}; new Function("require","exports",editNoticeCode)(name => modules[name] || require(name), edit);
   const manageSchedule = {}; new Function("require","exports",manageScheduleCode)(name => modules[name] || require(name), manageSchedule);
   const invoke = async (route,body,expected) => {const response=await route.POST(new Request("https://example.invalid/api/test",{method:"POST",body:JSON.stringify(body)}));const result=await response.json();assert.equal(response.status,expected,result.error);return result;};
-  return { records, pushes, manage:(body,expected=200)=>invoke(manageSchedule,body,expected), draft:(body,expected=200)=>invoke(draft,body,expected), edit:(body,expected=200)=>invoke(edit,body,expected), async create(body, expected = 200) {
+  return { records, pushes, manage:(body,expected=200)=>invoke(manageSchedule,body,expected), draft:(body,expected=200)=>invoke(draft,body,expected), edit:(body,expected=200)=>invoke(edit,{changeId:"edit-"+(body.expectedRevision||0),...body},expected), async create(body, expected = 200) {
     const response = await createNotice.POST(new Request("https://example.invalid/api/notifications/create", { method:"POST", body:JSON.stringify(body) }));
     const result = await response.json(); assert.equal(response.status, expected, result.error || "Expected response"); return result;
   }, async post(body = schedule, expected = 200, retryOnly = false) {
@@ -194,10 +194,10 @@ test("Revoked staff, barangay staff, and another official cannot overwrite an ev
   await app.post({...body,kind:"event",dateISO:"2099-11-15",startTime:"09:00"},409);assert.equal(app.pushes.length,0);
 });
 
-test("Notification edits keep the delivery record and audience, detect stale edits, and never resend",async()=>{
+test("Notification edits preserve the original delivery record and audience and publish one new update",async()=>{
   const app=fixture();await app.create(notice);const sent=app.records.get("notifications/stable-notice");
   await app.edit({id:notice.id,expectedRevision:0,title:"Updated collection",message:"Use green bags.",type:"schedule"});
-  const updated=app.records.get("notifications/stable-notice");assert.equal(updated.message,"Use green bags.");assert.equal(updated.pushStatus,sent.pushStatus);assert.equal(updated.recipients,"Sala");assert.equal(app.pushes.length,1);
+  const updated=app.records.get("notifications/stable-notice");assert.equal(updated.message,"Use green bags.");assert.equal(updated.pushStatus,sent.pushStatus);assert.equal(updated.recipients,"Sala");assert.equal(app.pushes.length,2);
   await app.edit({id:notice.id,expectedRevision:0,title:"Stale edit",message:"Old copy",type:"schedule"},409);
   await app.edit({id:notice.id,expectedRevision:1,title:"Different audience",message:"Copy",type:"schedule",recipients:"Looc"},400);
   updated.pushStatus="sending";await app.edit({id:notice.id,expectedRevision:1,title:"Wait",message:"Copy",type:"schedule"},409);
@@ -227,7 +227,7 @@ const outcome={id:"collection",changeId:"intent-one",expectedRevision:0,expected
 const savedCollection={barangay:"Sala",date:"2026-11-01",time:"13:00",status:"Active",description:"Bring sorted bags"};
 
 test("Each collection outcome atomically saves the actual audience's inbox notice and visible phone push", async()=>{
-  for(const status of ["Completed","Failed","Unfinished","Inactive","Active"]) {
+  for(const status of ["Completed","Failed","Unfinished","Active"]) {
     for(const barangay of ["Sala","All Barangays"]) {
       const app=fixture();app.records.set("schedules/collection",{...savedCollection,barangay,date:status==="Active"?"2099-11-01":savedCollection.date,status:status==="Active"?"Inactive":"Active"});
       const result=await app.manage({...outcome,status,expectedStatus:status==="Active"?"Inactive":"Active",recipients:"Looc"});
@@ -282,4 +282,30 @@ test("Historical outcomes can be recorded, but a dated collection cannot be reac
   assert.equal(app.records.get("schedules/collection").status,"Failed");assert.equal(app.pushes.length,0);
   await app.manage({...outcome,expectedStatus:"Failed",status:"Completed",notes:"Collection finished"});
   assert.equal(app.records.get("schedules/collection").status,"Completed");assert.equal(app.pushes.length,1);
+});
+
+test("Editing a read announcement creates one fresh update with its original audience and category",async()=>{
+  const app=fixture();await app.create(notice);
+  const edit={id:notice.id,changeId:"stable-edit",expectedRevision:0,title:notice.title,message:notice.message,type:"event"};
+  const result=await app.edit(edit);assert.equal(result.changed,true);assert.equal(result.queued,true);
+  const update=app.records.get("notifications/"+result.notificationId);assert.equal(update.type,"event");assert.equal(update.recipients,"Sala");assert.equal(update.isRead,false);assert.equal(update.originalNotificationId,notice.id);
+  assert.equal(app.pushes.length,2);assert.equal(app.pushes[1].topic,"trashtrack_barangay_sala_v1");assert.equal(app.pushes[1].data.type,"event");
+  const count=app.records.size;await app.edit(edit);assert.equal(app.records.size,count);assert.equal(app.pushes.length,2);
+  await app.edit({...edit,message:"Different payload"},409);
+  const noChange=await app.edit({...edit,changeId:"no-op",expectedRevision:1});assert.equal(noChange.changed,false);assert.equal(app.records.size,count);
+});
+
+test("An in-app-only announcement edit stays in-app and cannot escalate its audience or push setting",async()=>{
+  const app=fixture();await app.create({...notice,push:false});
+  const edit={id:notice.id,changeId:"in-app-edit",expectedRevision:0,title:"Changed title",message:notice.message,type:"general"};
+  const result=await app.edit(edit);assert.equal(result.queued,false);assert.equal(app.pushes.length,0);assert.equal(app.records.get("notifications/"+result.notificationId).pushStatus,"disabled");
+  await app.edit({...edit,changeId:"escalation",expectedRevision:1,push:true},400);
+});
+
+test("Edited-notice phone failures keep the saved revision and retry the same new notice",async()=>{
+  const app=fixture({failSecondPush:true});await app.create(notice);
+  const edit={id:notice.id,changeId:"retry-updated-notice",expectedRevision:0,title:"Revised title",message:"Updated instructions",type:"event"};
+  const first=await app.edit(edit);assert.equal(first.saved,true);assert.equal(first.queued,false);assert.ok(first.deliveryError);
+  assert.equal(app.records.get("notifications/"+notice.id).revision,1);assert.equal(app.records.get("notifications/"+first.notificationId).pushStatus,"failed");
+  const count=app.records.size;const second=await app.edit(edit);assert.equal(second.notificationId,first.notificationId);assert.equal(second.queued,true);assert.equal(app.records.size,count);assert.equal(app.pushes.length,3);
 });

@@ -33,7 +33,7 @@ export default function LogoutPage() {
   };
 
   return <main className={styles.page}>
-    <picture className={styles.backgroundPicture} aria-hidden="true">
+    <picture className={styles.backgroundPicture}>
       <source type="image/webp" srcSet="/images/balete-lakeside-1280.webp 1280w, /images/balete-lakeside-1920.webp 1920w, /images/balete-lakeside-hd.webp 2500w" sizes="(max-aspect-ratio: 500/313) 160vh, 100vw" />
       <Image src="/images/balete-lakeside-hd.webp" alt="" fill unoptimized loading="eager" fetchPriority="high" className={styles.background} />
     </picture>

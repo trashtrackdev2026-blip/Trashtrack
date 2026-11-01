@@ -15,9 +15,10 @@ import { subscribeWithDeadline } from "@/lib/live-data";
 import { DataState } from "@/components/ui/data-state";
 import { db } from "@/lib/firebase";
 import { eventRequest } from "@/lib/event-client";
+import { CertificateNameCorrection } from "@/components/events/CertificateNameCorrection";
 import { EventCertificateSettings } from "@/components/events/EventCertificateSettings";
 import { CertificatePreview } from "@/components/events/CertificatePreview";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { EditEventDialog, type EditableEvent } from "@/components/events/EditEventDialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,6 +36,7 @@ import {
 import { Trash2 } from "lucide-react";
 
 interface EventData {
+  certificateDesign?: "classic" | "community";
   id: string;
   title: string;
   barangay: string;
@@ -54,6 +56,8 @@ interface EventData {
 
 export default function EventsPage() {
   const wideDetails = useWideWorkspace();
+  const [certificateNameReview,setCertificateNameReview]=useState<{eventId:string;userId:string}|null>(null);
+  const [detailSelection,setDetailSelection]=useState({id:"",tab:"Overview"});
   const DetailTitle = wideDetails ? "h2" : DialogTitle;
   const DetailDescription = wideDetails ? "p" : DialogDescription;
   const { role } = useAuth();
@@ -394,7 +398,11 @@ export default function EventsPage() {
           {/* Right Panel: Event Details */}
           <DetailPanel wide={wideDetails} dark label="Event details" empty={<div className="tt-detail-empty"><Calendar aria-hidden="true" /><h2>Community events</h2><p>Select an event to view attendance and certificates.</p></div>} open={!!activeEvent} onOpenChange={open => { if (!open) setActiveEventId(null); }}>
           {activeEvent && (
-          <div id="event-detail" className="p-5">
+          <div id="event-detail" className="max-h-[calc(100dvh-8rem)] overflow-y-auto p-5">
+            <div role="tablist" aria-label="Event detail sections" className="sticky top-0 z-10 mb-5 flex flex-wrap gap-2 border-b bg-[#123d2e] pb-3">
+              {["Overview","Attendance","Certificates"].map(tab=><button key={tab} type="button" role="tab" aria-selected={((detailSelection.id===activeEvent.id?detailSelection.tab:"Overview")===tab)} onClick={()=>setDetailSelection({id:activeEvent.id,tab})} className={"min-h-11 rounded-full px-4 text-sm font-semibold "+(((detailSelection.id===activeEvent.id?detailSelection.tab:"Overview")===tab)?"bg-[#f7f2df] text-[#194f3d]":"text-[#f7f2df] border border-white/30")}>{tab}</button>)}
+            </div>
+            {certificateNameReview && <CertificateNameCorrection {...certificateNameReview} onClose={()=>setCertificateNameReview(null)} />}
             <DetailDescription className="sr-only">Event information, attendance and certificates.</DetailDescription>
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3 pr-8">
               <DetailTitle className="font-bold text-lg text-slate-900">Event Details</DetailTitle>
@@ -408,7 +416,7 @@ export default function EventsPage() {
               </div>
             </div>
 
-            <div className="mb-6 flex flex-col gap-4">
+            {(detailSelection.id!==activeEvent.id || detailSelection.tab==="Overview") && <><div className="mb-6 flex flex-col gap-4">
               <div className="tt-event-hero">
                  {activeEvent.img ? <Image src={activeEvent.img} alt={activeEvent.title} fill sizes="(max-width:767px) 90vw, (max-width:1279px) 720px, 42vw" /> : <Calendar aria-hidden="true" />}
               </div>
@@ -454,7 +462,8 @@ export default function EventsPage() {
               </div>
             </div>
 
-            <div className="mt-auto">
+            </>}
+            {(detailSelection.id===activeEvent.id && detailSelection.tab==="Attendance") && <div className="mt-auto">
               {activeEvent.status !== "Draft" && <AttendanceQr key={activeEvent.id} eventId={activeEvent.id} method={activeEvent.attendanceMethod} />}
 
               <div className="bg-green-50 p-3 rounded-lg flex items-start gap-2 border border-green-100/50">
@@ -463,10 +472,10 @@ export default function EventsPage() {
                 </div>
                 <p className="text-[10px] text-[#2E7D32] leading-tight">Attendance is confirmed by scanning the event QR or by MENRO below. Completed participants with unconfirmed attendance see a pending certificate in the phone.</p>
               </div>
-            </div>
-            {activeEvent.status === "Draft" ? <Link href={"/events/create?draft="+encodeURIComponent(activeEvent.id)} className="tt-primary-link">Continue editing draft</Link> : <EventCertificateSettings key={activeEvent.id} event={activeEvent} onPreview={setCertificatePreview} />}
+            </div>}
+            {(detailSelection.id===activeEvent.id && detailSelection.tab==="Certificates") && (activeEvent.status === "Draft" ? <Link href={"/events/create?draft="+encodeURIComponent(activeEvent.id)} className="tt-primary-link">Continue editing draft</Link> : <EventCertificateSettings key={activeEvent.id} event={activeEvent} onPreview={setCertificatePreview} />)}
             {actionError && <p role="alert" className="mt-3 text-xs text-red-700">{actionError}</p>}
-            <div className="mt-6">
+            {(detailSelection.id===activeEvent.id && detailSelection.tab!=="Overview") && <div className="mt-6">
               <h5 className="font-bold text-sm text-slate-800 border-b border-slate-100 pb-2 mb-3 flex items-center gap-2">
                 <Users className="w-4 h-4 text-slate-400" />
                 Participants
@@ -509,6 +518,7 @@ export default function EventsPage() {
                               onClick={() => downloadAttendeeCertificate(p.userId, p.userName)}>
                               <Download className="h-4 w-4" />
                             </Button>
+                            {p.attended && p.userId && activeEvent.status === "Completed" && activeEvent.certificateEnabled !== false && <button type="button" onClick={()=>setCertificateNameReview({eventId:activeEvent.id,userId:p.userId})} className="mt-1 block min-h-10 text-xs font-semibold underline">Review full name</button>}
                           </td>
                         </tr>
                       ))}
@@ -516,7 +526,7 @@ export default function EventsPage() {
                   </table>
                 </div>
               )}
-            </div>
+            </div>}
 
           </div>
           )}

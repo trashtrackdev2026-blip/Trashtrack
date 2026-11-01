@@ -1,4 +1,5 @@
 "use client";
+import { OfficialPositionSelect } from "@/components/auth/OfficialPositionSelect";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -11,6 +12,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState(""); const [barangay, setBarangay] = useState("");
   const [contact, setContact] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [position, setPosition] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [createdUser, setCreatedUser] = useState<User | null>(null);
   const [requestSaved, setRequestSaved] = useState(false);
   const router = useRouter();
@@ -47,9 +49,9 @@ export default function SignupPage() {
     {createdUser && <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-800">{requestSaved ? "Your account and approval request are saved. Send the verification email to continue." : "Your login account is created. Complete registration below to save the approval request."} <Link href="/staff-account" className="font-semibold underline">Open staff account</Link></p>}
     <fieldset disabled={busy || requestSaved} className="space-y-5 disabled:opacity-70">
     <label className="block text-sm font-medium">Full name<input className={inputClass} value={name} onChange={e => setName(e.target.value)} required maxLength={120} autoComplete="name" /></label>
-    <label className="block text-sm font-medium">Official position<input className={inputClass} value={position} onChange={e => setPosition(e.target.value)} required maxLength={120} placeholder="Barangay official / designated staff" autoComplete="organization-title" /></label>
+    <label className="block text-sm font-medium">Official position<OfficialPositionSelect className={inputClass} value={position} onChange={e => setPosition(e.target.value)} disabled={busy} /></label>
     <label className="block text-sm font-medium">Official email<input disabled={!!createdUser} className={inputClass} type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username" /></label>
-    {!createdUser && <label className="block text-sm font-medium">Password<input className={inputClass} type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={12} maxLength={128} autoComplete="new-password" /><span className="mt-1 block text-xs text-slate-500">Use at least 12 characters. A unique passphrase works well.</span></label>}
+    {!createdUser && <label className="block text-sm font-medium">Password<input className={inputClass} type={passwordVisible ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required minLength={12} maxLength={128} autoComplete="new-password" /><button type="button" aria-pressed={passwordVisible} aria-label={passwordVisible ? "Hide password" : "Show password"} onClick={() => setPasswordVisible(value => !value)} className="mt-2 min-h-10 text-sm font-semibold text-green-800">{passwordVisible ? "Hide password" : "Show password"}</button><span className="mt-1 block text-xs text-slate-500">Use at least 12 characters. A unique passphrase works well.</span></label>}
     <label className="block text-sm font-medium">Barangay<select className={inputClass} value={barangay} onChange={e => setBarangay(e.target.value)} required><option value="">Select your barangay</option>{STAFF_BARANGAYS.map(value => <option key={value}>{value}</option>)}</select></label>
     <label className="block text-sm font-medium">Contact number<input className={inputClass} type="tel" value={contact} onChange={e => setContact(e.target.value)} required maxLength={40} autoComplete="tel" /></label>
     </fieldset>

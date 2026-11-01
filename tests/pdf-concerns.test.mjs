@@ -31,7 +31,7 @@ test("Captain can review and forward only their barangay's reports", () => {
 });
 
 test("MENRO acts after endorsement and confirms collection before resolving", () => {
-  const report = { location: "Makina", status: "For MENRO Review" };
+  const report = { location: "Makina", status: "MENRO Under Review" };
   assert.equal(canUpdateReport("Admin", null, report, "Endorsed"), true);
   assert.equal(canUpdateReport("Admin", null, report, "Resolved", true), false);
   assert.equal(canUpdateReport("Admin", null, { ...report, status: "Endorsed" }, "Resolved"), false);

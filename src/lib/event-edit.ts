@@ -1,4 +1,4 @@
-import { communityPublication } from "./community-publication.ts";
+import { eventFormFields } from "./event-form.ts";
 import { StaffAccessError } from "./staff-access.ts";
 import { eventDate } from "./certificate-data.ts";
 import { assertFutureSchedule } from "./scheduling-time.ts";
@@ -17,7 +17,7 @@ export function eventEditorDate(dateISO: string | undefined, date: string): stri
 
 export function eventEditFields(body: Record<string, unknown>, current: Record<string, unknown>) {
   if (String(current.status).toLowerCase() === "completed") throw new StaffAccessError("Completed events are kept unchanged for attendance and certificate records.", 409);
-  const validated = communityPublication("event", { ...body, certificateEnabled: false }).post;
+  const validated = eventFormFields({ ...body, certificateEnabled: false }, false, String(current.category || ""));
   if (!("title" in validated)) throw new StaffAccessError("Invalid event details.", 400);
   // Attendance, participant counts, status and certificate settings are never
   // overwritten by the general details form.

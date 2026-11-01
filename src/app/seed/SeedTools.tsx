@@ -49,9 +49,9 @@ export default function SeedTools() {
       }
 
       setStatus("Seeding Complete! Check Firestore.");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      setStatus("Error: " + error.message);
+      setStatus("Error: " + (error instanceof Error ? error.message : "Seeding failed."));
     }
   };
 

@@ -5,8 +5,8 @@ export function notificationEdit(body: Record<string,unknown>, current: Record<s
   if (current.pushStatus === "sending") throw new StaffAccessError("Phone delivery is in progress. Wait before editing this notification.",409);
   const reportNotice = current.type === "report" && body.type === "report";
   const value = notificationPublication({...current,...body,...(reportNotice?{type:"general"}:{})});
-  // Editing the in-app copy does not resend a phone notification or change its
-  // original audience. This keeps already delivered messages and retry topics consistent.
+  // Category changes never change the audience. The manage route creates a
+  // revision-linked update notice so an already-read notice is not overlooked.
   if (value.recipients !== current.recipients || value.push !== (current.push === true)) throw new StaffAccessError("The original audience and phone delivery setting cannot be changed after publication.",400);
   return {title:value.title,message:value.message,type:reportNotice?"report":value.type};
 }

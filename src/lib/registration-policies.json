@@ -1,0 +1,80 @@
+{
+  "version": "2026-11-02",
+  "approvedForPublication": true,
+  "legalReference": {
+    "title": "Data Privacy Act of 2012 (Republic Act No. 10173)",
+    "url": "https://privacy.gov.ph/data-privacy-act/"
+  },
+  "documents": {
+    "terms": {
+      "title": "Terms and Conditions",
+      "sections": [
+        {
+          "heading": "Using TrashTrack",
+          "body": "TrashTrack helps residents report waste concerns, view collection schedules, join community events and access waste-management information. Authorized barangay and MENRO staff review and manage community records."
+        },
+        {
+          "heading": "Your account",
+          "body": "Provide accurate account information and keep your password private. Use your own account. Barangay staff must complete the official approval process; resident registration does not grant staff access. Contact the responsible TrashTrack team or MENRO if you believe your account has been accessed without permission."
+        },
+        {
+          "heading": "Reports and attachments",
+          "body": "Submit truthful information and use the correct location for the concern. Attach only photos or videos you have the right to share. Avoid including identity documents, private messages, passwords, unrelated people or other unnecessary personal information. Do not submit abusive, misleading or unlawful material."
+        },
+        {
+          "heading": "Schedules, events and resolution",
+          "body": "Posted dates and report updates come from authorized staff and may change. Submitting a report does not guarantee a particular response time or collection. Event registration does not by itself establish attendance or certificate eligibility. TrashTrack is not an emergency-response channel; use the appropriate official emergency service for an immediate danger."
+        },
+        {
+          "heading": "AI Assist",
+          "body": "AI Assist provides automated waste-related guidance and can make mistakes. Check local posted instructions and ask barangay or MENRO staff when an answer is uncertain. Do not rely on it for an emergency or for handling hazardous material safely."
+        },
+        {
+          "heading": "Responsible access",
+          "body": "Do not impersonate others, attempt unauthorized access, interfere with the service or misuse other residents' information. Authorized administrators may restrict accounts in accordance with the service's account controls and applicable policy."
+        },
+        {
+          "heading": "Privacy and updates",
+          "body": "Read the Privacy Policy before submitting personal information. Material changes to these documents should be made available to users with an updated version/date. For questions or corrections, contact the responsible TrashTrack team or MENRO through its official channels."
+        }
+      ]
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "sections": [
+        {
+          "heading": "Information used by TrashTrack",
+          "body": "Depending on the features you use, TrashTrack processes your name, email, barangay, account identifiers and optional contact/profile information; report descriptions, selected map coordinates and attachments; event registration, attendance and certificate records; and notification settings. Staff accounts also include official position, contact information, approval/access records and action audits."
+        },
+        {
+          "heading": "Why this information is used",
+          "body": "Information supports account access and recovery, barangay assignment, waste-report verification and follow-up, schedules and notifications, community events, attendance and certificates, educational content, and protection of the service. Submit only information needed for these purposes."
+        },
+        {
+          "heading": "Who can access it",
+          "body": "Residents can view their own account/report records and community content available in the app. Authorized barangay and MENRO staff access records according to their assigned permissions. Staff access and important management actions are subject to the system's authorization and audit controls."
+        },
+        {
+          "heading": "Service providers and AI",
+          "body": "TrashTrack uses Firebase for authentication, data and notifications; Cloudinary for uploaded media; and an AI service for waste questions and image analysis. Inputs you submit to AI Assist, including attached images, may be sent to that service to produce an answer. These providers process the information needed to deliver the requested feature under their respective terms. Do not send secrets or unnecessary personal information to AI Assist."
+        },
+        {
+          "heading": "Camera, location and notifications",
+          "body": "The camera and media picker are used when you choose to attach an image or video. Location is used when selecting or verifying a report pin, including a location you request through your device. Phone-notification delivery depends on your device permission and notification settings. You can manage supported app settings and device permissions."
+        },
+        {
+          "heading": "Accuracy, retention and requests",
+          "body": "Keep your details accurate. Ask the responsible organization to review a correction, access or deletion request through its official channel; identity and record-retention requirements may need to be checked. Report, attendance, certificate and audit records can have administrative recordkeeping requirements. Ask the barangay office or MENRO about the retention and request procedure that applies to your record."
+        },
+        {
+          "heading": "Security and changes",
+          "body": "Protect your device and credentials. The system uses account permissions and security controls, but no online service can guarantee absolute security. Contact the responsible TrashTrack team or MENRO about a suspected account or privacy issue. An updated policy should identify its version/date and explain significant changes."
+        },
+        {
+          "heading": "Data Privacy Act of 2012 (RA 10173)",
+          "body": "This policy should be read with the Data Privacy Act of 2012 (Republic Act No. 10173). You may exercise applicable rights to be informed, access your information, object to processing, request correction or erasure/blocking, and raise a concern with the National Privacy Commission, subject to the law and relevant recordkeeping requirements. For a TrashTrack record request, contact your barangay office or the Municipal Environment and Natural Resources Office (MENRO). Identity verification may be needed."
+        }
+      ]
+    }
+  }
+}

@@ -1,15 +1,15 @@
 import { normalizeReportStatus } from "./report-workflow.ts";
 
 export type MenroStage = "ready" | "submitted" | "review" | "collection" | "resolved";
-export type MenroReport = { id: string; type: string; description: string; location: string; status: string; date: string; reporterName: string; reviewedByName?: string; verifiedByName?: string; forwardedByName?: string };
+export type MenroReport = { id: string; type: string; description: string; location: string; status: string; date: string; reporterName: string; reviewedByName?: string; verifiedByName?: string; forwardedByName?: string; resolvedByRole?: string };
 export type MenroFilters = { stage: MenroStage; search: string; status: string; barangay: string; days: number; assignedBarangay?: string | null; now?: Date };
 
 export const MENRO_STAGES: { id: MenroStage; label: string; description: string }[] = [
   { id: "ready", label: "For MENRO Review", description: "Verify and send reports" },
   { id: "submitted", label: "Submitted to MENRO", description: "Waiting for MENRO review" },
   { id: "review", label: "Under MENRO Review", description: "Being reviewed by MENRO" },
-  { id: "collection", label: "For Collection", description: "Scheduled by MENRO" },
-  { id: "resolved", label: "Resolved", description: "Collection confirmed" },
+  { id: "collection", label: "In Progress", description: "Response action planned" },
+  { id: "resolved", label: "Resolved", description: "MENRO action completed" },
 ];
 
 export function menroStage(status: string): MenroStage | null {
@@ -42,6 +42,7 @@ export function filterMenroReports<T extends MenroReport>(reports: T[], filters:
   const now = filters.now || new Date();
   const cutoff = filters.days > 0 ? now.getTime() - filters.days * 86400000 : null;
   return reports.filter(report => {
+    if (report.resolvedByRole === "Semi-Admin") return false;
     if (filters.assignedBarangay && report.location !== filters.assignedBarangay) return false;
     if (menroStage(report.status) !== filters.stage) return false;
     if (filters.status !== "all" && menroStage(report.status) !== filters.status) return false;

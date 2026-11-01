@@ -51,7 +51,7 @@ export function MenroReports() {
   return <MenroReportsView reports={reports} loading={loading} error={error} retry={retry} role={role} barangay={barangay}
     onSend={async (report, remarks) => {
       if (!user) throw new Error("Sign in to forward reports.");
-      await updateReportStatus(report.id, { uid: user.uid, role, barangay }, "For MENRO Review", remarks, false);
+      await updateReportStatus(report.id, { uid: user.uid, role, barangay }, "For MENRO Review", remarks, false, {verificationConfirmed:true,severity:"Major",expectedStatus:report.status,expectedRevision:report.statusRevision||0});
     }} />;
 }
 
@@ -67,6 +67,7 @@ export function MenroReportsView({ reports, loading, error, retry, role, baranga
   const [days, setDays] = useState(0);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openedVersion, setOpenedVersion] = useState({status:"",statusRevision:0});
   const [confirmed, setConfirmed] = useState(false);
   const [remarks, setRemarks] = useState("");
   const [saving, setSaving] = useState(false);
@@ -74,7 +75,7 @@ export function MenroReportsView({ reports, loading, error, retry, role, baranga
   const [notice, setNotice] = useState("");
   const submitting = useRef(false);
   const semiAdmin = role === "Semi-Admin";
-  const scoped = semiAdmin ? reports.filter(report => !!barangay && report.location === barangay) : reports;
+  const scoped = (semiAdmin ? reports.filter(report => !!barangay && report.location === barangay) : reports).filter(report=>report.resolvedByRole!=="Semi-Admin");
   const filtered = filterMenroReports(scoped, { stage, search, status: statusFilter, barangay: barangayFilter, days, assignedBarangay: semiAdmin ? barangay : null });
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pages);
@@ -84,14 +85,14 @@ export function MenroReportsView({ reports, loading, error, retry, role, baranga
   const locations = [...new Set(scoped.map(report => report.location).filter(Boolean))].sort();
 
   function openReport(report: CommunityReport) {
-    setSelectedId(report.id); setConfirmed(false); setRemarks(report.remarks); setSendError("");
+    setSelectedId(report.id);setOpenedVersion({status:report.status,statusRevision:report.statusRevision||0}); setConfirmed(false); setRemarks(report.remarks); setSendError("");
   }
   function chooseStage(next: MenroStage) { setStage(next); setStatusFilter("all"); setPage(1); }
   async function send() {
-    if (!selected || !canSend || !confirmed || submitting.current || loading || error) return;
+    if (!selected || !canSend || !confirmed || !remarks.trim() || submitting.current || loading || error) return;
     submitting.current = true; setSaving(true); setSendError("");
     try {
-      await onSend(selected, remarks);
+      await onSend({...selected,...openedVersion}, remarks);
       setSelectedId(null); setConfirmed(false); setRemarks("");
       setNotice(`${selected.type} was sent to MENRO. It is now waiting for MENRO review.`);
       chooseStage("submitted");
@@ -158,9 +159,9 @@ export function MenroReportsView({ reports, loading, error, retry, role, baranga
           <ReportEvidence report={selected} />
           {typeof selected.latitude === "number" && typeof selected.longitude === "number" && Number.isFinite(selected.latitude) && Number.isFinite(selected.longitude) && <div><p className="mb-2 text-xs font-semibold text-slate-700">Pinned location</p><div className="h-[280px] min-h-[280px] w-full sm:h-[360px]"><ReportMap latitude={selected.latitude} longitude={selected.longitude} label={selected.location} /></div></div>}
           {selected.forwardedAt && <p className="text-xs text-slate-500">Forwarded {reportDate(selected.forwardedAt)?.toLocaleString("en-PH", { timeZone: "Asia/Manila" })} by {selected.forwardedByName || "the barangay official"}.</p>}
-          {canSend ? <><div><label htmlFor="forward-remarks" className="mb-2 block text-xs font-semibold text-slate-700">Remarks for MENRO (optional)</label><textarea id="forward-remarks" rows={3} maxLength={2000} value={remarks} disabled={saving} onChange={event => setRemarks(event.target.value)} placeholder="Add the location details or findings MENRO should know…" className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:outline-2 focus:outline-green-700" /></div><label className="flex items-start gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-sm leading-5 text-green-900"><input type="checkbox" checked={confirmed} disabled={saving} onChange={event => setConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-green-800" />I verified the report and its location in {barangay}, and confirm it is ready for MENRO review.</label></> : selected.remarks && <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><p className="mb-1 font-semibold">Latest remarks</p><p className="whitespace-pre-wrap">{selected.remarks}</p></div>}
+          {canSend ? <><div><label htmlFor="forward-remarks" className="mb-2 block text-xs font-semibold text-slate-700">Verified findings and reason MENRO assistance is needed</label><textarea id="forward-remarks" rows={3} maxLength={2000} value={remarks} disabled={saving} onChange={event => setRemarks(event.target.value)} placeholder="Add the location details or findings MENRO should know…" className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:outline-2 focus:outline-green-700" /></div><label className="flex items-start gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-sm leading-5 text-green-900"><input type="checkbox" checked={confirmed} disabled={saving} onChange={event => setConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-green-800" />I verified the report and its location in {barangay}, assessed it as major and beyond barangay capacity, and confirm it needs MENRO assistance.</label></> : selected.remarks && <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><p className="mb-1 font-semibold">Latest remarks</p><p className="whitespace-pre-wrap">{selected.remarks}</p></div>}
           {sendError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{sendError}</p>}
-          <DialogFooter><Button variant="outline" disabled={saving} onClick={() => setSelectedId(null)}>{canSend ? "Cancel" : "Close"}</Button>{canSend && <Button disabled={!confirmed || saving || loading || !!error} onClick={send} className="bg-green-800 text-white hover:bg-green-900"><Send className="h-4 w-4" />{saving ? "Sending…" : "Send to MENRO"}</Button>}{role === "Admin" && <Link href="/reports" className="inline-flex items-center justify-center rounded-lg bg-green-800 px-4 py-2 font-medium text-white hover:bg-green-900">Review in report management</Link>}</DialogFooter>
+          <DialogFooter><Button variant="outline" disabled={saving} onClick={() => setSelectedId(null)}>{canSend ? "Cancel" : "Close"}</Button>{canSend && <Button disabled={!confirmed || !remarks.trim() || saving || loading || !!error} onClick={send} className="bg-green-800 text-white hover:bg-green-900"><Send className="h-4 w-4" />{saving ? "Sending…" : "Send to MENRO"}</Button>}{role === "Admin" && <Link href="/reports" className="inline-flex items-center justify-center rounded-lg bg-green-800 px-4 py-2 font-medium text-white hover:bg-green-900">Review in report management</Link>}</DialogFooter>
         </> : <p className="py-6 text-sm text-slate-600">This report is no longer available. Close this dialog and refresh the list.</p>}
       </DialogContent>
     </Dialog>

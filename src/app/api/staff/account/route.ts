@@ -9,11 +9,15 @@ export async function GET(request: Request) {
     // Only the authenticator setup screen needs the project configuration.
     // Normal sign-in still verifies the account and all required MFA claims.
     let totpEnabled: boolean | undefined;
+    let totpState: "available" | "disabled" | "unavailable" | undefined;
     if (new URL(request.url).searchParams.get("setup") === "1") {
-      const config = await getAuth(app).projectConfigManager().getProjectConfig();
-      totpEnabled = config.multiFactorConfig?.state === "ENABLED" && config.multiFactorConfig.providerConfigs?.some(p => p.state === "ENABLED" && p.totpProviderConfig !== undefined) === true;
+      try {
+        const config = await getAuth(app).projectConfigManager().getProjectConfig();
+        totpEnabled = config.multiFactorConfig?.state === "ENABLED" && config.multiFactorConfig.providerConfigs?.some(p => p.state === "ENABLED" && p.totpProviderConfig !== undefined) === true;
+        totpState = totpEnabled ? "available" : "disabled";
+      } catch { totpState = "unavailable"; }
     }
-    return Response.json({ profile, problem: staffAccessProblem(profile, identity as unknown as Record<string, unknown>), totpEnabled },
+    return Response.json({ profile, problem: staffAccessProblem(profile, identity as unknown as Record<string, unknown>), totpEnabled, totpState },
       { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return staffApiError(error); }
 }

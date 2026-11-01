@@ -60,3 +60,11 @@ test("long words and event titles wrap within the certificate text area", async 
   assert.ok(lines.length > 1);
   assert.ok(lines.every(line => font.widthOfTextAtSize(line, 18) <= 650));
 });
+
+test("Certificate issuance preserves multi-part full names and the existing template",async()=>{
+  const name="Maria Isabel de los Reyes Santos";
+  const snapshot=buildCertificateSnapshot("id","event-1","resident-1",event,name);
+  assert.equal(snapshot.participantName,name);
+  const pdf=await PDFDocument.load(await generateCertificatePdf(snapshot));
+  assert.equal(pdf.getPageCount(),1);assert.equal(pdf.getTitle(),"Certificate of Appreciation - "+name);
+});

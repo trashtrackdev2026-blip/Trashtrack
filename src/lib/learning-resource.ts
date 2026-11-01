@@ -30,3 +30,19 @@ export function learningPreviewUrl(value: string): string | null {
     return url.href;
   } catch { return null; }
 }
+
+export function learningCover(resource: {coverUrl?: string; image?: string}): string | null {
+  for (const value of [resource.coverUrl,resource.image]) {
+    const url=learningPreviewUrl(value || "");
+    if(url && learningResourceType(url)==="image") return url;
+  }
+  return null;
+}
+
+export function learningEmbeddedVideo(value: string): string | null {
+  try {
+    const url=new URL(value),host=url.hostname.toLowerCase().replace(/^www\./,"");
+    const id=host==="youtu.be"?url.pathname.split("/")[1]:["youtube.com","m.youtube.com","youtube-nocookie.com"].includes(host)?url.searchParams.get("v") || url.pathname.match(/^\/(?:embed|shorts)\/([^/]+)/)?.[1]:null;
+    return id && /^[\w-]{11}$/.test(id)?`https://www.youtube-nocookie.com/embed/${id}`:null;
+  } catch {return null;}
+}

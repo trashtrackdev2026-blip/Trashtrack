@@ -4,21 +4,27 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { passwordResetFeedback } from "@/lib/password-reset";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  useEffect(() => { if (!cooldown) return; const timer = window.setTimeout(() => setCooldown(value => value - 1), 1000); return () => window.clearTimeout(timer); }, [cooldown]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy || cooldown) return;
     setBusy(true); setMessage("");
     try {
+      auth.languageCode = "en";
       await sendPasswordResetEmail(auth, email.trim());
-      setMessage("If this email has an account, a reset link will arrive shortly. Check your inbox and spam folder.");
-    } catch { setMessage("The request could not be confirmed. Check your internet connection and try again."); }
+      const result = passwordResetFeedback();setMessage(result.message);setAccepted(result.accepted);setCooldown(60);
+    } catch (failure) { const result=passwordResetFeedback(failure);setMessage(result.message);setAccepted(result.accepted);if(result.accepted)setCooldown(60); }
     finally { setBusy(false); }
   };
 
@@ -56,7 +62,8 @@ export default function ForgotPasswordPage() {
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-6 w-full">
-            {message && <p role="status" className="rounded-xl bg-green-50 p-4 text-sm text-green-900">{message}</p>}
+            {message && <p role={accepted ? "status" : "alert"} className={"rounded-xl p-4 text-sm " + (accepted ? "bg-green-50 text-green-900" : "bg-red-50 text-red-800")}>{message}</p>}
+            <p className="text-sm text-slate-600">Use the same official email you registered with. If no message arrives, check Spam/Junk and ask MENRO to verify the account email and email service.</p>
             <div className="space-y-2">
               <Input
                 id="email"
@@ -72,10 +79,10 @@ export default function ForgotPasswordPage() {
             
             <Button 
               type="submit" 
-              disabled={busy}
+              disabled={busy || cooldown > 0}
               className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl h-14 text-sm font-bold uppercase tracking-wider transition-colors shadow-lg shadow-green-900/20" 
             >
-              {busy ? "Requesting…" : "Reset Password"}
+              {busy ? "Requesting…" : cooldown ? `Request again in ${cooldown}s` : "Reset Password"}
             </Button>
             
             <div className="flex justify-center pt-2">

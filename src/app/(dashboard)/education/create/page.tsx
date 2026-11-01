@@ -16,6 +16,7 @@ import {
   PlayCircle
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
@@ -25,6 +26,7 @@ export default function CreateEducationResourcePage() {
     category: "Waste Segregation",
     type: "Guide",
     image: "",
+    coverUrl: "",
     videoUrl: "",
     fileName: "",
     description: "",
@@ -84,6 +86,8 @@ export default function CreateEducationResourcePage() {
     try {
       const source = publicLearningUrl(form.image || form.videoUrl);
       const detectedFileType = getFileType(source, form.fileName);
+      const coverUrl=form.coverUrl.trim()?publicLearningUrl(form.coverUrl):"";
+      if(coverUrl && learningResourceType(coverUrl)!=="image")throw new Error("Use a public JPG, PNG or WebP URL for the optional cover image.");
       const finalImage = detectedFileType === "image" ? source : "";
 
       await addDoc(collection(db, "educational_resources"), {
@@ -93,6 +97,7 @@ export default function CreateEducationResourcePage() {
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         status: "Published",
         image: finalImage,
+        coverUrl,
         videoUrl: detectedFileType === "video" ? source : "",
         fileUrl: source,
         fileType: detectedFileType,
@@ -153,6 +158,7 @@ export default function CreateEducationResourcePage() {
               <div className="space-y-8">
 
                 <div className="space-y-6 max-w-2xl">
+                  <label className="block text-sm font-semibold">Cover image URL (optional)<Input type="url" value={form.coverUrl} onChange={e=>setForm({...form,coverUrl:e.target.value})} placeholder="https://.../cover.jpg" className="mt-2"/><span className="mt-2 block text-xs font-normal text-slate-600">Use a cover photo for a document or video. The original learning file stays separate.</span></label>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Resource Title <span className="text-red-500">*</span></label>
                     <Input 
@@ -287,7 +293,7 @@ export default function CreateEducationResourcePage() {
                               </div>
                             ) : (
                               <div className="relative w-full h-40">
-                                <img src={form.image} alt="Preview" className="w-full h-full object-cover rounded-lg" />
+                                <Image src={form.image} alt="Preview" fill unoptimized sizes="(max-width: 767px) 90vw, 600px" className="object-cover rounded-lg" />
                               </div>
                             )}
 

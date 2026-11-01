@@ -6,6 +6,11 @@ export const STAFF_SESSION_SECONDS = 8 * 60 * 60;
 export const STAFF_RECENT_SECONDS = 5 * 60;
 export const STAFF_IDLE_MS = 15 * 60 * 1000;
 export type StaffRole = "admin" | "semi-admin";
+export const STAFF_POSITIONS = ["Barangay Captain", "Secretary"] as const;
+export function staffPosition(value: unknown): string {
+  const raw = String(value || "").trim();
+  return STAFF_POSITIONS.find(position => position.toLowerCase() === raw.toLowerCase()) || (raw.toLowerCase() === "barangay secretary" ? "Secretary" : "");
+}
 
 export class StaffAccessError extends Error {
   status: number;
@@ -43,10 +48,10 @@ export function staffAccessProblem(profile: Record<string, unknown>, claims: Rec
 }
 export function requestFields(body: Record<string, unknown>) {
   const name = typeof body.name === "string" ? body.name.trim().replace(/\s+/g, " ") : "";
-  const position = typeof body.position === "string" ? body.position.trim() : "";
+  const position = staffPosition(body.position);
   const contact = typeof body.contact === "string" ? body.contact.trim() : "";
   if (!name || name.length > 120 || !position || position.length > 120 || !contact || contact.length > 40 || !validStaffBarangay(body.barangay)) {
-    throw new StaffAccessError("Enter your name, official position, contact number and a valid Balete barangay.", 400);
+    throw new StaffAccessError("Enter your name, choose Barangay Captain or Secretary, and provide a contact number and valid Balete barangay.", 400);
   }
   return { name, position, contact, barangay: body.barangay };
 }

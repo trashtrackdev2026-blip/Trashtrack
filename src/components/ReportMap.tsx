@@ -1,14 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-
-// Fix Leaflet default marker icons
-const iconRetinaUrl = "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png";
-const iconUrl = "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png";
-const shadowUrl = "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png";
 
 interface ReportMapProps {
   latitude: number;
@@ -17,27 +11,6 @@ interface ReportMapProps {
 }
 
 export default function ReportMap({ latitude, longitude, label = "Report Location" }: ReportMapProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    // @ts-ignore
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl,
-      iconUrl,
-      shadowUrl,
-    });
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="w-full h-full bg-slate-100 rounded-xl flex flex-col items-center justify-center text-slate-500">
-        <span className="text-xs font-semibold">Loading Map...</span>
-      </div>
-    );
-  }
-
   const customIcon = L.divIcon({
     className: "custom-report-pin",
     html: `

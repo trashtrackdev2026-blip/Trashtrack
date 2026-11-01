@@ -15,7 +15,7 @@ function fixture(options = {}) {
   const records = new Map([
     ["users/menro", { role: "Admin", accessStatus: "active", mfaRequired: false }],
     ["users/official", { role: "Resident", barangay: "Sala", ...options.profile }],
-    ["staff_requests/official", { status: "pending", name: "Test Official", contact: "09000000000", position: "Barangay staff", barangay: "Sala", ...options.request }],
+    ["staff_requests/official", { status: "pending", name: "Test Official", contact: "09000000000", position: "Secretary", barangay: "Sala", ...options.request }],
   ]);
   if (options.noRequest) records.delete("staff_requests/official");
   if (options.noProfile) records.delete("users/official");
@@ -216,7 +216,7 @@ test("MENRO can find a verified registration with no request without listing unr
 
 test("Recovering a staff registration queues approval without granting permissions", async () => {
   const app = fixture({ noRequest: true, profile: { role:"Semi-Admin", accessStatus:"needs-review", points: 57 } });
-  await app.post({ action: "recover", name: "Existing Official", position: "Barangay secretary", contact: "09000000000", barangay: "Solis", role: "Admin" });
+  await app.post({ action: "recover", name: "Existing Official", position: "Secretary", contact: "09000000000", barangay: "Solis", role: "Admin" });
   const pending = app.records.get("staff_requests/official");
   assert.equal(pending.status, "pending"); assert.equal(pending.barangay, "Solis");
   assert.equal(app.records.get("users/official").role, "Semi-Admin");
@@ -228,7 +228,7 @@ test("Recovering a staff registration queues approval without granting permissio
 });
 
 test("Recovery cannot bypass pending requests, verification, suspension or active access", async () => {
-  const details = { action: "recover", name: "Official", position: "Barangay secretary", contact: "09000000000", barangay: "Solis" };
+  const details = { action: "recover", name: "Official", position: "Secretary", contact: "09000000000", barangay: "Solis" };
   for (const options of [{}, { noRequest: true, account: { emailVerified: false } }, { noRequest: true, account: { disabled: true } },
     { noRequest: true, profile: { accessStatus: "suspended" } }, { noRequest: true, profile: { role: "Semi-Admin", accessStatus: "active" } }]) {
     const app = fixture(options);
@@ -241,8 +241,8 @@ test("An incomplete recovered request requires official details before approval"
   const app = fixture({ request: { position: "", needsOfficialDetails: true } });
   await app.post({ action: "approve", barangay: "Sala", identityConfirmed: true }, 400);
   assert.equal(app.records.get("users/official").role, "Resident");
-  await app.post({ action: "approve", position: "Barangay secretary", barangay: "Sala", identityConfirmed: true });
-  assert.equal(app.records.get("users/official").position, "Barangay secretary");
+  await app.post({ action: "approve", position: "Secretary", barangay: "Sala", identityConfirmed: true });
+  assert.equal(app.records.get("users/official").position, "Secretary");
   assert.equal(app.records.get("staff_requests/official").needsOfficialDetails, false);
 });
 

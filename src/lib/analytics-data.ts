@@ -46,6 +46,10 @@ export function summarizeAnalytics(reports: RecordData[], events: RecordData[], 
   }
   const collectionData = ["Active", "Completed", "Unfinished", "Failed", "Inactive", "Unknown"].map(name => ({ name, value: 0 }));
   for (const schedule of schedules) collectionData.find(item => item.name === (collectionStatus(schedule.status) || "Unknown"))!.value++;
-  return { stats, trendData, categoryData: percentages, eventData, collectionData,
+  const resolutionData = ["Barangay", "MENRO", "Not recorded"].map(name => ({ name, value: 0 }));
+  for (const report of reports.filter(report => normalizeReportStatus(String(report.status)) === "Resolved")) {
+    resolutionData[report.resolvedByRole === "Semi-Admin" ? 0 : report.resolvedByRole === "Admin" ? 1 : 2].value++;
+  }
+  return { stats, trendData, categoryData: percentages, eventData, collectionData, resolutionData,
     totalCollections: schedules.length, undatedReports: reports.filter(report => !analyticsReportDate(report)).length };
 }

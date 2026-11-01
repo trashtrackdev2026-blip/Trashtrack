@@ -1,16 +1,21 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import {useRouter} from "next/navigation";
+import { OfficialPositionSelect } from "@/components/auth/OfficialPositionSelect";
 import { QRCodeSVG } from "qrcode.react";
 import { multiFactor, TotpMultiFactorGenerator, sendEmailVerification, type TotpSecret } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { staffRequest } from "@/lib/staff-client";
 import { STAFF_BARANGAYS, staffRole } from "@/lib/staff-access";
-type Account = { profile: Record<string, unknown>; problem: string | null; totpEnabled: boolean };
+import { ConfirmStaffSession } from "@/components/auth/ConfirmStaffSession";
+import { StaffConfirmationRequired, withRecentStaffSignIn } from "@/lib/staff-action";
+type Account = { profile: Record<string, unknown>; problem: string | null; totpEnabled?: boolean; totpState?: "available" | "disabled" | "unavailable" };
 type AccessRequest = { status: string; approvedBarangay?: string; approvedRole?: string; position?: string };
 export default function StaffAccountPage() {
   const { user, signOut, retry } = useAuth();
+  const router=useRouter();
   const [loadedAccount, setAccount] = useState<(Account & { userId: string }) | null>(null);
   const account = loadedAccount?.userId === user?.uid ? loadedAccount : null;
   const [request, setRequest] = useState<AccessRequest | null>(null);
@@ -20,6 +25,7 @@ export default function StaffAccountPage() {
   const [busy, setBusy] = useState(false); const [secret, setSecret] = useState<TotpSecret | null>(null);
   const [accountLoading, setAccountLoading] = useState(true);
   const [qr, setQr] = useState(""); const [code, setCode] = useState("");
+  const [pendingAuthAction,setPendingAuthAction]=useState<{uid:string;action:()=>Promise<void>}|null>(null);
   const refresh = useCallback(async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
@@ -75,6 +81,13 @@ export default function StaffAccountPage() {
     try { await action(); } catch (failure) { setError(failure instanceof Error ? failure.message : "Try again."); }
     finally { setBusy(false); }
   }
+  async function runRecent(action: () => Promise<void>) {
+    if (!user) return;
+    setBusy(true);setError("");
+    try {await withRecentStaffSignIn(user,action);}
+    catch(failure){if(failure instanceof StaffConfirmationRequired)setPendingAuthAction({uid:user.uid,action});else setError(failure instanceof Error?failure.message:"Authenticator setup could not be completed.");}
+    finally {setBusy(false);}
+  }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     await run(async () => { await staffRequest("/api/staff/requests", { name, barangay, position, contact }); setMessage("Request submitted. MENRO will verify your official details."); await refresh(); });
@@ -100,7 +113,7 @@ export default function StaffAccountPage() {
         {approved && <div className="space-y-4 rounded-xl border border-green-200 bg-green-50 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-green-950">{assignedRole === "admin" ? "MENRO Admin" : "Barangay Semi-Admin"}</h2>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-green-800">{account?.problem ? "Sign-in needs attention" : "Active access"}</span></div>
-          <p className="text-sm text-green-900">{assignedRole === "admin" ? "You can review staff requests, approve Admin or Semi-Admin access, and manage all barangays." : "You can review community reports for " + String(account?.profile.barangay || "your assigned barangay") + "."}</p>
+          <p className="text-sm text-green-900">{assignedRole === "admin" ? "You can review staff requests, approve Semi-Admin access, and manage all barangays." : "You can review community reports for " + String(account?.profile.barangay || "your assigned barangay") + "."}</p>
           {!account?.problem && <div className="flex flex-wrap gap-3">
             {assignedRole === "admin" && <Link href="/users#staff-access" className="rounded-xl bg-green-800 px-5 py-3 text-sm font-semibold text-white">MENRO staff approvals</Link>}
             <Link href={assignedRole === "admin" ? "/" : "/reports"} className="rounded-xl border border-green-800 bg-white px-5 py-3 text-sm font-semibold text-green-800">Open dashboard</Link>
@@ -110,16 +123,17 @@ export default function StaffAccountPage() {
           <h2 className="text-lg font-semibold">Request barangay access</h2>
           {!request && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Your email is verified, but no approval request has been submitted. Complete these details to appear in MENRO&apos;s pending requests.</p>}
           <label className="block text-sm font-medium">Full name<input className={field} value={name} onChange={e => setName(e.target.value)} required maxLength={120} /></label>
-          <label className="block text-sm font-medium">Official position<input className={field} value={position} onChange={e => setPosition(e.target.value)} required maxLength={120} placeholder="Barangay official / designated staff" /></label>
+          <label className="block text-sm font-medium">Official position<OfficialPositionSelect className={field} value={position} onChange={e => setPosition(e.target.value)} disabled={busy} /></label>
           <label className="block text-sm font-medium">Barangay<select className={field} value={barangay} onChange={e => setBarangay(e.target.value)} required><option value="">Select barangay</option>{STAFF_BARANGAYS.map(value => <option key={value}>{value}</option>)}</select></label>
           <label className="block text-sm font-medium">Contact number<input className={field} type="tel" value={contact} onChange={e => setContact(e.target.value)} required maxLength={40} /></label>
           <button disabled={busy} className="rounded-xl bg-green-800 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Submitting…" : "Submit for MENRO approval"}</button>
         </form>}
+        {approved && account?.totpEnabled !== true && <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><h2 className="font-semibold">Authenticator setup {account?.totpState === "unavailable" ? "could not be checked" : "is unavailable"}</h2><p>{account?.totpState === "unavailable" ? "Your account is loaded, but the project authenticator settings could not be read. Refresh account status to retry." : "The project owner must activate Identity Platform and enable TOTP in Firebase before accounts can enroll an authenticator. Opening a setup link does not enable protection."}</p><p>Lost access to an enrolled authenticator? Contact an authorized MENRO administrator for identity-verified recovery. If this is the only MENRO account, the Firebase project owner must assist.</p></div>}
         {approved && account?.totpEnabled === true && <div className="space-y-4 border-t pt-5">
           <h2 className="text-lg font-semibold">Authenticator protection</h2>
           {account?.profile.mfaRequired === true ? <p className="text-sm text-green-800">Authenticator sign-in is required for this account.</p> : null}
             <p className="text-sm text-slate-600">Set up an authenticator from HTTPS or localhost on the admin PC. If you have signed in for more than five minutes, sign in again first.</p>
-            {!secret && <button disabled={busy || !!multiFactor(user).enrolledFactors.length} onClick={() => void run(async () => {
+            {!secret && <button disabled={busy || !!multiFactor(user).enrolledFactors.length} onClick={() => void runRecent(async () => {
               if (!window.isSecureContext) throw new Error("Open http://localhost:3000/staff-account on the admin PC, or use your HTTPS address, to enroll securely.");
               const generated = await TotpMultiFactorGenerator.generateSecret(await multiFactor(user).getSession());
               setSecret(generated); setQr(generated.generateQrCodeUrl(user.email || "Staff", "TrashTrack MENRO"));
@@ -127,17 +141,18 @@ export default function StaffAccountPage() {
             {secret && <div className="space-y-4 rounded-xl bg-slate-50 p-5">
               <p className="text-sm">Scan this QR code in your authenticator. Keep it private.</p><QRCodeSVG value={qr} size={192} marginSize={2} />
               <label className="block text-sm font-medium">Six-digit code<input className={field} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))} /></label>
-              <button disabled={busy || code.length !== 6} onClick={() => void run(async () => {
+              <button disabled={busy || code.length !== 6} onClick={() => void runRecent(async () => {
                 await multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(secret, code), "TrashTrack authenticator");
                 await staffRequest("/api/staff/account", {});
-                setSecret(null); setQr(""); setCode(""); await signOut(); window.location.assign("/login");
+                setSecret(null); setQr(""); setCode(""); await signOut(); router.replace("/login");
               })} className="rounded-xl bg-green-800 px-4 py-3 text-sm text-white disabled:opacity-50">Verify and enable protection</button>
             </div>}
             {!secret && multiFactor(user).enrolledFactors.length > 0 && account.profile.mfaRequired !== true &&
-              <button disabled={busy} onClick={() => void run(async () => { await staffRequest("/api/staff/account", {}); await signOut(); window.location.assign("/login"); })} className="text-sm font-semibold text-green-800 underline">Require my enrolled authenticator</button>}
+              <button disabled={busy} onClick={() => void runRecent(async () => { await staffRequest("/api/staff/account", {}); await signOut(); router.replace("/login"); })} className="text-sm font-semibold text-green-800 underline">Require my enrolled authenticator</button>}
         </div>}
       </>}
     </section>
+    {pendingAuthAction && user?.uid === pendingAuthAction.uid && <ConfirmStaffSession user={user} onCancel={()=>setPendingAuthAction(null)} onConfirmed={async()=>{const pending=pendingAuthAction;setPendingAuthAction(null);await runRecent(pending.action);}} />}
   </div></main>;
 }
 
