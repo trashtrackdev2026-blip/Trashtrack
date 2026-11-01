@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
 
 const base = resolve(".next/server/app");
-const required = ["appreciation-v1.png", "GreatVibes-Regular.ttf", "GreatVibes-OFL.txt"].map(name => resolve("assets/certificates", name));
+const required = ["appreciation-v1.png", "balete-appreciation-v2.png", "GreatVibes-Regular.ttf", "GreatVibes-OFL.txt"].map(name => resolve("assets/certificates", name));
 const errors = [];
 for (const route of ["api/certificates", "api/certificates/preview"]) {
   const file = resolve(base, route, "route.js.nft.json");

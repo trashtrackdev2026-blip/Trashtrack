@@ -28,8 +28,9 @@ test("Name review is read-only and shows the full authoritative profile name aga
   const app=fixture(),before=structuredClone([...app.records]);const result=await app.post();assert.deepEqual(result,{issuedName:"Maria",profileName:"Maria Isabel Santos",revision:0,canCorrect:true});assert.deepEqual([...app.records],before);
 });
 test("Confirmed correction archives the prior snapshot and audits the exact name change without altering event details",async()=>{
-  const app=fixture();await app.post({action:"correct",expectedRevision:0,identityConfirmed:true});const saved=app.records.get("certificates/"+id);
+  const app=fixture({certificate:{templateId:"appreciation-v1"}});await app.post({action:"correct",expectedRevision:0,identityConfirmed:true});const saved=app.records.get("certificates/"+id);
   assert.equal(saved.participantName,"Maria Isabel Santos");assert.equal(saved.eventTitle,"Saved title");assert.equal(saved.issuedAt,"original date");assert.equal(saved.revision,1);
+  assert.equal(saved.templateId,"appreciation-v1");
   assert.equal(app.records.get("certificates/"+id+"/revisions/0").participantName,"Maria");assert.ok([...app.records.values()].some(row=>row.action==="certificate.correctName"&&row.from==="Maria"&&row.to==="Maria Isabel Santos"));
   const before=structuredClone([...app.records]);await app.post({action:"correct",expectedRevision:0,identityConfirmed:true});assert.deepEqual([...app.records],before);
 });

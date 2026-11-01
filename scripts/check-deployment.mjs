@@ -6,7 +6,7 @@ const env = loadDeploymentEnvironment();
 const vercel = process.argv.includes("--vercel") || env.VERCEL === "1";
 const result = checkDeploymentEnvironment(env, vercel);
 try { readDeploymentCredential(env); } catch (error) { result.errors.push(error.message); }
-for (const asset of ["appreciation-v1.png", "GreatVibes-Regular.ttf", "GreatVibes-OFL.txt"]) {
+for (const asset of ["appreciation-v1.png", "balete-appreciation-v2.png", "GreatVibes-Regular.ttf", "GreatVibes-OFL.txt"]) {
   if (!existsSync(`assets/certificates/${asset}`)) result.errors.push(`Missing certificate asset: ${asset}.`);
 }
 for (const warning of result.warnings) console.warn(`Notice: ${warning}`);

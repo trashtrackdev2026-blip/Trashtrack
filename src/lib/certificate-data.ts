@@ -3,10 +3,13 @@ export class CertificateError extends Error {
   constructor(message: string, status = 400) { super(message); this.status = status; }
 }
 
+export const CURRENT_CERTIFICATE_TEMPLATE = "balete-appreciation-v2" as const;
+
 export type CertificateSnapshot = {
   version: 1; id: string; eventId: string; userId: string; participantName: string;
   eventTitle: string; eventDate: string; eventDateISO: string; organizer: string;
   signatory: string; position: string;
+  templateId?: "appreciation-v1" | typeof CURRENT_CERTIFICATE_TEMPLATE;
 };
 
 export function requiredText(value: unknown, label: string, maximum = 140): string {
@@ -67,5 +70,6 @@ export function buildCertificateSnapshot(id: string, eventId: string, userId: st
     version: 1, id, eventId, userId, participantName: requiredText(name, "Participant name"),
     eventTitle: requiredText(event.title, "Event title"), eventDate: date.display, eventDateISO: date.iso,
     organizer: settings.certificateOrganizer, signatory: settings.certificateSignatory, position: settings.certificatePosition,
+    templateId: CURRENT_CERTIFICATE_TEMPLATE,
   };
 }

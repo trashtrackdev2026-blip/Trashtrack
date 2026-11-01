@@ -1,6 +1,6 @@
 # November 2 concern implementation
 
-This release implements the approved review of the 20-page concern PDF. The resident app is version 1.0.3 (code 4). The existing lakeside design and Classic certificate template are retained.
+This release implements the approved review of the 20-page concern PDF. The resident app is version 1.0.3 (code 4), retaining the existing lakeside design. New certificates use the subsequently supplied Balete seal artwork; previously issued snapshots keep their original template.
 
 ## Concern register
 
@@ -17,7 +17,7 @@ This release implements the approved review of the 20-page concern PDF. The resi
 | C09 | Dashboard navigation uses User Management. |
 | C10 | Existing Philippine date/time restrictions retained. Scheduled report actions also reject past dates/times. |
 | C11 | Event detail is divided into Overview, Attendance and Certificates with bounded scrolling. |
-| C12 | **Deferred by the user:** their own certificate artwork will be provided later. No replacement design is activated. |
+| C12 | The user supplied the replacement artwork on November 2. New certificates and staff previews use the supplied gold/green Balete seal template. Issued snapshots save the template ID; older snapshots retain their original artwork. |
 | C13 | My Events separates participation from event lifecycle. Expired/cancelled events never become completed merely because their date passed. Certificate access requires explicit completion and confirmed attendance. |
 | C14 | Event editing uses the same category dropdown and validation as creation; unchanged legacy categories remain readable. |
 | C15 | Learning resource covers are distinct from original files. Image, PDF, video and supported YouTube previews have source/recovery links. |
@@ -39,12 +39,12 @@ Certificate corrections require MENRO access, a recent sign-in, an explicit iden
 
 ## Verification and limits
 
-- Web: all 168 automated tests passed again after compatible dependency patches. Final lint, TypeScript, production build and function bundle checks passed. Three production pages loaded locally and five protected APIs rejected unsigned requests with private, no-store caching.
+- Web: all 169 automated tests passed after the supplied certificate template was added. Final lint, TypeScript, production build and function bundle checks passed. Three normal/long-field/legacy certificate PDFs were rendered and visually checked. In the preceding release, three production pages loaded locally and five protected APIs rejected unsigned requests with private, no-store caching.
 - Android: 57 unit tests and 34 offline instrumented UI tests passed on the release candidate, including normal and larger text screens.
 - Isolated preview: nine dashboard/public routes returned HTTP 200 with synthetic data and no live writes. Interactive browser automation was unavailable because browser use is disabled in the user's settings.
 - One authorized reset email was sent and its receipt confirmed by the user. Final password replacement was not performed, so the existing account password was preserved.
 - Production report actions, pushes and certificate corrections were not fabricated for testing. Their transaction, authorization, retry and failure paths were tested using local fixtures.
-- TOTP end-to-end enrollment/sign-in remains untested until the owner activates the provider. New certificate artwork remains pending the user's file.
+- TOTP end-to-end enrollment/sign-in remains untested until the owner activates the provider. The supplied replacement certificate artwork is implemented with versioned snapshots.
 
 ## Dependency patch
 

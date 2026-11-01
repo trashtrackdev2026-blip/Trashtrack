@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PDFDocument, StandardFonts } from "pdf-lib";
-import { assertCertificateEligible, buildCertificateSnapshot, eventDate, validId } from "../src/lib/certificate-data.ts";
+import { readFile } from "node:fs/promises";
+import { PDFDocument, PDFDict, PDFName, PDFRawStream, StandardFonts } from "pdf-lib";
+import { assertCertificateEligible, buildCertificateSnapshot, CURRENT_CERTIFICATE_TEMPLATE, eventDate, validId } from "../src/lib/certificate-data.ts";
 import { generateCertificatePdf, wrapCertificateText } from "../src/lib/certificate-pdf.ts";
 
 const event = {
@@ -37,6 +38,7 @@ test("issued details are a snapshot, and missing names or signatories do not cre
   assert.equal(snapshot.eventDate, "October 1, 2026");
   assert.equal(snapshot.signatory, event.certificateSignatory);
   assert.equal(snapshot.participantName, "José Niño de la Cruz");
+  assert.equal(snapshot.templateId, CURRENT_CERTIFICATE_TEMPLATE);
   assert.throws(() => buildCertificateSnapshot("id", "event-1", "resident-1", event, ""), /Participant name/);
   assert.throws(() => buildCertificateSnapshot("id", "event-1", "resident-1", { ...event, certificateSignatory: "" }, "Resident"), /Signatory/);
   for (const id of ["../another-user", "event/user", "", null]) assert.throws(() => validId(id));
@@ -67,4 +69,22 @@ test("Certificate issuance preserves multi-part full names and the existing temp
   assert.equal(snapshot.participantName,name);
   const pdf=await PDFDocument.load(await generateCertificatePdf(snapshot));
   assert.equal(pdf.getPageCount(),1);assert.equal(pdf.getTitle(),"Certificate of Appreciation - "+name);
+});
+
+async function backgroundImage(bytes) {
+  const pdf=await PDFDocument.load(bytes);
+  const images=pdf.context.lookup(pdf.getPage(0).node.Resources().get(PDFName.of("XObject")),PDFDict);
+  return images.values().map(ref=>pdf.context.lookup(ref)).find(value=>value instanceof PDFRawStream && value.dict.get(PDFName.of("Subtype"))===PDFName.of("Image")).getContents();
+}
+
+test("New certificates embed the supplied Balete artwork; old snapshots retain the original artwork",async()=>{
+  const details=buildCertificateSnapshot("id","event-1","resident-1",event,"Maria Isabel Santos");
+  const current=await generateCertificatePdf(details);
+  const {templateId,...legacy}=details;
+  assert.equal(templateId,"balete-appreciation-v2");
+  for(const [snapshot,asset] of [[details,"balete-appreciation-v2.png"],[legacy,"appreciation-v1.png"],[{...legacy,templateId:"appreciation-v1"},"appreciation-v1.png"]]) {
+    const expected=await PDFDocument.create();const image=await expected.embedPng(await readFile(new URL("../assets/certificates/"+asset,import.meta.url)));
+    expected.addPage([841.89,595.28]).drawImage(image,{x:0,y:0,width:841.89,height:595.28});
+    assert.deepEqual(await backgroundImage(snapshot===details?current:await generateCertificatePdf(snapshot)),await backgroundImage(await expected.save()));
+  }
 });
