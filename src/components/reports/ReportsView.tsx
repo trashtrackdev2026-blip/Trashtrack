@@ -62,6 +62,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   try { const next=normalizeReportStatus(newStatus);if(next)reportActionFields(role,next,{...actionInput,remarks}); } catch (failure) { actionValid=false;actionError=failure instanceof Error?failure.message:"Complete the action details."; }
   const canSave = !!activeReport && actionValid && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
   const openReport = (report: CommunityReport) => {
+    setShowConfirm(false);
     const draft=preservedDraft.current?.id===report.id?preservedDraft.current:null;
     setActiveReportId(report.id);setNewStatus(draft&&nextReportStatuses(role,report.status).some(status=>status===draft.status)?draft.status:"");setRemarks(draft?.remarks||"");setCollectionConfirmed(false);setActionInput(draft?.action||{});setOpenedVersion({expectedStatus:report.status,expectedRevision:report.statusRevision||0});setUpdateError(null);
   };
@@ -69,7 +70,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     review: role === "Semi-Admin" ? "For MENRO Review" : "Under Review", resolved: role === "Semi-Admin" ? "Resolved" : "Resolved Reports" };
   const selectSummary = (filter: ReportSummaryFilter) => {
     if (isUpdating) return;
-    setSummaryFilter(filter); setActiveReportId(null); setNewStatus(""); setRemarks(""); setCollectionConfirmed(false); setUpdateError(null);
+    setShowConfirm(false); setSummaryFilter(filter); setActiveReportId(null); setNewStatus(""); setRemarks(""); setCollectionConfirmed(false); setUpdateError(null);
   };
   const cardFilter = (filter: ReportSummaryFilter) => ({
     onClick: () => selectSummary(filter), selected: summaryFilter === filter, controls: "reports-table",
@@ -193,9 +194,9 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
             </div>
 
             <div className="tt-filter-bar mx-4 mt-4">
-              <label className="relative min-w-40 flex-1"><span className="sr-only">Search reports</span><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" /><input value={search} onChange={event => { setSearch(event.target.value);setActiveReportId(null); }} placeholder="Search reports" className="h-10 w-full rounded-lg border bg-white/50 pl-9 pr-3 text-sm" /></label>
-              <Select value={barangayFilter} onValueChange={value => { setBarangayFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report barangay" className="w-40"><SelectValue>{barangayFilter === "all" ? "All barangays" : barangayFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All barangays</SelectItem>{BALETE_BARANGAYS.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
-              <Select value={typeFilter} onValueChange={value => { setTypeFilter(value || "all");setActiveReportId(null); }}><SelectTrigger aria-label="Report category" className="w-40"><SelectValue>{typeFilter === "all" ? "All categories" : typeFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{[...new Set(reports.map(report => report.type))].filter(Boolean).sort().map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
+              <label className="relative min-w-40 flex-1"><span className="sr-only">Search reports</span><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" /><input value={search} onChange={event => { setSearch(event.target.value);setActiveReportId(null);setShowConfirm(false); }} placeholder="Search reports" className="h-10 w-full rounded-lg border bg-white/50 pl-9 pr-3 text-sm" /></label>
+              <Select value={barangayFilter} onValueChange={value => { setBarangayFilter(value || "all");setActiveReportId(null);setShowConfirm(false); }}><SelectTrigger aria-label="Report barangay" className="w-40"><SelectValue>{barangayFilter === "all" ? "All barangays" : barangayFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All barangays</SelectItem>{BALETE_BARANGAYS.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
+              <Select value={typeFilter} onValueChange={value => { setTypeFilter(value || "all");setActiveReportId(null);setShowConfirm(false); }}><SelectTrigger aria-label="Report category" className="w-40"><SelectValue>{typeFilter === "all" ? "All categories" : typeFilter}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{[...new Set(reports.map(report => report.type))].filter(Boolean).sort().map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
             </div>
             <div className="px-4 pb-2">
               {visibleReports.map(report => { const photo=report.imageUrl || report.attachments.find(item => item.type === "image")?.url;return <button key={report.id} type="button" disabled={isUpdating} className="tt-report-item" aria-pressed={activeReport?.id === report.id} onClick={() => openReport(report)}>
@@ -342,16 +343,8 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                 </div>
 
               </div>
-            </DialogContent>
-          )}
-          </Dialog>
-
-        </div>
-
-      </div>
-
-      <Dialog open={showConfirm && !!activeReport} onOpenChange={open => { if (!isUpdating) setShowConfirm(open); }}>
-        {activeReport && <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto gap-0 p-0 sm:max-w-sm" showCloseButton={!isUpdating}>
+      <Dialog open={showConfirm && !!newStatus && !!activeReport} onOpenChange={open => { if (!isUpdating) setShowConfirm(open); }}>
+        {activeReport && <DialogContent className="z-[60] max-h-[calc(100dvh-2rem)] overflow-y-auto gap-0 p-0 sm:max-w-sm" showCloseButton={!isUpdating}>
           <DialogHeader className="sticky top-0 z-10 border-b border-slate-100 bg-white p-5 pr-12">
             <DialogTitle className="flex items-center gap-2 font-bold text-slate-900 leading-snug">
               <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" /> Confirm Status Update
@@ -375,6 +368,14 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           </DialogFooter>
         </DialogContent>}
       </Dialog>
+
+            </DialogContent>
+          )}
+          </Dialog>
+
+        </div>
+
+      </div>
 
       {/* Full Photo Modal */}
       {fullPhotoUrl && (

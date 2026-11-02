@@ -2,11 +2,13 @@
 
 import { staffRequest } from "@/lib/staff-client";
 import { useState } from "react";
-import { learningResourceType, publicLearningUrl, learningCover } from "@/lib/learning-resource";
+import { learningResourceType, publicLearningUrl, learningPreviewUrl } from "@/lib/learning-resource";
+import { LEARNING_CATEGORIES, LEARNING_TYPES, learningPublicationFields } from "@/lib/learning-publication";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
+  UploadCloud,
   Send, 
   Image as ImageIcon, 
   LayoutDashboard, 
@@ -38,6 +40,7 @@ export default function CreateEducationResourcePage() {
   const [uploadError, setUploadError] = useState("");
   const [pendingDocument,setPendingDocument]=useState<{url:string;name:string}|null>(null);
   const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
+  const coverPreview=learningPreviewUrl(form.coverUrl);
 
   const getFileType = (url: string, fileName = "") => learningResourceType(url, fileName, form.type);
 
@@ -90,36 +93,14 @@ export default function CreateEducationResourcePage() {
   };
 
   const handlePublish = async () => {
-    if (!form.title) {
-      alert("Title is required");
-      return;
-    }
-
-    if (isUploading || pendingDocument) return;
-    setUploadError("");
-    setIsSubmitting(true);
+    if (isSubmitting || isUploading || pendingDocument) return;
+    setUploadError("");setIsSubmitting(true);
     try {
-      const source = publicLearningUrl(form.image || form.videoUrl);
-      const detectedFileType = getFileType(source, form.fileName);
-      const coverUrl=form.coverUrl.trim()?publicLearningUrl(form.coverUrl):"";
-      if(coverUrl && learningResourceType(coverUrl)!=="image")throw new Error("Use a public JPG, PNG or WebP URL for the optional cover image.");
-      const finalImage = detectedFileType === "image" ? source : "";
-
+      const fields=learningPublicationFields(form);
       await addDoc(collection(db, "educational_resources"), {
-        title: form.title,
-        category: form.category,
-        type: form.type,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        status: "Published",
-        image: finalImage,
-        coverUrl,
-        thumbnailUrl: learningCover({coverUrl,fileUrl:source,fileName:form.fileName,type:form.type}) || "",
-        videoUrl: detectedFileType === "video" ? source : "",
-        fileUrl: source,
-        fileType: detectedFileType,
-        fileName: form.fileName || "",
-        description: form.description,
-        createdAt: serverTimestamp()
+        ...fields,
+        date:new Date().toLocaleDateString("en-US",{timeZone:"Asia/Manila",month:"short",day:"numeric",year:"numeric"}),
+        createdAt:serverTimestamp(),
       });
       setIsSuccess(true);
     } catch (e) {
@@ -174,7 +155,17 @@ export default function CreateEducationResourcePage() {
               <div className="space-y-8">
 
                 <div className="space-y-6 max-w-2xl">
-                  <label className="block text-sm font-semibold">Upload a real cover (optional)<input type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploading||isSubmitting} onChange={event=>void uploadCover(event)} className="mt-2 block w-full text-sm"/><span className="mt-2 block text-xs font-normal text-slate-600">PDF pages and supported video frames are used automatically. You can also choose a real cover photo.</span></label>
+                  <div className="rounded-2xl border border-[#cbd9c7] bg-[#f7f4e9] p-5">
+                    <p className="font-semibold">Cover photo <span className="text-xs font-normal">(optional)</span></p>
+                    <p className="mt-1 text-sm text-muted-foreground">PDF pages and supported video frames appear automatically. Add your own cover here.</p>
+                    <label className="mt-4 flex cursor-pointer flex-wrap items-center gap-3 rounded-xl border-2 border-dashed border-[#8ba88f] bg-white/70 p-5 focus-within:ring-2 focus-within:ring-green-800">
+                      <UploadCloud aria-hidden="true" className="h-8 w-8 shrink-0 text-[#194f40]"/>
+                      <span className="flex-1"><strong className="block">{isUploading ? "Uploading…" : "Choose a cover photo"}</strong><small>JPG, PNG or WebP · up to 8 MB</small></span>
+                      <span className="rounded-full bg-[#194f40] px-4 py-2 text-sm font-semibold text-white">Browse files</span>
+                      <input aria-label="Choose a cover photo" type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploading||isSubmitting} onChange={event=>void uploadCover(event)} className="sr-only"/>
+                    </label>
+                    {coverPreview && learningResourceType(coverPreview)==="image" && <div className="mt-3 flex items-center gap-3"><div className="relative h-20 w-28 overflow-hidden rounded-xl"><Image unoptimized src={coverPreview} alt="Selected cover" fill sizes="112px" className="object-cover"/></div><Button type="button" variant="outline" onClick={()=>setForm(current=>({...current,coverUrl:""}))}>Remove cover</Button></div>}
+                  </div>
                   <label className="block text-sm font-semibold">Cover image URL (optional)<Input type="url" value={form.coverUrl} onChange={e=>setForm({...form,coverUrl:e.target.value})} placeholder="https://.../cover.jpg" className="mt-2"/><span className="mt-2 block text-xs font-normal text-slate-600">Use a cover photo for a document or video. The original learning file stays separate.</span></label>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Resource Title <span className="text-red-500">*</span></label>
@@ -194,10 +185,7 @@ export default function CreateEducationResourcePage() {
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Waste Segregation">Waste Segregation</SelectItem>
-                          <SelectItem value="Composting">Composting</SelectItem>
-                          <SelectItem value="Recycling">Recycling</SelectItem>
-                          <SelectItem value="Environmental Awareness">Environmental Awareness</SelectItem>
+                          {LEARNING_CATEGORIES.map(value=><SelectItem key={value} value={value}>{value}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -219,17 +207,15 @@ export default function CreateEducationResourcePage() {
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Guide">Guide</SelectItem>
-                          <SelectItem value="Video">Video</SelectItem>
-                          <SelectItem value="Article">Article</SelectItem>
+                          {LEARNING_TYPES.map(value=><SelectItem key={value} value={value}>{value}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Description / Content</label>
-                    <textarea 
+                    <label htmlFor="learning-content" className="text-xs font-bold text-slate-700 uppercase tracking-wide">{form.type==="Article" ? "Article content / description" : "Description / Content"}</label>
+                    <textarea id="learning-content" maxLength={20000}
                       rows={5}
                       value={form.description}
                       onChange={(e) => setForm({...form, description: e.target.value})}
@@ -238,6 +224,7 @@ export default function CreateEducationResourcePage() {
                     />
                   </div>
 
+                  {form.type==="Article" && <p className="rounded-xl bg-[#eaf0df] p-4 text-sm">Write the article above, or attach a document or public article link below. An attachment and cover photo are optional for a written article.</p>}
                   {/* File Upload Section */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">

@@ -1,3 +1,4 @@
+import { collectionChangeMessage } from "@/lib/collection-outcome-notice";
 import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
@@ -63,9 +64,8 @@ export async function POST(request: Request) {
         const noticeId = "schedule_change_" + body.id + "_" + body.changeId + "_" + index;
         noticeIds.push(noticeId);
         const title = body.action === "delete" ? "Collection cancelled" : body.action === "followup" ? "Follow-up collection" : "Collection schedule updated";
-        const message = body.action === "delete" ? `The ${current.barangay} collection on ${current.date || current.day} at ${current.time} was removed. Check TrashTrack for the latest schedule.`
-          : `${body.action === "followup" ? "A follow-up is posted" : "The collection changed"}: ${current.barangay}, ${current.date || current.day} at ${current.time}. New schedule: ${fields!.barangay}, ${fields!.date} at ${fields!.time}. Check TrashTrack for details.`;
-        tx.create(db.collection("notifications").doc(noticeId), { title, message, type: "schedule", recipients: audience, sourceId: scheduleId, changeHash, push: true, pushStatus: "pending", isRead: false, createdBy: identity.uid, createdAt: FieldValue.serverTimestamp(), timestamp: FieldValue.serverTimestamp() });
+        const message = collectionChangeMessage(body.action, current, fields);
+        tx.create(db.collection("notifications").doc(noticeId), { title, message, outcomeNotes:String(current.statusNotes || "").trim(), outcomeStatus:String(current.status || ""), type: "schedule", recipients: audience, sourceId: scheduleId, changeHash, push: true, pushStatus: "pending", isRead: false, createdBy: identity.uid, createdAt: FieldValue.serverTimestamp(), timestamp: FieldValue.serverTimestamp() });
       }
       for (const day of days) tx.set(day.lock, { revision: day.revision + 1 });
       if (body.action === "delete") tx.delete(ref);

@@ -15,7 +15,6 @@ import {
   Trash2,
   Check
 } from "lucide-react";
-import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { useState, useEffect } from "react";
@@ -26,7 +25,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { staffRequest } from "@/lib/staff-client";
 import { EditNotificationDialog } from "@/components/notifications/EditNotificationDialog";
-import { notificationCategory, notificationCategoryLabel, DELIVERY_FILTER_LABELS, matchesDeliveryFilter } from "@/lib/notification-categories";
+import { notificationCategory, notificationCategoryLabel } from "@/lib/notification-categories";
 import { notificationDeliveryLabel } from "@/lib/notification-edit";
 import { phoneDeliveryDue } from "@/lib/notification-publication";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -35,6 +34,7 @@ interface NotificationData {
   id: string;
   title: string;
   message: string;
+  outcomeNotes?: string;
   type: string;
   isRead: boolean;
   date?: string;
@@ -73,18 +73,16 @@ export default function NotificationsPage() {
   // Filter State
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("category");
-  const [status, setStatus] = useState("status");
 
   const filteredNotifications = notifications.filter((notif) => {
     const matchesSearch = notif.title.toLowerCase().includes(search.toLowerCase()) || notif.message.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === "category" || notificationCategory(notif.type) === category;
 
-    const matchesStatus = matchesDeliveryFilter(notif,status);
 
     const now = filterNow;
     const today = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Manila"}).format(new Date(now));
     const matchesDate = dateFilter === "date" || (notif.createdAtMillis > 0 && (dateFilter === "today" ? new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Manila"}).format(new Date(notif.createdAtMillis)) === today : notif.createdAtMillis >= now - 7 * 86400000 && notif.createdAtMillis <= now));
-    return matchesSearch && matchesCategory && matchesStatus && matchesDate;
+    return matchesSearch && matchesCategory && matchesDate;
   });
 
   useEffect(() => {
@@ -100,6 +98,7 @@ export default function NotificationsPage() {
           id: doc.id,
           title: data.title || "Notification",
           message: data.message || "",
+          outcomeNotes:typeof data.outcomeNotes === "string" ? data.outcomeNotes : "",
           type: data.type || "general",
           isRead: data.isRead || false,
           recipients: data.recipients || "All Barangays", push: data.push === true, pushStatus: data.pushStatus || (data.push ? "pending" : "disabled"),
@@ -220,20 +219,7 @@ export default function NotificationsPage() {
                   <SelectItem value="category">Category (All)</SelectItem>
                   <SelectItem value="schedule">Schedule</SelectItem>
                   <SelectItem value="alert">Alerts</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
-                  <SelectItem value="event">Events</SelectItem><SelectItem value="report">Reports</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={status} onValueChange={(val) => { setStatus(val ?? "status"); setCurrentPage(1); }}>
-                <SelectTrigger className="w-[210px] h-11 bg-white border-slate-200">
-                  <SelectValue>{DELIVERY_FILTER_LABELS[status] || "All delivery states"}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="status">Status (All)</SelectItem>
-                  <SelectItem value="in-app">In-app only</SelectItem><SelectItem value="sent">Sent to phone service</SelectItem>
-                  <SelectItem value="pending">Waiting for phone service</SelectItem><SelectItem value="sending">Sending to phone service</SelectItem>
-                  <SelectItem value="failed">Phone delivery failed</SelectItem>
+                  <SelectItem value="event">Events</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -253,7 +239,7 @@ export default function NotificationsPage() {
 
         </div>
 
-        <nav className="tt-tabs" aria-label="Announcements"><Link href="/notifications" aria-current="page">Notification history</Link><Link href="/notifications/create">Create notification</Link></nav>
+        <h2 className="text-lg font-semibold">Notification history</h2>
         {/* Table Area */}
         <div className="tt-surface overflow-hidden">
           <div className="overflow-x-auto">
@@ -323,7 +309,7 @@ export default function NotificationsPage() {
             </table>
           </div>
 
-          {!loading && !filteredNotifications.length && <div className="tt-empty"><p>No announcements match these filters.</p><Button variant="outline" className="mt-3" onClick={() => {setSearch("");setCategory("category");setStatus("status");setDateFilter("date");setCurrentPage(1);}}>Clear filters</Button></div>}
+          {!loading && !filteredNotifications.length && <div className="tt-empty"><p>No announcements match these filters.</p><Button variant="outline" className="mt-3" onClick={() => {setSearch("");setCategory("category");setDateFilter("date");setCurrentPage(1);}}>Clear filters</Button></div>}
           {/* Pagination */}
           {(() => {
             const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / itemsPerPage));
@@ -426,6 +412,7 @@ export default function NotificationsPage() {
 
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                 <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{selectedNotif.message}</p>
+                {selectedNotif.outcomeNotes && <div className="mt-4 rounded-xl border bg-muted/30 p-4"><h3 className="text-sm font-semibold">Full outcome notes</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm">{selectedNotif.outcomeNotes}</p></div>}
               </div>
 
               <div className="flex w-full mt-2">

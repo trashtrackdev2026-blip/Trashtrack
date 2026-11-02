@@ -8,6 +8,7 @@ import * as schedule from "../src/lib/schedule-policy.ts";
 import * as publication from "../src/lib/community-publication.ts";
 import * as clock from "../src/lib/scheduling-time.ts";
 import * as workflow from "../src/lib/report-workflow.ts";
+import * as collectionNotice from "../src/lib/collection-outcome-notice.ts";
 import * as feedback from "../src/lib/system-feedback.ts";
 import {notificationCategory,matchesDeliveryFilter,DELIVERY_FILTER_LABELS} from "../src/lib/notification-categories.ts";
 import {learningCover} from "../src/lib/learning-resource.ts";
@@ -54,7 +55,7 @@ function fixture({role="Admin",currentRole=role,pushFails=false,suspended=false}
   const account={db,identity,profile};
   const modules={"firebase-admin/firestore":{FieldValue:{serverTimestamp:()=>"timestamp"}},"@/lib/staff-auth":{
     authenticatedAccount:async()=>account,authenticatedStaff:async(request,master)=>checkStaff(request,account,master),requireApprovedStaff:checkStaff,requireStaffSecurity:async()=>{},staffApiError:error=>Response.json({error:error.message},{status:error instanceof access.StaffAccessError?error.status:500})},
-    "@/lib/staff-access":access,"@/lib/schedule-policy":schedule,"@/lib/community-publication":publication,"@/lib/scheduling-time":clock,"@/lib/report-workflow":workflow,"@/lib/system-feedback":feedback,"@/lib/notification-delivery":{queuePhoneNotification:async()=>{if(pushFails)throw Error("Provider unavailable");}}};
+    "@/lib/staff-access":access,"@/lib/schedule-policy":schedule,"@/lib/community-publication":publication,"@/lib/scheduling-time":clock,"@/lib/report-workflow":workflow,"@/lib/system-feedback":feedback,"@/lib/collection-outcome-notice":collectionNotice,"@/lib/notification-delivery":{queuePhoneNotification:async()=>{if(pushFails)throw Error("Provider unavailable");}}};
   const routes={};for(const [name,source] of Object.entries(compiled)){routes[name]={};new Function("require","exports",source)(name=>modules[name]||require(name),routes[name]);}
   async function invoke(kind,body,expected=200,url="") {
     const result=await routes[kind][body?"POST":"GET"](new Request("http://localhost/api/"+kind+url,{...(body?{method:"POST",body:JSON.stringify(body)}:{})}));
@@ -67,6 +68,7 @@ function fixture({role="Admin",currentRole=role,pushFails=false,suspended=false}
 test("Collection edits update linked open actions, preserve original planning dates, and retry once",async()=>{
   const app=fixture();app.records.set("reports/report1",{location:"Poblacion",status:"Endorsed",scheduleId:"one",actionDate:"2099-11-04",actionTime:"07:00",statusRevision:4});
   const result=await app.invoke("collections",app.edit);assert.equal(result.saved,true);
+  const notice=[...app.records].find(([key])=>key.startsWith("notifications/"))[1];assert.match(notice.message,/8:00 AM/);assert.match(notice.message,/7:00 AM/);
   const report=app.records.get("reports/report1");assert.equal(report.actionDate,"2099-11-05");assert.equal(report.originalActionDate,"2099-11-04");assert.equal(report.statusRevision,5);assert.equal(report.status,"Endorsed");
   const saved=structuredClone([...app.records]);await app.invoke("collections",app.edit);assert.deepEqual([...app.records],saved);
 });
@@ -86,6 +88,7 @@ test("Failed old collection follow-up preserves its outcome and moves only unres
   const app=fixture();Object.assign(app.records.get("schedules/one"),{date:"2020-01-01",status:"Failed",statusNotes:"Road blocked"});
   app.records.set("reports/open",{scheduleId:"one",location:"Poblacion",status:"Endorsed"});app.records.set("reports/closed",{scheduleId:"one",location:"Poblacion",status:"Resolved",actionDate:"2020-01-01"});
   const result=await app.invoke("collections",{...app.edit,action:"followup",expectedStatus:"Failed"});assert.notEqual(result.scheduleId,"one");assert.equal(app.records.get("schedules/one").status,"Failed");assert.equal(app.records.get("schedules/one").statusNotes,"Road blocked");assert.equal(app.records.get("reports/open").scheduleId,result.scheduleId);assert.equal(app.records.get("reports/closed").scheduleId,"one");
+  const notice=[...app.records].find(([key])=>key.startsWith("notifications/"))[1];assert.equal(notice.outcomeNotes,"Road blocked");assert.match(notice.message,/Outcome notes: Road blocked/);
 });
 test("Deletion protects linked reports; allowed deletions have cancellation notices and idempotent retries",async()=>{
   const app=fixture();app.records.set("reports/linked",{scheduleId:"one",location:"Poblacion"});await app.invoke("collections",{...app.edit,action:"delete"},409);app.records.delete("reports/linked");

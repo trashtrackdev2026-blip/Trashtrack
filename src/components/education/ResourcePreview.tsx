@@ -3,12 +3,13 @@ import { useState } from "react";
 import Image from "next/image";
 import { learningResourceType, learningPreviewUrl, learningEmbeddedVideo } from "@/lib/learning-resource";
 
-export function ResourcePreview({ resource }: { resource: { title: string; type: string; image: string; fileUrl?: string; videoUrl?: string; fileName?: string; fileType?: string } }) {
+export function ResourcePreview({ resource }: { resource: { title: string; type: string; image: string; fileUrl?: string; videoUrl?: string; fileName?: string; fileType?: string; description?:string } }) {
   const [failed, setFailed] = useState(false);
   const source = learningPreviewUrl(resource.fileUrl || resource.videoUrl || resource.image || "");
   const kind = learningResourceType(source || "", resource.fileName, resource.type);
   const embedded=learningEmbeddedVideo(source || "");
   const isPdf = resource.fileType === "application/pdf" || /\.pdf(?:$|[?#])/i.test(source || "") || /\.pdf$/i.test(resource.fileName || "");
+  if (!source && resource.type.toLowerCase()==="article" && resource.description?.trim()) return <article className="mb-5 whitespace-pre-wrap break-words rounded-xl border bg-white/60 p-5 text-sm leading-relaxed">{resource.description}</article>;
   if (!source) return <p className="mb-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">This resource has no usable public link. Upload the original file again or publish a public HTTPS link.</p>;
   return <div key={source} className="mb-5 space-y-3">
     {kind === "image" && !failed && <div className="relative h-64"><Image src={source} alt={resource.title} fill sizes="(max-width: 767px) 90vw, 720px" className="rounded-lg object-contain" onError={()=>setFailed(true)} /></div>}

@@ -1,3 +1,4 @@
+import { collectionTimeLabel } from "./collection-calendar.ts";
 import { STAFF_BARANGAYS, StaffAccessError } from "./staff-access.ts";
 import { eventDate } from "./certificate-data.ts";
 import { eventFormFields } from "./event-form.ts";
@@ -13,9 +14,9 @@ export function communityPublication(kind: unknown, body: Record<string, unknown
     eventDate({ dateISO: date });
     const day = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "Asia/Manila" }).format(new Date(date + "T12:00:00+08:00"));
     return { post: { barangay, date, day, time, status: "Active", description: text("description", 2000) },
-      announcement: { title: "Collection schedule · " + barangay, message: `Waste collection for ${barangay} is scheduled on ${date} at ${time}. Check the full schedule in TrashTrack.`, type: "schedule", recipients: barangay } };
+      announcement: { title: "Collection schedule · " + barangay, message: `Waste collection for ${barangay} is scheduled on ${date} at ${collectionTimeLabel(time)}. Check the full schedule in TrashTrack.`, type: "schedule", recipients: barangay } };
   }
   const fields = eventFormFields(body);
   return { post: { ...fields,participants:0,status:"Upcoming" },
-    announcement: { title: "New event · " + fields.title.slice(0, 80), message: `${fields.title.slice(0,150)} on ${fields.date} at ${fields.startTime}. Open Events in TrashTrack for details.`, type:"event",recipients:barangay } };
+    announcement: { title: "New event · " + fields.title.slice(0, 80), message: `${fields.title.slice(0,150)} on ${fields.date} at ${collectionTimeLabel(fields.startTime)}. Open Events in TrashTrack for details.`, type:"event",recipients:barangay } };
 }

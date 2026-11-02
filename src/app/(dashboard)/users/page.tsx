@@ -58,7 +58,7 @@ export default function UsersPage() {
                           u.email.toLowerCase().includes(deferredSearch.toLowerCase()) ||
                           (u.phone && u.phone.toLowerCase().includes(deferredSearch.toLowerCase()));
     const matchesBarangay = barangayFilter === "all" || (u.barangay && u.barangay.toLowerCase() === barangayFilter.toLowerCase());
-    const matchesStatus = statusFilter === "all" || (u.status && u.status.toLowerCase() === statusFilter.toLowerCase());
+    const matchesStatus = accountGroup === "resident" || statusFilter === "all" || (u.status && u.status.toLowerCase() === statusFilter.toLowerCase());
     return u.group === accountGroup && matchesSearch && matchesBarangay && matchesStatus;
   }), [users, deferredSearch, barangayFilter, statusFilter, accountGroup]);
 
@@ -193,7 +193,7 @@ export default function UsersPage() {
                 </Select>
               </div>
 
-              <div className="flex flex-col">
+              {accountGroup !== "resident" && <div className="flex flex-col">
                 <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 ml-1">Account Status</span>
                 <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val ?? "all"); setCurrentPage(1); }}>
                   <SelectTrigger className="w-[160px] bg-white border-slate-200 rounded-xl h-9 text-sm">
@@ -204,10 +204,9 @@ export default function UsersPage() {
                     <SelectItem value="active">Active staff</SelectItem>
                     <SelectItem value="needs-review">Needs review</SelectItem>
                     <SelectItem value="suspended">Suspended</SelectItem>
-                    <SelectItem value="registered">Registered resident</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
 
               <div className="flex flex-col justify-end h-full pt-[20px]">
                 <Button 
@@ -224,7 +223,7 @@ export default function UsersPage() {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left"><thead><tr className="border-b"><th className="px-5 py-4">Name</th><th className="px-3 py-4">Barangay</th><th className="px-3 py-4">Role</th><th className="px-3 py-4">Status</th><th className="px-3 py-4">Joined</th><th className="px-4 py-4 text-right">Actions</th></tr></thead><tbody>{filteredUsers.slice((currentPage - 1) * itemsPerPage,currentPage * itemsPerPage).map(user=><tr key={user.id} className="border-b last:border-0"><td className="px-5 py-4"><button type="button" onClick={()=>setSelectedUser(user)} className="flex items-center gap-3 text-left"><span className="tt-avatar" aria-hidden="true">{user.name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join("").toUpperCase()}</span><span><strong className="block text-xs font-semibold">{user.name}</strong><small className="mt-1 block text-[10px] text-muted-foreground">{user.email}</small><small className="mt-1 block text-xs text-muted-foreground">{user.phone || "Contact not provided"}</small></span></button></td><td className="px-3 py-4 text-xs">{user.barangay || (user.role.toLowerCase()==="admin"?"All barangays":"Unassigned")}</td><td className="px-3 py-4 text-xs">{user.role}</td><td className="px-3 py-4"><span className="tt-status">{user.status}</span></td><td className="px-3 py-4 text-[11px] text-muted-foreground">{user.date}</td><td className="px-4 py-4 text-right"><Button variant="ghost" size="icon" aria-label={"View "+user.name} onClick={()=>setSelectedUser(user)}><Eye /></Button></td></tr>)}{!filteredUsers.length&&<tr><td colSpan={6} className="tt-empty">No users match your filters.</td></tr>}</tbody></table>
+            <table className="w-full min-w-[640px] text-left"><thead><tr className="border-b"><th className="px-5 py-4">Name</th><th className="px-3 py-4">Barangay</th><th className="px-3 py-4">Role</th><th className="px-3 py-4">Status</th><th className="px-3 py-4">Joined</th><th className="px-4 py-4 text-right">Actions</th></tr></thead><tbody>{filteredUsers.slice((currentPage - 1) * itemsPerPage,currentPage * itemsPerPage).map(user=><tr key={user.id} className="border-b last:border-0"><td className="px-5 py-4"><button type="button" onClick={()=>setSelectedUser(user)} className="flex items-center gap-3 text-left"><span className="tt-avatar" aria-hidden="true">{user.name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join("").toUpperCase()}</span><span><strong className="block text-xs font-semibold">{user.name}</strong><small className="mt-1 block text-[10px] text-muted-foreground">{user.email}</small>{user.phone && <small className="mt-1 block text-xs text-muted-foreground">{user.phone}</small>}</span></button></td><td className="px-3 py-4 text-xs">{user.barangay || (user.role.toLowerCase()==="admin"?"All barangays":"Unassigned")}</td><td className="px-3 py-4 text-xs">{user.role}</td><td className="px-3 py-4"><span className="tt-status">{user.status}</span></td><td className="px-3 py-4 text-[11px] text-muted-foreground">{user.date}</td><td className="px-4 py-4 text-right"><Button variant="ghost" size="icon" aria-label={"View "+user.name} onClick={()=>setSelectedUser(user)}><Eye /></Button></td></tr>)}{!filteredUsers.length&&<tr><td colSpan={6} className="tt-empty">No users match your filters.</td></tr>}</tbody></table>
           </div>
 
           {/* Pagination */}
@@ -335,7 +334,7 @@ export default function UsersPage() {
                 </Avatar>
                 <div>
                   <h4 className="font-bold text-slate-900 text-xl">{selectedUser.name}</h4>
-                  <p className="text-slate-500 text-sm">{selectedUser.email}</p><p className="mt-2 text-sm text-slate-700">Contact: {selectedUser.phone || "Not provided"}</p>
+                  <p className="text-slate-500 text-sm">{selectedUser.email}</p>{selectedUser.phone && <p className="mt-2 text-sm text-slate-700">Contact: {selectedUser.phone}</p>}
                 </div>
               </div>
 

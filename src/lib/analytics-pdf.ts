@@ -1,7 +1,8 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { AnalyticsPoint } from "./analytics-data.ts";
+import type { AnalyticsRecordRow } from "./analytics-period.ts";
 
-export type AnalyticsPdfSection = { title: string; rows: AnalyticsPoint[] };
+export type AnalyticsPdfSection = { title: string; rows: AnalyticsPoint[]; records?:AnalyticsRecordRow[] };
 
 export async function buildAnalyticsPdf(sections: AnalyticsPdfSection[], notes: string[] = [], now = new Date()) {
   const pdf = await PDFDocument.create();
@@ -29,6 +30,16 @@ export async function buildAnalyticsPdf(sections: AnalyticsPdfSection[], notes: 
   for (const section of sections) {
     if (y < 130) newPage();
     y -= 12;line(section.title, 14, true);
+    if(section.records) {
+      paragraph(`${section.records.length} report records. Dates and times use Asia/Manila.`);
+      for (const row of section.records) {
+        if(y<155){newPage();line(section.title+" (continued)",14,true);}
+        paragraph(`${row.date} | ${row.barangay} | ${row.status}`);
+        paragraph(`${row.type} | Reference: ${row.reference}`);
+        y-=8;
+      }
+      if(!section.records.length)paragraph("No report records for this period.");
+    }
     const largest = Math.max(1, ...section.rows.map(row => row.value));
     for (const row of section.rows) {
       if (y < 85) { newPage();line(section.title + " (continued)", 14, true); }
@@ -50,4 +61,17 @@ export async function downloadAnalyticsPdf(sections: AnalyticsPdfSection[], note
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type:"application/pdf" }));
   const anchor = document.createElement("a");anchor.href = url;anchor.download = `TrashTrack-${name}.pdf`;anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Open the same filtered document in the browser PDF viewer, which provides printing. */
+export async function openPrintableAnalyticsPdf(sections:AnalyticsPdfSection[],notes:string[]=[]) {
+  const preview=window.open("about:blank","_blank");
+  if(!preview)throw new Error("Allow the PDF preview window to print selected records.");
+  preview.opener=null;
+  try {
+    const bytes=await buildAnalyticsPdf(sections,notes);
+    const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:"application/pdf"}));
+    preview.location.replace(url);
+    setTimeout(()=>URL.revokeObjectURL(url),10*60*1000);
+  } catch(error){preview.close();throw error;}
 }

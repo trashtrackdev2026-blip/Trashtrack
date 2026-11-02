@@ -1,5 +1,6 @@
 "use client";
 
+import { LEARNING_CATEGORIES, LEARNING_TYPES, learningCategoryKey } from "@/lib/learning-publication";
 import { DeleteConfirmation } from "@/components/ui/DeleteConfirmation";
 import { useWideWorkspace } from "@/components/layout/DetailPanel";
 import { ResourcePreview } from "@/components/education/ResourcePreview";
@@ -46,6 +47,7 @@ interface ResourceData {
   videoUrl?: string;
   fileName?: string;
   fileType?: string;
+  description?: string;
 }
 
 export default function EducationPage() {
@@ -82,12 +84,13 @@ export default function EducationPage() {
 
   const filteredResources = resources.filter((item) => {
     const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = category === "all-categories" || item.category.toLowerCase().replace(/\s+/g, '-') === category || item.category.toLowerCase() === category;
+    const matchesCategory = category === "all-categories" || learningCategoryKey(item.category) === category;
     const matchesType = type === "all-types" || item.type.toLowerCase() === type;
     const matchesStatus = status === "all-status" || item.status.toLowerCase() === status;
     return matchesSearch && matchesCategory && matchesType && matchesStatus;
   });
 
+  const categoryOptions=[...new Set([...LEARNING_CATEGORIES,...resources.map(item=>item.category).filter(Boolean)])];
   const previewResource = filteredResources.find(item => item.id === previewId) || filteredResources[0];
   const selectPreview = (item: ResourceData) => { setPreviewId(item.id); if (!wideDetails) setActiveResource(item); };
 
@@ -178,29 +181,27 @@ export default function EducationPage() {
                 </div>
 
                 <div className="tt-filter-options flex flex-wrap gap-3">
-                  <Select value={category} onValueChange={(val) => { setCategory(val ?? "all"); setCurrentPage(1); }}>
+                  <Select value={category} onValueChange={(val) => { setCategory(val ?? "all-categories"); setCurrentPage(1); }}>
                     <SelectTrigger className="w-[140px] h-11 bg-white border-slate-200">
                       <SelectValue>{category === "all-categories" ? "All categories" : category.replaceAll("-"," ")}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all-categories">All Categories</SelectItem>
-                      <SelectItem value="waste-segregation">Waste Segregation</SelectItem>
-                      <SelectItem value="composting">Composting</SelectItem>
+                      {categoryOptions.map(value=><SelectItem key={value} value={learningCategoryKey(value)}>{value}</SelectItem>)}
                     </SelectContent>
                   </Select>
 
-                  <Select value={type} onValueChange={(val) => { setType(val ?? "all"); setCurrentPage(1); }}>
+                  <Select value={type} onValueChange={(val) => { setType(val ?? "all-types"); setCurrentPage(1); }}>
                     <SelectTrigger className="w-[120px] h-11 bg-white border-slate-200">
                       <SelectValue>{type === "all-types" ? "All types" : type.charAt(0).toUpperCase()+type.slice(1)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all-types">All Types</SelectItem>
-                      <SelectItem value="guide">Guide</SelectItem>
-                      <SelectItem value="video">Video</SelectItem>
+                      {LEARNING_TYPES.map(value=><SelectItem key={value} value={value.toLowerCase()}>{value}</SelectItem>)}
                     </SelectContent>
                   </Select>
 
-                  <Select value={status} onValueChange={(val) => { setStatus(val ?? "all"); setCurrentPage(1); }}>
+                  <Select value={status} onValueChange={(val) => { setStatus(val ?? "all-status"); setCurrentPage(1); }}>
                     <SelectTrigger className="w-[120px] h-11 bg-white border-slate-200">
                       <SelectValue>{status === "all-status" ? "All statuses" : status.charAt(0).toUpperCase()+status.slice(1)}</SelectValue>
                     </SelectTrigger>
@@ -336,7 +337,7 @@ export default function EducationPage() {
               </div>
 
               <p className="text-sm text-slate-600 leading-relaxed mb-8">
-                {activeResource.type.toLowerCase() === 'video' ? 'Watch this video to learn more about environmental awareness and proper waste management.' : 'Learn how to properly segregate waste at home and help keep our community clean and healthy.'}
+                {activeResource.description || "Open the original learning material to read its content."}
               </p>
 
               <div className="space-y-4 mb-8">
