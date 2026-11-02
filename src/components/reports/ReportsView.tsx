@@ -97,7 +97,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     setUpdateError(null);
     try {
       const result=await onUpdate(activeReport, newStatus, remarks, collectionConfirmed, {...actionInput,...openedVersion});
-      setSaveMessage(result?.deliveryError ? "Report action and schedule saved. Phone delivery is pending; retry the saved notice in Announcements." : "Report update saved.");
+      setSaveMessage(result?.deliveryError ? "Report update saved. Phone delivery is pending; resident progress notices retry when the app reconnects." : "Report update saved.");
       setShowConfirm(false);
       setNewStatus("");
       setRemarks("");
@@ -320,7 +320,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                       I confirm the reported concern has been addressed and the action is complete.
                     </label>}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700">Findings / action taken (required for barangay resolution or forwarding)</label>
+                      <label className="text-[11px] font-bold text-slate-700">{role === "Admin" && newStatus === "Resolved" ? "Resolution details (required)" : "Findings / action taken (required for barangay resolution or forwarding)"}</label>
                       <textarea
                         aria-label="Review remarks" maxLength={2000}
                         rows={3}

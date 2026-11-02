@@ -12,6 +12,7 @@ export function reportActionFields(role: ReportRole, next: ReportStatus, body: R
     if (typeof body.remarks !== "string" || !body.remarks.trim()) throw new StaffAccessError("Describe the verified findings and action taken or reason for forwarding.", 400);
     return { severity };
   }
+  if(role==="Admin" && next==="Resolved" && (typeof body.remarks!=="string" || !body.remarks.trim()))throw new StaffAccessError("Describe the final action taken before resolving this report.",400);
   if (next === "Endorsed") {
     const actionKind = REPORT_ACTIONS.find(value => value === body.actionKind);
     const actionNotes = typeof body.actionNotes === "string" ? body.actionNotes.trim() : "";

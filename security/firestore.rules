@@ -53,6 +53,10 @@ service cloud.firestore {
       // Status transitions and their audit records are committed together by the server.
       allow update, delete: if false;
     }
+    match /resident_notifications/{noticeId} {
+      allow read: if activeAccount() && resource.data.recipientId == request.auth.uid;
+      allow write: if false;
+    }
     match /events/{eventId} { allow read: if activeAccount(); allow write: if admin(); }
     match /schedules/{scheduleId} { allow read: if activeAccount(); allow write: if false; }
     match /educational_resources/{resourceId} { allow read: if activeAccount(); allow write: if admin(); }

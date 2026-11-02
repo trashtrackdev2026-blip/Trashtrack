@@ -1,3 +1,5 @@
+import { reportProgressEntry } from "@/lib/report-progress";
+import { queueResidentNotification } from "@/lib/resident-notification-delivery";
 import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
     const ref = db.collection("reports").doc(body.reportId);
     const operation = db.collection("report_actions").doc(body.reportId + "_" + body.changeId);
     const changeHash = createHash("sha256").update(JSON.stringify(body)).digest("hex");
-    const notificationId = await db.runTransaction(async tx => {
+    const delivery = await db.runTransaction(async tx => {
       const [reportSnap, actorSnap, previous] = await Promise.all([tx.get(ref), tx.get(db.collection("users").doc(identity.uid)), tx.get(operation)]);
       const report = reportSnap.data();
       if (!report) throw new StaffAccessError("This report no longer exists.", 404);
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
       if (staffAccessProblem(actor || {}, identity as unknown as Record<string, unknown>) || actor?.role !== profile.role || actor?.barangay !== profile.barangay || (role === "Semi-Admin" && report.location !== profile.barangay)) throw new StaffAccessError("Your access changed. Refresh the report and check your barangay assignment.");
       if (previous.exists) {
         if (previous.data()?.changeHash !== changeHash || previous.data()?.actor !== identity.uid) throw new StaffAccessError("This update was already saved with different details. Reopen the report.", 409);
-        return String(previous.data()?.notificationId || "");
+        return {notificationId:String(previous.data()?.notificationId || ""),progressId:String(previous.data()?.progressId || "")};
       }
       const currentStatus = reportWorkflowStatus(report);
       if (normalizeReportStatus(body.expectedStatus) !== normalizeReportStatus(currentStatus) || body.expectedRevision !== Number(report.statusRevision || 0)) throw new StaffAccessError("This report changed. Reopen it before updating.", 409);
@@ -68,7 +70,12 @@ export async function POST(request: Request) {
         }
         tx.set(dayRef, { revision: Number(day.data()?.revision || 0) + 1 });
       }
-      tx.update(ref, { ...action, ...(scheduleId ? { scheduleId } : {}), status: next === "MENRO Under Review" ? "For MENRO Review" : next, statusRevision: body.expectedRevision + 1, remarks: body.remarks.trim(), updatedBy: identity.uid, updatedAt: FieldValue.serverTimestamp(),
+      const recipientId=typeof report.userId==="string"?report.userId:"";
+      const progressId=recipientId ? "report_"+createHash("sha256").update(body.reportId+"\0"+body.changeId).digest("hex").slice(0,40) : "";
+      const progress=reportProgressEntry(body.reportId,recipientId,next,role,body.remarks,action,body.expectedRevision+1);
+      if(progressId)tx.create(db.collection("resident_notifications").doc(progressId),{...progress,pushStatus:"pending",createdAt:FieldValue.serverTimestamp()});
+      const history=Array.isArray(report.progressHistory)?report.progressHistory.slice(-30):[];
+      tx.update(ref, { progressHistory:[...history,progress], ...action, ...(scheduleId ? { scheduleId } : {}), status: next === "MENRO Under Review" ? "For MENRO Review" : next, statusRevision: body.expectedRevision + 1, remarks: body.remarks.trim(), updatedBy: identity.uid, updatedAt: FieldValue.serverTimestamp(),
         ...(role === "Semi-Admin" && ["Resolved", "For MENRO Review"].includes(next) ? {verificationNotes:body.remarks.trim()} : {}),
         ...(next === "UnderReview" ? { reviewedBy: identity.uid, reviewedByName: actorName, reviewedAt: FieldValue.serverTimestamp() } : {}),
         ...(role === "Semi-Admin" && ["Resolved", "For MENRO Review"].includes(next) ? { verifiedBy: identity.uid, verifiedByName: actorName, verifiedAt: FieldValue.serverTimestamp() } : {}),
@@ -78,13 +85,14 @@ export async function POST(request: Request) {
         ...(next === "Resolved" ? { resolvedBy: identity.uid, resolvedByName: actorName, resolvedByRole: role, resolvedAt: FieldValue.serverTimestamp(), resolutionNotes: body.remarks.trim(), collectedBy: identity.uid, collectedAt: FieldValue.serverTimestamp() } : {}) });
       const audit = { action: "report.status", actor: identity.uid, actorRole:role, target: body.reportId, barangay: report.location, from: currentStatus, to: next, findings:body.remarks.trim(), ...action, ...(scheduleId ? { scheduleId } : {}), at: FieldValue.serverTimestamp() };
       tx.create(db.collection("audit_logs").doc(), audit);
-      tx.create(operation, { ...audit, changeHash, notificationId:scheduleNoticeId });
-      return scheduleNoticeId;
+      tx.create(operation, { ...audit, changeHash, notificationId:scheduleNoticeId,progressId });
+      return {notificationId:scheduleNoticeId,progressId};
     });
-    if(notificationId) {
-      try {await queuePhoneNotification(app,db,notificationId);}
-      catch(error){return Response.json({saved:true,queued:false,notificationId,deliveryError:error instanceof Error?error.message:"The action and schedule are saved. Retry phone delivery in Announcements."});}
-    }
-    return Response.json({ saved: true });
+    const deliveries=await Promise.allSettled([
+      ...(delivery.notificationId?[queuePhoneNotification(app,db,delivery.notificationId)]:[]),
+      ...(delivery.progressId?[queueResidentNotification(app,db,delivery.progressId)]:[]),
+    ]);
+    const failed=deliveries.some(result=>result.status==="rejected");
+    return Response.json({saved:true,...delivery,...(failed?{queued:false,deliveryError:"Report update saved. Phone delivery is pending; the resident inbox keeps the update and retries when the app reconnects."}:{})},{headers:{"Cache-Control":"private, no-store"}});
   } catch (error) { return staffApiError(error); }
 }

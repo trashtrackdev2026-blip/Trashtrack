@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import * as policy from "../src/lib/staff-access.ts";
+import * as progress from "../src/lib/report-progress.ts";
 import * as actions from "../src/lib/report-action.ts";
 import * as schedules from "../src/lib/schedule-policy.ts";
 import * as workflow from "../src/lib/report-workflow.ts";
@@ -22,7 +23,7 @@ function fixture(options = {}) {
   const identity = { uid: "official", email_verified: true, auth_time: now, staffRole: policy.staffRole(profile.role), staffBarangay: profile.barangay, ...options.identity };
   const records = new Map([
     ["users/official", { ...profile, ...options.currentProfile }],
-    ["reports/one", { status: "UnderReview", location: "Poblacion", ...options.report }],
+    ["reports/one", { userId:"resident-owner", status: "UnderReview", location: "Poblacion", ...options.report }],
   ]);
   let sequence = 0;
   const db = {
@@ -50,6 +51,7 @@ function fixture(options = {}) {
       staffApiError: error => Response.json({ error: error.message }, { status: error instanceof policy.StaffAccessError ? error.status : 500 }),
     },
     "@/lib/staff-access": policy,
+    "@/lib/report-progress":progress,"@/lib/resident-notification-delivery":{queueResidentNotification:async()=>{if(options.privatePushFails)throw new Error("Private delivery pending");}},
     "@/lib/scheduling-time":schedulingTime,"@/lib/event-form":eventForm,
     "@/lib/report-workflow": workflow,"@/lib/report-action":actions,"@/lib/schedule-policy":schedules,"@/lib/community-publication":{communityPublication},"@/lib/notification-delivery":{queuePhoneNotification:async()=>{if(options.pushFails)throw new Error("Simulated provider failure");}},
   };
@@ -175,4 +177,27 @@ test("Legacy status spelling can progress with a fresh version while stale versi
   await app.post({expectedStatus:"UnderReview",status:"Resolved",severity:"Minor",collectionConfirmed:true,remarks:"Barangay team completed the local action."});
   assert.equal(app.records.get("reports/one").verificationNotes,"Barangay team completed the local action.");
   assert.ok([...app.records.values()].some(record=>record.action==="report.status"&&record.findings==="Barangay team completed the local action."));
+});
+
+test("Every real report transition creates exactly one private owner notice and preserves original description",async()=>{
+ const cases=[
+  [{report:{status:"Pending"}},{status:"UnderReview",remarks:"Barangay inspection started."}],
+  [{},{status:"For MENRO Review"}],
+  [{profile:{role:"Admin",barangay:""},report:{status:"For MENRO Review"}},{status:"MENRO Under Review",remarks:"MENRO is assessing the concern."}],
+  [{profile:{role:"Admin",barangay:""},report:{status:"For MENRO Review",menroReviewedAt:"timestamp"}},{status:"Endorsed",actionKind:"Other",actionNotes:"Inspect drainage and arrange assistance.",remarks:"Site visit planned."}],
+  [{profile:{role:"Admin",barangay:""},report:{status:"Endorsed"}},{status:"Resolved",collectionConfirmed:true,remarks:"MENRO completed the clearing operation."}],
+  [{},{status:"Resolved",severity:"Minor",collectionConfirmed:true,remarks:"Barangay team removed the obstruction."}],
+ ];
+ for(const [options,body] of cases){const app=fixture({...options,report:{description:"Original resident account",...options.report}});await app.post({...body,recipientId:"forged-owner",userId:"forged-owner"});
+ const notices=[...app.records].filter(([key])=>key.startsWith("resident_notifications/"));assert.equal(notices.length,1);const notice=notices[0][1];assert.equal(notice.recipientId,"resident-owner");assert.equal(notice.status,body.status);assert.equal(notice.remarks,body.remarks || "Verified Riverside location.");assert.equal(app.records.get("reports/one").description,"Original resident account");assert.equal(app.records.get("reports/one").progressHistory.length,1);
+ const saved=structuredClone([...app.records]);await app.invoke(app.lastRequest);assert.deepEqual([...app.records],saved);
+ assert.equal([...app.records.keys()].filter(key=>key.startsWith("notifications/")).length,0,"Personal progress never enters the public announcement collection");}
+});
+test("Private delivery failure keeps status, final resolution notes, history and the owned inbox record committed",async()=>{
+ const app=fixture({privatePushFails:true,profile:{role:"Admin",barangay:""},report:{status:"Endorsed",actionKind:"Cleanup",actionNotes:"Assigned cleanup crew"}});
+ const result=await app.post({status:"Resolved",collectionConfirmed:true,remarks:"Clearing completed and inspected."});assert.equal(result.saved,true);assert.ok(result.deliveryError);
+ const report=app.records.get("reports/one");assert.equal(report.resolutionNotes,"Clearing completed and inspected.");assert.equal(report.actionNotes,"Assigned cleanup crew");assert.equal(report.status,"Resolved");assert.ok(app.records.has("resident_notifications/"+result.progressId));
+});
+test("MENRO final resolution requires the final action details",async()=>{
+ const app=fixture({profile:{role:"Admin",barangay:""},report:{status:"Endorsed"}}),before=structuredClone([...app.records]);await app.post({status:"Resolved",collectionConfirmed:true,remarks:" "},400);assert.deepEqual([...app.records],before);
 });
