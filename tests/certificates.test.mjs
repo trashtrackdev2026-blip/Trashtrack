@@ -81,8 +81,8 @@ test("New certificates embed the supplied Balete artwork; old snapshots retain t
   const details=buildCertificateSnapshot("id","event-1","resident-1",event,"Maria Isabel Santos");
   const current=await generateCertificatePdf(details);
   const {templateId,...legacy}=details;
-  assert.equal(templateId,"balete-appreciation-v2");
-  for(const [snapshot,asset] of [[details,"balete-appreciation-v2.png"],[legacy,"appreciation-v1.png"],[{...legacy,templateId:"appreciation-v1"},"appreciation-v1.png"]]) {
+  assert.equal(templateId,"balete-appreciation-v3");
+  for(const [snapshot,asset] of [[details,"balete-appreciation-v2.png"],[{...details,templateId:"balete-appreciation-v2"},"balete-appreciation-v2.png"],[legacy,"appreciation-v1.png"],[{...legacy,templateId:"appreciation-v1"},"appreciation-v1.png"]]) {
     const expected=await PDFDocument.create();const image=await expected.embedPng(await readFile(new URL("../assets/certificates/"+asset,import.meta.url)));
     expected.addPage([841.89,595.28]).drawImage(image,{x:0,y:0,width:841.89,height:595.28});
     assert.deepEqual(await backgroundImage(snapshot===details?current:await generateCertificatePdf(snapshot)),await backgroundImage(await expected.save()));

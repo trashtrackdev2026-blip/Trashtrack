@@ -407,7 +407,7 @@ export default function EventsPage() {
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3 pr-8">
               <DetailTitle className="font-bold text-lg text-slate-900">Event Details</DetailTitle>
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${activeEvent.status.toLowerCase() === 'completed' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-blue-50 text-blue-500'}`}>{activeEvent.status}</span>
+                <span className={`tt-event-status text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${activeEvent.status.toLowerCase() === 'completed' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-blue-50 text-blue-500'}`}>{activeEvent.status}</span>
                 {!["completed","draft"].includes(activeEvent.status.toLowerCase()) && (
                   <Button onClick={handleMarkCompleted} disabled={loadingParticipants || busyAttendance !== null} size="sm" variant="outline" className="min-h-11 px-4 bg-green-50 border-green-200 text-green-800 hover:bg-green-100">
                     Mark Completed

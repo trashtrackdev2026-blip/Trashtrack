@@ -37,7 +37,8 @@ export async function generateCertificatePdf(snapshot: CertificateSnapshot): Pro
   pdf.registerFontkit(fontkit);
   const assets = join(process.cwd(), "assets", "certificates");
   // Snapshots issued before template versioning keep their original artwork.
-  const baleteTemplate = snapshot.templateId === CURRENT_CERTIFICATE_TEMPLATE;
+  const baleteTemplate = snapshot.templateId === CURRENT_CERTIFICATE_TEMPLATE || snapshot.templateId === "balete-appreciation-v2";
+  const officerAboveLine = snapshot.templateId === CURRENT_CERTIFICATE_TEMPLATE;
   const [backgroundBytes, scriptBytes] = await Promise.all([
     readFile(join(assets, baleteTemplate ? "balete-appreciation-v2.png" : "appreciation-v1.png")), readFile(join(assets, "GreatVibes-Regular.ttf")),
   ]);
@@ -83,7 +84,8 @@ export async function generateCertificatePdf(snapshot: CertificateSnapshot): Pro
     signatorySize -= 0.5;
     signatoryLines = wrapCertificateText(signatory, signatoryFont, signatorySize, signatoryWidth);
   }
-  signatoryLines.forEach((line, index) => centered(line, signatoryFont, signatorySize, HEIGHT * 0.121 - index * signatorySize * 1.1));
+  const signatoryY = officerAboveLine ? HEIGHT * 0.166 + (signatoryLines.length - 1) * signatorySize * 1.1 : HEIGHT * 0.121;
+  signatoryLines.forEach((line, index) => centered(line, signatoryFont, signatorySize, signatoryY - index * signatorySize * 1.1));
   const position = fontText(snapshot.position, serif);
   const positionWidth = WIDTH * (baleteTemplate ? 0.30 : 0.56);
   let positionSize = 15;
@@ -93,7 +95,7 @@ export async function generateCertificatePdf(snapshot: CertificateSnapshot): Pro
     positionSize -= 0.5;
     positionLines = wrapCertificateText(position, serif, positionSize, positionWidth);
   }
-  const positionY = baleteTemplate ? Math.min(HEIGHT * 0.085, HEIGHT * 0.121 - (signatoryLines.length - 1) * signatorySize * 1.1 - positionSize * 1.2) : HEIGHT * 0.085;
+  const positionY = baleteTemplate && !officerAboveLine ? Math.min(HEIGHT * 0.085, HEIGHT * 0.121 - (signatoryLines.length - 1) * signatorySize * 1.1 - positionSize * 1.2) : HEIGHT * 0.085;
   positionLines.forEach((line, index) => centered(line, serif, positionSize, positionY - index * positionSize * 1.1, bodyInk));
   pdf.setTitle("Certificate of Appreciation - " + snapshot.participantName);
   pdf.setAuthor(snapshot.organizer);

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { checkDeploymentEnvironment } from "../src/lib/deployment-config.ts";
 import { loadDeploymentEnvironment, readDeploymentCredential } from "./deployment-env.mjs";
+import { matchesFirestorePolicy } from "../src/lib/security-policy.ts";
 
 const env = loadDeploymentEnvironment();
 const vercel = process.argv.includes("--vercel") || env.VERCEL === "1";
@@ -23,13 +24,13 @@ if (!result.errors.length && process.argv.includes("--verify-services")) {
   const app = initializeApp({ credential: cert(credential), projectId: credential.projectId }, "trashtrack-deployment-check");
   try {
     const rules = await getSecurityRules(app).getFirestoreRuleset();
-    if (rules.name !== env.STAFF_SECURITY_RULESET || rules.name !== env.CERTIFICATE_SECURITY_RULESET) {
+    if (!matchesFirestorePolicy(rules, env.STAFF_SECURITY_RULESET, env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) || !matchesFirestorePolicy(rules, env.CERTIFICATE_SECURITY_RULESET, env.NEXT_PUBLIC_FIREBASE_PROJECT_ID)) {
       throw new Error("The configured ruleset pins do not match the currently deployed Firestore policy.");
     }
     await getAuth(app).projectConfigManager().getProjectConfig();
     // Read one record to check Firestore connectivity; do not emit user data.
     await getFirestore(app).collection("users").limit(1).get();
-    console.log("Read-only Firebase check passed: Auth, Firestore and the active ruleset pins.");
+    console.log("Read-only Firebase check passed: Auth, Firestore and the reviewed active security policy.");
   } catch {
     console.error("Firebase readiness check failed. Verify credential permissions, internet access and the active ruleset pins.");
     process.exitCode = 1;

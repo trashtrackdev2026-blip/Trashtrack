@@ -31,10 +31,27 @@ export function learningPreviewUrl(value: string): string | null {
   } catch { return null; }
 }
 
-export function learningCover(resource: {coverUrl?: string; image?: string}): string | null {
-  for (const value of [resource.coverUrl,resource.image]) {
+export function learningCover(resource: {coverUrl?: string; thumbnailUrl?:string; image?: string; fileUrl?:string; videoUrl?:string; fileName?:string; type?:string}): string | null {
+  for (const value of [resource.coverUrl,resource.thumbnailUrl]) {
     const url=learningPreviewUrl(value || "");
     if(url && learningResourceType(url)==="image") return url;
+  }
+  const source = learningPreviewUrl(resource.fileUrl || resource.videoUrl || resource.image || "");
+  if (source) {
+    if (learningResourceType(source,resource.fileName,resource.type) === "image") return source;
+    const url = new URL(source);
+    // Provider transformations refer only to an existing uploaded asset; no server URL fetch.
+    if (url.hostname === "res.cloudinary.com" && !url.port && !url.username && !url.password) {
+      if (/^\/[^/]+\/video\/upload\//.test(url.pathname)) {
+        url.pathname = url.pathname.replace("/video/upload/","/video/upload/so_0,w_640,h_360,c_fill/").replace(/\.[a-z0-9]+$/i,".jpg");return url.href;
+      }
+      if (/^\/[^/]+\/image\/upload\//.test(url.pathname) && /\.pdf$/i.test(url.pathname)) {
+        url.pathname = url.pathname.replace("/image/upload/","/image/upload/pg_1,w_640,h_420,c_fit,b_white/").replace(/\.pdf$/i,".jpg");return url.href;
+      }
+    }
+    const embedded = learningEmbeddedVideo(source);
+    const id = embedded?.split("/").at(-1);
+    if (id && /^[\w-]{11}$/.test(id)) return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
   }
   return null;
 }

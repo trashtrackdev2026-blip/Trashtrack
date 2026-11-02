@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-02",
+  "version": "2026-11-02-feedback",
   "approvedForPublication": true,
   "legalReference": {
     "title": "Data Privacy Act of 2012 (Republic Act No. 10173)",
@@ -53,6 +53,10 @@
         {
           "heading": "Who can access it",
           "body": "Residents can view their own account/report records and community content available in the app. Authorized barangay and MENRO staff access records according to their assigned permissions. Staff access and important management actions are subject to the system's authorization and audit controls."
+        },
+        {
+          "heading": "System feedback",
+          "body": "When you choose to send system feedback, TrashTrack records your message, feedback category, account identifier, name, barangay, app version and submission time so MENRO can review issues and suggestions. Feedback is private to the submitting resident and authorized MENRO review, with review-state action records. Do not include passwords or unnecessary personal information. System feedback is separate from waste reports."
         },
         {
           "heading": "Service providers and AI",

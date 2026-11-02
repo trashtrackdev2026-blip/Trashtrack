@@ -1,8 +1,8 @@
 "use client";
 
+import { DeleteConfirmation } from "@/components/ui/DeleteConfirmation";
 import { useWideWorkspace } from "@/components/layout/DetailPanel";
 import { ResourcePreview } from "@/components/education/ResourcePreview";
-import { learningResourceType, learningCover } from "@/lib/learning-resource";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import {
   Globe,
   Check
 } from "lucide-react";
-import Image from "next/image";
+import { LearningCover } from "@/components/education/LearningCover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -41,6 +41,7 @@ interface ResourceData {
   status: string;
   image: string;
   coverUrl?: string;
+  thumbnailUrl?: string;
   fileUrl?: string;
   videoUrl?: string;
   fileName?: string;
@@ -56,6 +57,9 @@ export default function EducationPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const retryData = () => { setLoading(true); setDataError(null); setAttempt(value => value + 1); };
+  const [deleteTarget,setDeleteTarget] = useState<ResourceData|null>(null);
+  const [deleting,setDeleting] = useState(false);
+  const [deleteError,setDeleteError] = useState("");
   const [activeResource, setActiveResource] = useState<ResourceData | null>(null);
 
   const [editingResource, setEditingResource] = useState<ResourceData | null>(null);
@@ -101,18 +105,17 @@ export default function EducationPage() {
     }, error => { setDataError(error.message.includes("taking too long") ? error.message : "Unable to load learning resources. Check your connection and retry."); setLoading(false); });
   }, [role, attempt]);
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this resource?")) {
-      try {
-        await deleteDoc(doc(db, "educational_resources", id));
-      } catch (error) {
-        console.error("Error deleting resource:", error);
-      }
-    }
+  const handleDelete = (id: string) => {setDeleteTarget(resources.find(resource=>resource.id===id)||null);setDeleteError("");};
+  const deleteResource = async () => {
+    if(!deleteTarget || deleting)return;setDeleting(true);setDeleteError("");
+    try {await deleteDoc(doc(db,"educational_resources",deleteTarget.id));setDeleteTarget(null);setActiveResource(null);}
+    catch {setDeleteError("The resource could not be removed. Check your connection and retry.");}
+    finally {setDeleting(false);}
   };
 
   return (
     <>
+      <DeleteConfirmation open={!!deleteTarget} title="Remove this learning resource?" description={deleteTarget ? `“${deleteTarget.title}” will be removed from the learning library. Its original uploaded file is kept.` : ""} busy={deleting} error={deleteError} onCancel={() => setDeleteTarget(null)} onConfirm={() => void deleteResource()} />
       <div className="space-y-6 ">
         <DataState loading={loading} error={dataError} onRetry={retryData} />
 
@@ -216,8 +219,8 @@ export default function EducationPage() {
             {/* Table Area */}
             <div className="tt-surface overflow-hidden">
               <div>
-                {filteredResources.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(item => { const source=item.fileUrl || item.videoUrl || item.image || "";const kind=learningResourceType(source,item.fileName,item.type);return <article key={item.id} className={"tt-resource-row" + (wideDetails && previewResource?.id === item.id ? " is-selected" : "")}>
-                  <button type="button" className="tt-resource-image" onClick={() => selectPreview(item)} aria-label={"Preview " + item.title}>{learningCover(item) ? <Image src={learningCover(item)!} alt="" fill sizes="(max-width:767px) 90px, 150px" className="object-cover" /> : kind === "video" ? <PlayCircle className="h-10 w-10" aria-hidden="true" /> : <FileText className="h-10 w-10" aria-hidden="true" />}</button>
+                {filteredResources.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(item => { return <article key={item.id} className={"tt-resource-row" + (wideDetails && previewResource?.id === item.id ? " is-selected" : "")}>
+                  <button type="button" className="tt-resource-image" onClick={() => selectPreview(item)} aria-label={"Preview " + item.title}><LearningCover resource={item} /></button>
                   <div className="tt-resource-copy"><h2>{item.title}</h2><p>{item.category} · {item.type}<br />{item.status}{item.date ? " · " + item.date : ""}</p><div className="tt-resource-actions"><Button variant="outline" onClick={() => selectPreview(item)}><Eye aria-hidden="true" />Preview</Button><Button variant="ghost" onClick={() => openEdit(item)} aria-label={"Edit " + item.title}><Pencil /></Button><Button variant="ghost" aria-label={"Delete " + item.title} onClick={() => void handleDelete(item.id)}><Trash2 className="text-red-700" /></Button></div></div>
                 </article>;})}
                 {!loading && filteredResources.length === 0 && <p className="tt-empty">No resources match your filters.</p>}

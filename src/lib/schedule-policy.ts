@@ -7,6 +7,10 @@ export function collectionStatus(value: unknown): CollectionStatus | null {
   return [...COLLECTION_STATUSES, "Inactive" as const].find(status => status.toLowerCase() === String(value).trim().toLowerCase()) || null;
 }
 
+export function assertCollectionEditable(current: { status?: unknown }) {
+  if (collectionStatus(current.status) === "Completed") throw new StaffAccessError("Completed collections are locked and remain available for reference.", 409);
+}
+
 // A collection occupies its barangay's date, even when a different start time
 // is entered. Failed/cancelled collections can be replaced without a future cap.
 export function assertCollectionAvailable(

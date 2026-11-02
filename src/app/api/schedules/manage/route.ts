@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
 import { StaffAccessError, staffAccessProblem, staffRole } from "@/lib/staff-access";
-import { assertCollectionAvailable, collectionStatusUpdate } from "@/lib/schedule-policy";
+import { assertCollectionAvailable, assertCollectionEditable, collectionStatusUpdate } from "@/lib/schedule-policy";
 import { collectionOutcomeNotice } from "@/lib/collection-outcome-notice";
 import { queuePhoneNotification } from "@/lib/notification-delivery";
 import { assertFutureSchedule } from "@/lib/scheduling-time";
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       const current = snap.data();
       if (!current) throw new StaffAccessError("Collection schedule not found.", 404);
       if (current.status !== body.expectedStatus || Number(current.statusRevision || 0) !== body.expectedRevision) throw new StaffAccessError("This collection changed. Reopen it and review its current status.", 409);
+      assertCollectionEditable(current);
       if (current.status === update.status && String(current.statusNotes || "").trim() === update.statusNotes) return false;
       if (update.status === "Active" && current.status !== "Active" && current.date) {
         assertFutureSchedule(String(current.date), normalizedEventTime(current.time));

@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function activeAccount() { return signedIn() && !(profile().get('accessStatus', '') in ['suspended', 'disabled']); }
+    function validBarangay(value) {
+      return value in ['Alangilan', 'Calawit', 'Looc', 'Magapi', 'Makina', 'Malabanan', 'Paligawan',
+        'Palsara', 'Poblacion', 'Sala', 'Sampalocan', 'Solis', 'San Sebastian'];
+    }
+    function staffSession() {
+      return signedIn() && profile().get('accessStatus', '') == 'active'
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.auth_time <= request.time.toMillis() / 1000 + 60
+        && request.auth.token.auth_time > request.time.toMillis() / 1000 - 28800
+        && request.auth.token.auth_time > profile().get('staffValidAfter', 0)
+        && (!profile().get('mfaRequired', false)
+          || request.auth.token.firebase.get('sign_in_second_factor', '') == 'totp');
+    }
+    function admin() {
+      return staffSession() && profile().role.lower() == 'admin'
+        && request.auth.token.get('staffRole', '') == 'admin';
+    }
+    function captain() {
+      return staffSession() && profile().role.lower() == 'semi-admin'
+        && request.auth.token.get('staffRole', '') == 'semi-admin'
+        && validBarangay(profile().barangay)
+        && request.auth.token.get('staffBarangay', '') == profile().barangay;
+    }
+    function ownBarangay(location) { return captain() && location == profile().barangay; }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || admin() || ownBarangay(resource.data.barangay));
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'barangay', 'points', 'role', 'contact', 'createdAt'])
+        && request.resource.data.role.lower() == 'resident'
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120 && validBarangay(request.resource.data.barangay)
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.get('points', 0) == 0;
+      // All roles, approval, scope, suspension and authenticator enforcement are server-owned.
+      allow update: if activeAccount() && request.auth.uid == uid
+        && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'contact', 'photoUrl', 'avatarUrl'])
+          || (resource.data.role.lower() == 'resident'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'contact', 'photoUrl', 'avatarUrl', 'barangay'])
+            && validBarangay(request.resource.data.barangay)));
+      allow delete: if false;
+    }
+    match /reports/{reportId} {
+      allow read: if activeAccount() && (resource.data.userId == request.auth.uid || admin() || ownBarangay(resource.data.location));
+      // The authenticated submission API validates the pin against the resident's barangay polygons.
+      allow create: if false;
+      // Status transitions and their audit records are committed together by the server.
+      allow update, delete: if false;
+    }
+    match /events/{eventId} { allow read: if activeAccount(); allow write: if admin(); }
+    match /schedules/{scheduleId} { allow read: if activeAccount(); allow write: if false; }
+    match /educational_resources/{resourceId} { allow read: if activeAccount(); allow write: if admin(); }
+    match /notifications/{notificationId} { allow read: if activeAccount(); allow write: if admin(); }
+    match /registrations/{registrationId} {
+      allow read: if admin() || (activeAccount() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+    match /certificates/{certificateId} {
+      allow read: if admin() || (activeAccount() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+    match /staff_requests/{uid} {
+      allow read: if admin() || (signedIn() && request.auth.uid == uid);
+      allow write: if false;
+    }
+    match /audit_logs/{logId} { allow read: if admin(); allow write: if false; }
+    // System feedback and submission throttles are private, server-managed records.
+    match /system_feedback/{feedbackId} { allow read, write: if false; }
+    // Private QR tokens, throttles and unrecognized collections are never client-accessible.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
+

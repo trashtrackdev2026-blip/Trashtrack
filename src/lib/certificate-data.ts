@@ -3,13 +3,13 @@ export class CertificateError extends Error {
   constructor(message: string, status = 400) { super(message); this.status = status; }
 }
 
-export const CURRENT_CERTIFICATE_TEMPLATE = "balete-appreciation-v2" as const;
+export const CURRENT_CERTIFICATE_TEMPLATE = "balete-appreciation-v3" as const;
 
 export type CertificateSnapshot = {
   version: 1; id: string; eventId: string; userId: string; participantName: string;
   eventTitle: string; eventDate: string; eventDateISO: string; organizer: string;
   signatory: string; position: string;
-  templateId?: "appreciation-v1" | typeof CURRENT_CERTIFICATE_TEMPLATE;
+  templateId?: "appreciation-v1" | "balete-appreciation-v2" | typeof CURRENT_CERTIFICATE_TEMPLATE;
 };
 
 export function requiredText(value: unknown, label: string, maximum = 140): string {

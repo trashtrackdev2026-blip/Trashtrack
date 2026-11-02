@@ -1,4 +1,5 @@
 import test from "node:test";
+import * as securityPolicy from "../src/lib/security-policy.ts";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -55,7 +56,7 @@ test("The real server guard preserves recent sign-in, role and MFA requirements 
   const compiled = ts.transpileModule(fs.readFileSync(new URL("../src/lib/staff-auth.ts", import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  const modules = { "server-only": {}, "firebase-admin/auth": {}, "firebase-admin/firestore": {}, "firebase-admin/security-rules": {}, "./firebase-admin": {}, "./staff-access": policy };
+  const modules = { "server-only": {}, "firebase-admin/auth": {}, "firebase-admin/firestore": {}, "firebase-admin/security-rules": {}, "./firebase-admin": {}, "./staff-access": policy, "./security-policy":securityPolicy };
   const exported = {};
   new Function("require", "exports", compiled)(name => modules[name] || require(name), exported);
   const current = Math.floor(Date.now() / 1000);

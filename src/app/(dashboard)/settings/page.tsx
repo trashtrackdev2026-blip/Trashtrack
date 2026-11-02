@@ -8,9 +8,9 @@ import { Shield, Key, LogOut, Loader2, ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { db, auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
-import { multiFactor, EmailAuthProvider, reauthenticateWithCredential, updatePassword, getMultiFactorResolver, TotpMultiFactorGenerator, type MultiFactorError } from "firebase/auth";
+import { multiFactor } from "firebase/auth";
 import { staffRequest } from "@/lib/staff-client";
 
 export default function Settings() {
@@ -30,10 +30,6 @@ export default function Settings() {
   const hasAuthenticator=user?multiFactor(user).enrolledFactors.length>0:false;
   const [authenticatorState,setAuthenticatorState]=useState<"checking"|"available"|"disabled"|"unavailable">("checking");
   useEffect(()=>{if(!user)return;let stopped=false;void staffRequest<{totpState?:"available"|"disabled"|"unavailable"}>("/api/staff/account?setup=1").then(result=>{if(!stopped)setAuthenticatorState(result.totpState||"unavailable");}).catch(()=>{if(!stopped)setAuthenticatorState("unavailable");});return()=>{stopped=true;};},[user]);
-  // Password State
-  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-
   const handleUpdateProfile = async () => {
     if (!user || profileLoadedUid !== user.uid || !profileName.trim() || profileLoading) return;
     setIsUpdatingProfile(true);setError("");setMessage("");
@@ -51,41 +47,6 @@ export default function Settings() {
     }
   };
 
-  const handleUpdatePassword = async () => {
-    if (!user || !user.email) return;
-    if (passwords.new !== passwords.confirm) {
-      setError("New passwords do not match.");
-      return;
-    }
-    if (passwords.new.length < 12) { setError("Use a password of at least 12 characters."); return; }
-    setIsUpdatingPassword(true);setMessage("");setError("");
-    try {
-      const credential = EmailAuthProvider.credential(user.email, passwords.current);
-      try { await reauthenticateWithCredential(user, credential); }
-      catch (failure) {
-        if (!failure || typeof failure !== "object" || !("code" in failure) || failure.code !== "auth/multi-factor-auth-required") throw failure;
-        const resolver = getMultiFactorResolver(auth, failure as MultiFactorError);
-        const hint = resolver.hints.find(item => item.factorId === TotpMultiFactorGenerator.FACTOR_ID);
-        const code = window.prompt("Enter the current six-digit authenticator code.");
-        if (!hint || !code || !/^[0-9]{6}$/.test(code)) throw new Error("Enter a valid authenticator code.");
-        await resolver.resolveSignIn(TotpMultiFactorGenerator.assertionForSignIn(hint.uid, code));
-      }
-      await updatePassword(user, passwords.new);
-      setMessage("Password updated successfully.");
-      setPasswords({ current: "", new: "", confirm: "" });
-    } catch (error: unknown) {
-      console.error("Error updating password:", error);
-      const code = error && typeof error === "object" && "code" in error ? error.code : "";
-      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-        setError("Incorrect current password.");
-      } else {
-        setError("Failed to update password. " + (error instanceof Error ? error.message : "Try again."));
-      }
-    } finally {
-      setIsUpdatingPassword(false);
-    }
-  };
-
   return <div className="space-y-5">
     {message && <p role="status" className="rounded-xl bg-green-50 p-4 text-sm text-green-800">{message}</p>}
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-800"><span>{error}</span><button type="button" onClick={()=>{setProfileLoading(true);setProfileAttempt(value=>value+1);}} className="font-semibold underline">Reload profile</button></div>}
@@ -97,7 +58,7 @@ export default function Settings() {
         <div className="grid gap-5 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="fullName">Full name</Label><Input id="fullName" value={profileName} maxLength={120} disabled={profileLoading} onChange={event=>setProfileName(event.target.value)} autoComplete="name" /></div><div className="space-y-2"><Label htmlFor="email">Email address</Label><Input id="email" type="email" value={user?.email||""} disabled /></div><div className="space-y-2"><Label htmlFor="contact">Contact number</Label><Input id="contact" type="tel" value={profileContact} disabled={profileLoading} onChange={event=>setProfileContact(event.target.value)} placeholder="Your contact number" autoComplete="tel" /></div><div className="space-y-2"><Label htmlFor="barangay">Barangay</Label><Input id="barangay" value={barangay||"All barangays"} disabled /></div></div>
         <p className="text-xs leading-relaxed text-muted-foreground">Your email and assigned barangay are managed through your account access.</p><Button disabled={isUpdatingProfile||profileLoading||profileLoadedUid!==user?.uid||!profileName.trim()} onClick={()=>void handleUpdateProfile()}>{isUpdatingProfile&&<Loader2 className="animate-spin" aria-hidden="true" />}{isUpdatingProfile?"Saving…":"Save changes"}</Button>
       </CardContent></Card>
-      <Card id="change-password"><CardHeader><CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" aria-hidden="true" />Change password</CardTitle><CardDescription>Use at least 12 characters to keep your account secure.</CardDescription></CardHeader><CardContent><form onSubmit={event=>{event.preventDefault();void handleUpdatePassword();}} className="space-y-5"><div className="tt-password-grid"><div className="space-y-2"><Label htmlFor="current-password">Current password</Label><Input id="current-password" type="password" autoComplete="current-password" required value={passwords.current} onChange={event=>setPasswords({...passwords,current:event.target.value})} /></div><div className="space-y-2"><Label htmlFor="new-password">New password</Label><Input id="new-password" type="password" autoComplete="new-password" minLength={12} required value={passwords.new} onChange={event=>setPasswords({...passwords,new:event.target.value})} /></div><div className="space-y-2"><Label htmlFor="confirm-password">Confirm new password</Label><Input id="confirm-password" type="password" autoComplete="new-password" minLength={12} required value={passwords.confirm} onChange={event=>setPasswords({...passwords,confirm:event.target.value})} /></div></div><Button type="submit" disabled={isUpdatingPassword}>{isUpdatingPassword&&<Loader2 className="animate-spin" aria-hidden="true" />}{isUpdatingPassword?"Updating…":"Update password"}</Button></form></CardContent></Card></div>
+      <Card id="change-password"><CardHeader><CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" aria-hidden="true" />Password recovery</CardTitle><CardDescription>Manage your password through your registered email.</CardDescription></CardHeader><CardContent className="space-y-4"><p className="text-sm text-muted-foreground">Use {user?.email || "your registered email"} on the recovery page. Your existing password stays unchanged until you complete the reset link.</p><Link href="/forgot-password" className="tt-primary-link">Open password recovery <ArrowUpRight className="h-4 w-4" /></Link></CardContent></Card></div>
       <Card className="tt-dark-panel"><CardHeader><CardTitle className="flex items-center gap-3"><Shield className="h-7 w-7" aria-hidden="true" />Account protection</CardTitle><CardDescription>Protect your sign-in with an authenticator. Project support and account enrollment are checked separately.</CardDescription></CardHeader><CardContent className="space-y-7"><div><div className="mb-5 flex items-center justify-between gap-3"><span className="text-sm">Authenticator</span><span className={"tt-status"+(hasAuthenticator?"":" tt-status-pending")}>{hasAuthenticator?"Configured":authenticatorState==="disabled"?"Project setup required":authenticatorState==="unavailable"?"Could not check":authenticatorState==="checking"?"Checking…":"Not configured"}</span></div><Link href="/staff-account" className="tt-text-link">{hasAuthenticator?"Manage authenticator":authenticatorState==="available"?"Set up authenticator":"View authenticator setup"}<ArrowUpRight aria-hidden="true" /></Link></div><div className="space-y-4 border-t pt-6"><h2>Session</h2><p className="text-sm text-muted-foreground">Sign out of TrashTrack on this device.</p><Button variant="outline" onClick={()=>void signOut()}><LogOut aria-hidden="true" />Sign out</Button></div></CardContent></Card>
     </div>
   </div>;

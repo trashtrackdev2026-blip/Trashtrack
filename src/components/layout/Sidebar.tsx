@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Users, CalendarDays, Bell, FileText, CalendarCheck, BookOpen, ChartNoAxesCombined, Settings2, House, Send, LogOut, ShieldCheck } from "lucide-react";
+import { Users, CalendarDays, Bell, FileText, CalendarCheck, BookOpen, ChartNoAxesCombined, Settings2, House, Send, LogOut, ShieldCheck, MessageSquareText } from "lucide-react";
+import { useEffect, useState } from "react";
+import { staffRequest } from "@/lib/staff-client";
 import { Brand } from "./Brand";
 import { NavigationPending } from "./NavigationPending";
 
@@ -18,6 +20,7 @@ const community = [
   { name: "Events", href: "/events", icon: CalendarCheck },
   { name: "Learning Management", href: "/education", icon: BookOpen },
   { name: "Analytics", href: "/analytics", icon: ChartNoAxesCombined },
+  { name: "System feedback", href: "/feedback", icon: MessageSquareText },
 ];
 const barangayItems = [
   { name: "Community reports", href: "/reports", icon: FileText },
@@ -28,6 +31,9 @@ export function Sidebar({ collapsed, onNavigate }: { collapsed: boolean; onNavig
   const pathname = usePathname();
   const router = useRouter();
   const { role, user, name, barangay } = useAuth();
+  const [feedbackCount,setFeedbackCount] = useState({owner:"",count:0});
+  const uid=user?.uid;
+  useEffect(()=>{if(role!=="Admin"||!uid)return;let stopped=false;const load=()=>{void staffRequest<{newCount:number}>("/api/feedback?summary=1",undefined,uid).then(result=>{if(!stopped)setFeedbackCount({owner:uid,count:result.newCount});}).catch(()=>{});};load();const timer=window.setInterval(load,60_000);return()=>{stopped=true;clearInterval(timer);};},[role,uid]);
   const displayName = name || user?.email?.split("@")[0] || "MENRO Admin";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase();
   const navLink = (item: typeof operations[number]) => {
@@ -35,7 +41,7 @@ export function Sidebar({ collapsed, onNavigate }: { collapsed: boolean; onNavig
     return <li key={item.href}><Link href={item.href} onClick={onNavigate} prefetch={false}
       onMouseEnter={() => router.prefetch(item.href)} onFocus={() => router.prefetch(item.href)}
       className="tt-nav-link" aria-current={active ? "page" : undefined} title={collapsed ? item.name : undefined}>
-      <item.icon aria-hidden="true" />{!collapsed && <span>{item.name}</span>}<NavigationPending />
+      <item.icon aria-hidden="true" />{!collapsed && <span>{item.name}</span>}{item.href==="/feedback"&&feedbackCount.owner===uid&&feedbackCount.count>0&&<span className="ml-auto rounded-full bg-[#174c39] px-2 py-0.5 text-[10px] text-white" aria-label={`${feedbackCount.count} new feedback messages`}>{feedbackCount.count}</span>}<NavigationPending />
       {collapsed && <span className="sr-only">{item.name}</span>}
     </Link></li>;
   };

@@ -76,7 +76,7 @@ export default function Dashboard() {
         <div className="tt-section-heading"><h2>Today’s collections</h2><Link href="/schedules" className="tt-text-link">View calendar <ArrowUpRight aria-hidden="true" /></Link></div>
         <p className="text-xs text-muted-foreground">{loading || error ? "Your posted collection schedule" : `${todayCount} ${todayCount === 1 ? "collection" : "collections"} on the schedule today`}</p>
         <div className="tt-collection-feature">
-          <div className="tt-collection-photo"><Image src="/images/collection-community.webp" alt="Illustrative scene of a collection truck and sanitation workers" fill sizes="(max-width:767px) 90vw, (max-width:1100px) 40vw, 26vw" /></div>
+          <div className="tt-collection-photo"><Image src="/images/balete-real-photo.webp" alt="Balete landscape overlooking Taal Lake" fill sizes="(max-width:767px) 90vw, (max-width:1100px) 40vw, 26vw" /></div>
           <div className="tt-collection-list">{todaySchedules.map(schedule => <div className="tt-collection-row" key={schedule.id}><strong>{collectionTimeLabel(schedule.time)}</strong><div><p>{schedule.barangay}</p><small className="line-clamp-2">{schedule.description}</small></div><span className="tt-status">Scheduled</span></div>)}</div>
         </div>
         {!loading && !error && !todaySchedules.length && <p className="tt-empty">No collections are scheduled for today.<br /><Link href="/schedules" className="tt-text-link mt-3">Browse upcoming collections <ArrowUpRight /></Link></p>}

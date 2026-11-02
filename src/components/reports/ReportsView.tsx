@@ -7,7 +7,7 @@ import { ReportActionFields } from "./ReportActionFields";
 import { reportActionFields, type ReportActionInput } from "@/lib/report-action";
 import type { ReportUpdateInput } from "@/lib/update-report";
 import { normalizeReportStatus } from "@/lib/report-workflow";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Search, FileText, Clock, CheckCircle2, AlertTriangle, Check, Send, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const [collectionConfirmed, setCollectionConfirmed] = useState(false);
   const [actionInput, setActionInput] = useState<ReportActionInput>({});
   const [openedVersion, setOpenedVersion] = useState({expectedStatus:"",expectedRevision:0});
+  const preservedDraft = useRef<{id:string; status:string; remarks:string; confirmed:boolean; action:ReportActionInput} | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [saveMessage,setSaveMessage]=useState("");
   const [summaryFilter, setSummaryFilter] = useState<ReportSummaryFilter>("all");
@@ -57,10 +58,13 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     && (barangayFilter === "all" || reportBarangayLabel(report.location) === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
   const activeReport = visibleReports.find(report => report.id === activeReportId);
   const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
-  let actionValid = true;
-  try { const next=normalizeReportStatus(newStatus);if(next)reportActionFields(role,next,{...actionInput,remarks}); } catch { actionValid=false; }
+  let actionValid = true, actionError = "";
+  try { const next=normalizeReportStatus(newStatus);if(next)reportActionFields(role,next,{...actionInput,remarks}); } catch (failure) { actionValid=false;actionError=failure instanceof Error?failure.message:"Complete the action details."; }
   const canSave = !!activeReport && actionValid && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
-  const openReport = (report: CommunityReport) => {setActiveReportId(report.id);setNewStatus("");setRemarks("");setCollectionConfirmed(false);setActionInput({});setOpenedVersion({expectedStatus:report.status,expectedRevision:report.statusRevision||0});setUpdateError(null);};
+  const openReport = (report: CommunityReport) => {
+    const draft=preservedDraft.current?.id===report.id?preservedDraft.current:null;
+    setActiveReportId(report.id);setNewStatus(draft&&nextReportStatuses(role,report.status).some(status=>status===draft.status)?draft.status:"");setRemarks(draft?.remarks||"");setCollectionConfirmed(false);setActionInput(draft?.action||{});setOpenedVersion({expectedStatus:report.status,expectedRevision:report.statusRevision||0});setUpdateError(null);
+  };
   const summaryLabels = { all: "All reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
     review: role === "Semi-Admin" ? "For MENRO Review" : "Under Review", resolved: role === "Semi-Admin" ? "Resolved" : "Resolved Reports" };
   const selectSummary = (filter: ReportSummaryFilter) => {
@@ -97,6 +101,8 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
       setNewStatus("");
       setRemarks("");
       setCollectionConfirmed(false);
+      preservedDraft.current=null;
+      setActiveReportId(null);
     } catch (error) {
       setUpdateError(error instanceof Error ? error.message : "Failed to update status");
     } finally {
@@ -307,7 +313,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                     {allowedStatuses.length === 0 && <p className="text-xs text-slate-600">
                       {role === "Semi-Admin" ? "Forwarded reports are handled by MENRO. Resolved reports remain available for reference." : "MENRO can schedule a report after the Barangay Captain verifies and forwards it."}
                     </p>}
-                    <ReportActionFields role={role} status={newStatus} value={actionInput} onChange={setActionInput} disabled={isUpdating} />
+                    <ReportActionFields role={role} status={newStatus} value={actionInput} onChange={setActionInput} disabled={isUpdating} barangay={activeReport.location} />
                     {newStatus === "Resolved" && <label className="flex gap-2 items-start text-xs text-slate-700">
                       <input type="checkbox" checked={collectionConfirmed} onChange={event => setCollectionConfirmed(event.target.checked)} className="mt-0.5" />
                       I confirm the reported concern has been addressed and the action is complete.
@@ -323,6 +329,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                         placeholder="Describe your verified findings and action taken or reason for forwarding..."
                       />
                     </div>
+                    {newStatus && actionError && <p role="status" className="text-xs leading-relaxed">{actionError}</p>}
 
                     <Button
                       onClick={() => { setUpdateError(null); setShowConfirm(true); }}
@@ -358,7 +365,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
               <dd><span className={`inline-block rounded-full px-2 py-1 text-xs font-bold ${getStatusColor(newStatus)}`}>{REPORT_STATUS_LABELS[newStatus as keyof typeof REPORT_STATUS_LABELS] || newStatus}</span></dd>
             </dl>
             <DialogDescription className="text-center text-sm text-slate-600">Are you sure you want to update this report?</DialogDescription>
-            {updateError && <p role="alert" className="text-sm text-red-700">{updateError}</p>}
+            {updateError && <div className="space-y-3"><p role="alert" className="text-sm text-red-700">{updateError}</p>{updateError.includes("changed") && <Button variant="outline" onClick={() => {preservedDraft.current={id:activeReport.id,status:newStatus,remarks,confirmed:collectionConfirmed,action:actionInput};setShowConfirm(false);setActiveReportId(null);retry();setSaveMessage("Reloading the latest reports. Reopen this report to review its current stage; your notes and action draft are kept. Confirm the action again after reviewing.");}}>Review latest report</Button>}</div>}
           </div>
           <DialogFooter className="sticky bottom-0 mx-0 mb-0 flex-row gap-3 border-t border-slate-100 bg-white p-4">
             <Button onClick={() => setShowConfirm(false)} disabled={isUpdating} variant="outline" className="h-10 flex-1 rounded-xl border-slate-200 font-semibold text-slate-600">Cancel</Button>

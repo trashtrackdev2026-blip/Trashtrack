@@ -3,12 +3,12 @@
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  CalendarDays, 
-  AlertTriangle, 
-  Megaphone, 
-  Calendar as CalendarIcon, 
-  Search, 
+import {
+  CalendarDays,
+  AlertTriangle,
+  Megaphone,
+  Calendar as CalendarIcon,
+  Search,
   ChevronDown,
   Eye,
   Pencil,
@@ -26,6 +26,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { staffRequest } from "@/lib/staff-client";
 import { EditNotificationDialog } from "@/components/notifications/EditNotificationDialog";
+import { notificationCategory, notificationCategoryLabel, DELIVERY_FILTER_LABELS, matchesDeliveryFilter } from "@/lib/notification-categories";
 import { notificationDeliveryLabel } from "@/lib/notification-edit";
 import { phoneDeliveryDue } from "@/lib/notification-publication";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -60,7 +61,8 @@ export default function NotificationsPage() {
   const [filterNow, setFilterNow] = useState(() => Date.now());
   const [dateFilter, setDateFilter] = useState("date");
   const [editingNotice,setEditingNotice] = useState<NotificationData|null>(null);
-  const [selectedNotif, setSelectedNotif] = useState<NotificationData | null>(null);
+  const [selectedNotifId, setSelectedNotifId] = useState<string | null>(null);
+  const selectedNotif = notifications.find(notice=>notice.id===selectedNotifId) || null;
   const [retrying, setRetrying] = useState<string | null>(null);
   const [deliveryError, setDeliveryError] = useState("");
 
@@ -75,9 +77,9 @@ export default function NotificationsPage() {
 
   const filteredNotifications = notifications.filter((notif) => {
     const matchesSearch = notif.title.toLowerCase().includes(search.toLowerCase()) || notif.message.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = category === "category" || notif.type.toLowerCase() === category;
+    const matchesCategory = category === "category" || notificationCategory(notif.type) === category;
 
-    const matchesStatus = status === "status" || (status === "in-app" ? !notif.push : status === "sent" ? notif.push && notif.pushStatus === "queued" : status === "failed" ? notif.push && notif.pushStatus === "failed" : notif.push && ["pending","sending"].includes(notif.pushStatus));
+    const matchesStatus = matchesDeliveryFilter(notif,status);
 
     const now = filterNow;
     const today = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Manila"}).format(new Date(now));
@@ -133,6 +135,7 @@ export default function NotificationsPage() {
     return () => { disposed = true; clearInterval(timer); clearTimeout(firstRetry); window.removeEventListener("online", resumeDelivery); };
   }, [role, notifications]);
 
+  const safePage = Math.max(1,Math.min(currentPage,Math.ceil(filteredNotifications.length/itemsPerPage)||1));
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return;
     setDeleting(true);setDeleteError("");
@@ -161,37 +164,37 @@ export default function NotificationsPage() {
 
         {/* KPI Cards */}
         <div className="tt-metric-strip">
-          <KpiCard 
-            title="Total Notifications" 
-            value={notifications.length.toString()} 
-            subtitle="All time" 
-            icon={<CalendarIcon className="w-7 h-7" />} 
-            iconBgColor="bg-[#E8F5E9]" 
-            iconColor="text-[#2E7D32]" 
+          <KpiCard
+            title="Total Notifications"
+            value={notifications.length.toString()}
+            subtitle="All time"
+            icon={<CalendarIcon className="w-7 h-7" />}
+            iconBgColor="bg-[#E8F5E9]"
+            iconColor="text-[#2E7D32]"
           />
-          <KpiCard 
-            title="Schedules & Alerts" 
-            value={notifications.filter(n => n.type.toLowerCase() === 'schedule' || n.type.toLowerCase() === 'alert').length.toString()} 
-            subtitle="System alerts" 
-            icon={<CalendarDays className="w-7 h-7" />} 
-            iconBgColor="bg-blue-50" 
-            iconColor="text-blue-500" 
+          <KpiCard
+            title="Schedules & Alerts"
+            value={notifications.filter(n => notificationCategory(n.type) === 'schedule' || notificationCategory(n.type) === 'alert').length.toString()}
+            subtitle="System alerts"
+            icon={<CalendarDays className="w-7 h-7" />}
+            iconBgColor="bg-blue-50"
+            iconColor="text-blue-500"
           />
-          <KpiCard 
-            title="Reports & Updates" 
-            value={notifications.filter(n => n.type.toLowerCase() === 'report').length.toString()} 
-            subtitle="Report status changes" 
-            icon={<AlertTriangle className="w-7 h-7" />} 
-            iconBgColor="bg-orange-50" 
-            iconColor="text-orange-500" 
+          <KpiCard
+            title="Reports & Updates"
+            value={notifications.filter(n => notificationCategory(n.type) === 'report').length.toString()}
+            subtitle="Report status changes"
+            icon={<AlertTriangle className="w-7 h-7" />}
+            iconBgColor="bg-orange-50"
+            iconColor="text-orange-500"
           />
-          <KpiCard 
-            title="General Messages" 
-            value={notifications.filter(n => n.type.toLowerCase() !== 'report' && n.type.toLowerCase() !== 'schedule' && n.type.toLowerCase() !== 'alert').length.toString()} 
-            subtitle="Community announcements" 
-            icon={<Megaphone className="w-7 h-7" />} 
-            iconBgColor="bg-purple-50" 
-            iconColor="text-purple-500" 
+          <KpiCard
+            title="General Messages"
+            value={notifications.filter(n => notificationCategory(n.type) !== 'report' && notificationCategory(n.type) !== 'schedule' && notificationCategory(n.type) !== 'alert').length.toString()}
+            subtitle="Community announcements"
+            icon={<Megaphone className="w-7 h-7" />}
+            iconBgColor="bg-purple-50"
+            iconColor="text-purple-500"
           />
         </div>
 
@@ -200,16 +203,16 @@ export default function NotificationsPage() {
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <div className="relative w-full sm:w-[280px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input 
+              <Input
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-                placeholder="Search notifications..." 
-                className="pl-9 h-11 bg-slate-50 border-slate-200" 
+                placeholder="Search notifications..."
+                className="pl-9 h-11 bg-slate-50 border-slate-200"
               />
             </div>
 
             <div className="tt-filter-options flex flex-wrap gap-3">
-              <Select value={category} onValueChange={(val) => { setCategory(val ?? "all"); setCurrentPage(1); }}>
+              <Select value={category} onValueChange={(val) => { setCategory(val ?? "category"); setCurrentPage(1); }}>
                 <SelectTrigger className="w-[140px] h-11 bg-white border-slate-200">
                   <SelectValue>{category === "category" ? "All categories" : category.charAt(0).toUpperCase()+category.slice(1)}</SelectValue>
                 </SelectTrigger>
@@ -218,18 +221,18 @@ export default function NotificationsPage() {
                   <SelectItem value="schedule">Schedule</SelectItem>
                   <SelectItem value="alert">Alerts</SelectItem>
                   <SelectItem value="general">General</SelectItem>
-                  <SelectItem value="event">Events</SelectItem>
+                  <SelectItem value="event">Events</SelectItem><SelectItem value="report">Reports</SelectItem>
                 </SelectContent>
               </Select>
 
-              <Select value={status} onValueChange={(val) => { setStatus(val ?? "all"); setCurrentPage(1); }}>
-                <SelectTrigger className="w-[130px] h-11 bg-white border-slate-200">
-                  <SelectValue>{status === "status" ? "All statuses" : status === "sent" ? "Sent" : status === "failed" ? "Phone delivery failed" : "Waiting for phone delivery"}</SelectValue>
+              <Select value={status} onValueChange={(val) => { setStatus(val ?? "status"); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[210px] h-11 bg-white border-slate-200">
+                  <SelectValue>{DELIVERY_FILTER_LABELS[status] || "All delivery states"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="status">Status (All)</SelectItem>
                   <SelectItem value="in-app">In-app only</SelectItem><SelectItem value="sent">Sent to phone service</SelectItem>
-                  <SelectItem value="pending">Waiting for phone delivery</SelectItem>
+                  <SelectItem value="pending">Waiting for phone service</SelectItem><SelectItem value="sending">Sending to phone service</SelectItem>
                   <SelectItem value="failed">Phone delivery failed</SelectItem>
                 </SelectContent>
               </Select>
@@ -266,7 +269,7 @@ export default function NotificationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredNotifications.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((notif) => (
+                {filteredNotifications.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage).map((notif) => (
                   <tr key={notif.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="py-4 px-6">
                       <div className="flex items-start gap-4">
@@ -281,7 +284,7 @@ export default function NotificationsPage() {
                     </td>
                     <td className="py-4 px-6">
                       <span className={`text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap ${notif.type.toLowerCase() === 'report' ? 'text-orange-600 bg-orange-50' : notif.type.toLowerCase() === 'schedule' ? 'text-blue-600 bg-blue-50' : 'text-[#2E7D32] bg-[#E8F5E9]'}`}>
-                        {notif.type.toUpperCase()}
+                        {notificationCategoryLabel(notif.type).toUpperCase()}
                       </span>
                     </td>
                     <td className="py-4 px-6">
@@ -293,17 +296,17 @@ export default function NotificationsPage() {
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1 rounded-full ${notif.isRead ? 'text-slate-500 bg-slate-100' : 'text-[#2E7D32] bg-[#E8F5E9]'}`}>
-                        {notificationDeliveryLabel(notif.push,notif.pushStatus)} <Check className="w-3 h-3" />
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1 rounded-full ${!notif.push ? 'text-slate-600 bg-slate-100' : notif.pushStatus === 'failed' ? 'text-red-800 bg-red-50' : notif.pushStatus === 'queued' ? 'text-[#174c39] bg-[#e8f0dc]' : 'text-amber-900 bg-amber-50'}`}>
+                        {notificationDeliveryLabel(notif.push,notif.pushStatus)} {notif.push && notif.pushStatus === "queued" && <Check className="w-3 h-3" />}
                       </span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-center gap-2">
                         {notif.push && notif.pushStatus !== "queued" && <Button disabled={retrying !== null} variant="outline" size="sm" onClick={() => void retryPhone(notif.id)}>{retrying === notif.id ? "Queuing..." : "Retry phone delivery"}</Button>}
-                        <Button 
-                          onClick={() => setSelectedNotif(notif)} 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          onClick={() => setSelectedNotifId(notif.id)}
+                          variant="outline"
+                          size="sm"
                           className="h-8 border-slate-200 text-slate-600 rounded-lg text-xs font-semibold hover:bg-[#F1F8F5] hover:text-[#2E7D32] hover:border-green-200"
                         >
                           <Eye className="w-3.5 h-3.5 mr-1.5" /> View
@@ -320,40 +323,41 @@ export default function NotificationsPage() {
             </table>
           </div>
 
+          {!loading && !filteredNotifications.length && <div className="tt-empty"><p>No announcements match these filters.</p><Button variant="outline" className="mt-3" onClick={() => {setSearch("");setCategory("category");setStatus("status");setDateFilter("date");setCurrentPage(1);}}>Clear filters</Button></div>}
           {/* Pagination */}
           {(() => {
             const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / itemsPerPage));
-            const startItem = filteredNotifications.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
-            const endItem = Math.min(currentPage * itemsPerPage, filteredNotifications.length);
+            const startItem = filteredNotifications.length > 0 ? (safePage - 1) * itemsPerPage + 1 : 0;
+            const endItem = Math.min(safePage * itemsPerPage, filteredNotifications.length);
 
             return (
               <div className="py-4 px-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between bg-white gap-4">
                 <span className="text-xs text-slate-500 font-medium">Showing {startItem} to {endItem} of {filteredNotifications.length} notifications</span>
 
                 <div className="flex items-center gap-1">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
+                  <Button
+                    variant="outline"
+                    size="icon"
                     className="w-8 h-8 rounded-md border-slate-200 disabled:opacity-50"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={safePage === 1}
+                    onClick={() => setCurrentPage(Math.max(1,safePage - 1))}
                   >
                     <ChevronDown className="w-4 h-4 rotate-90" />
                   </Button>
 
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum = currentPage;
+                    let pageNum = safePage;
                     if (totalPages <= 5) pageNum = i + 1;
-                    else if (currentPage <= 3) pageNum = i + 1;
-                    else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                    else pageNum = currentPage - 2 + i;
+                    else if (safePage <= 3) pageNum = i + 1;
+                    else if (safePage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                    else pageNum = safePage - 2 + i;
 
                     return (
-                      <Button 
+                      <Button
                         key={pageNum}
-                        variant="outline" 
-                        size="icon" 
-                        className={`w-8 h-8 rounded-md border-slate-200 ${currentPage === pageNum ? 'bg-[#1B5E20] text-white border-[#1B5E20] hover:bg-[#2E7D32] hover:text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                        variant="outline"
+                        size="icon"
+                        className={`w-8 h-8 rounded-md border-slate-200 ${safePage === pageNum ? 'bg-[#1B5E20] text-white border-[#1B5E20] hover:bg-[#2E7D32] hover:text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                         onClick={() => setCurrentPage(pageNum)}
                       >
                         {pageNum}
@@ -364,9 +368,9 @@ export default function NotificationsPage() {
                   {totalPages > 5 && currentPage < totalPages - 2 && (
                     <>
                       <span className="text-slate-400 px-1">...</span>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
+                      <Button
+                        variant="outline"
+                        size="icon"
                         className="w-8 h-8 rounded-md border-slate-200 text-slate-600 hover:bg-slate-50"
                         onClick={() => setCurrentPage(totalPages)}
                       >
@@ -375,12 +379,12 @@ export default function NotificationsPage() {
                     </>
                   )}
 
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
+                  <Button
+                    variant="outline"
+                    size="icon"
                     className="w-8 h-8 rounded-md border-slate-200 disabled:opacity-50"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={safePage === totalPages}
+                    onClick={() => setCurrentPage(Math.min(totalPages,safePage + 1))}
                   >
                     <ChevronDown className="w-4 h-4 -rotate-90" />
                   </Button>
@@ -394,7 +398,7 @@ export default function NotificationsPage() {
       {editingNotice&&<EditNotificationDialog key={editingNotice.id} notice={editingNotice} onClose={()=>setEditingNotice(null)}/>}
       <Dialog open={!!deleteTarget} onOpenChange={open => {if (!open && !deleting) setDeleteTarget(null);}}><DialogContent showCloseButton={!deleting}><DialogTitle>Delete notification?</DialogTitle><DialogDescription>This removes “{deleteTarget?.title}” from the notification history. Phone notifications already delivered cannot be recalled.</DialogDescription>{deleteError && <p role="alert" className="text-red-700">{deleteError}</p>}<div className="flex justify-end gap-3"><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button disabled={deleting} onClick={() => void handleDelete()} className="bg-red-700 text-white hover:bg-red-800">{deleting ? "Deleting…" : "Delete notification"}</Button></div></DialogContent></Dialog>
       {/* View Notification Modal */}
-      <Dialog open={selectedNotif !== null} onOpenChange={open => { if (!open) setSelectedNotif(null); }}>
+      <Dialog open={selectedNotif !== null} onOpenChange={open => { if (!open) setSelectedNotifId(null); }}>
       {selectedNotif && (
           <DialogContent className="sm:max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 gap-0 bg-white">
 
@@ -425,8 +429,8 @@ export default function NotificationsPage() {
               </div>
 
               <div className="flex w-full mt-2">
-                <Button 
-                  onClick={() => setSelectedNotif(null)}
+                <Button
+                  onClick={() => setSelectedNotifId(null)}
                   className="w-full h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm"
                 >
                   Close

@@ -2,6 +2,7 @@ import "server-only";
 import { getSecurityRules } from "firebase-admin/security-rules";
 import { getFirebaseAdminApp } from "./firebase-admin";
 import { CertificateError } from "./certificate-data";
+import { matchesFirestorePolicy } from "./security-policy";
 
 export async function requireCertificateSecurity() {
   const expected = process.env.CERTIFICATE_SECURITY_RULESET;
@@ -10,7 +11,7 @@ export async function requireCertificateSecurity() {
     throw new CertificateError("Certificate setup is not complete. Please contact the event organizer.", 503);
   }
   const live = await getSecurityRules(getFirebaseAdminApp()).getFirestoreRuleset();
-  if (live.name !== expected) {
+  if (!matchesFirestorePolicy(live, expected)) {
     throw new CertificateError("Certificate setup is not complete. Please contact the event organizer.", 503);
   }
 }

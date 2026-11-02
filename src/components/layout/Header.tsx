@@ -23,6 +23,7 @@ const pages: Record<string, PageInfo> = {
   "/education": { section: "Learning Management", title: "Learning Management", subtitle: "Useful knowledge for everyday environmental care.", action: { href: "/education/create", label: "Add resource" } },
   "/analytics": { section: "Analytics", title: "Reports & analytics", subtitle: "See patterns. Focus care where it matters." },
   "/settings": { section: "Settings", title: "Settings & security", subtitle: "A comfortable workspace. An account you can trust." },
+  "/feedback": { section: "System feedback", title: "A better TrashTrack, together.", subtitle: "Listen to your residents. Turn their experience into better service." },
 };
 const creationPages: Record<string, PageInfo> = {
   "/schedules/create": { section: "Collections", title: "Plan a collection", subtitle: "Set the details, review, and share with your barangay." },

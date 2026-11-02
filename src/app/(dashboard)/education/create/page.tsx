@@ -2,7 +2,7 @@
 
 import { staffRequest } from "@/lib/staff-client";
 import { useState } from "react";
-import { learningResourceType, publicLearningUrl } from "@/lib/learning-resource";
+import { learningResourceType, publicLearningUrl, learningCover } from "@/lib/learning-resource";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -41,6 +41,21 @@ export default function CreateEducationResourcePage() {
 
   const getFileType = (url: string, fileName = "") => learningResourceType(url, fileName, form.type);
 
+  const uploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file=event.target.files?.[0];if(!file)return;
+    if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>8*1024*1024){setUploadError("Choose a JPG, PNG or WebP cover smaller than 8 MB.");event.target.value="";return;}
+    setIsUploading(true);setUploadError("");
+    try {
+      const cloud=process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,preset=process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+      if(!cloud||!preset)throw new Error("Media upload is not configured.");
+      const data=new FormData();data.append("file",file);data.append("upload_preset",preset);
+      const response=await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`,{method:"POST",body:data,signal:AbortSignal.timeout(60_000)});
+      const result=await response.json();if(!response.ok||!result.secure_url)throw new Error("The cover could not be uploaded. Try again.");
+      setForm(current=>({...current,coverUrl:publicLearningUrl(result.secure_url)}));
+    }catch(failure){setUploadError(failure instanceof Error?failure.message:"The cover could not be uploaded.");}
+    finally{setIsUploading(false);event.target.value="";}
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -57,7 +72,7 @@ export default function CreateEducationResourcePage() {
       formData.append("file", file);
       formData.append("upload_preset", uploadPreset);
       // Raw documents preserve the original file and extension for the resident reader.
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${document ? "raw" : "auto"}/upload`, {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${/\.pdf$/i.test(file.name) ? "image" : document ? "raw" : "auto"}/upload`, {
         method: "POST", body: formData, signal: AbortSignal.timeout(120_000),
       });
       const data = await res.json();
@@ -98,6 +113,7 @@ export default function CreateEducationResourcePage() {
         status: "Published",
         image: finalImage,
         coverUrl,
+        thumbnailUrl: learningCover({coverUrl,fileUrl:source,fileName:form.fileName,type:form.type}) || "",
         videoUrl: detectedFileType === "video" ? source : "",
         fileUrl: source,
         fileType: detectedFileType,
@@ -158,6 +174,7 @@ export default function CreateEducationResourcePage() {
               <div className="space-y-8">
 
                 <div className="space-y-6 max-w-2xl">
+                  <label className="block text-sm font-semibold">Upload a real cover (optional)<input type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploading||isSubmitting} onChange={event=>void uploadCover(event)} className="mt-2 block w-full text-sm"/><span className="mt-2 block text-xs font-normal text-slate-600">PDF pages and supported video frames are used automatically. You can also choose a real cover photo.</span></label>
                   <label className="block text-sm font-semibold">Cover image URL (optional)<Input type="url" value={form.coverUrl} onChange={e=>setForm({...form,coverUrl:e.target.value})} placeholder="https://.../cover.jpg" className="mt-2"/><span className="mt-2 block text-xs font-normal text-slate-600">Use a cover photo for a document or video. The original learning file stays separate.</span></label>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Resource Title <span className="text-red-500">*</span></label>

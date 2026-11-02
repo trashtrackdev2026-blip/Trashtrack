@@ -8,6 +8,8 @@ import * as actions from "../src/lib/report-action.ts";
 import * as schedules from "../src/lib/schedule-policy.ts";
 import * as workflow from "../src/lib/report-workflow.ts";
 import {communityPublication} from "../src/lib/community-publication.ts";
+import * as schedulingTime from "../src/lib/scheduling-time.ts";
+import * as eventForm from "../src/lib/event-form.ts";
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const compiled = ts.transpileModule(fs.readFileSync(new URL("../src/app/api/reports/manage/route.ts", import.meta.url), "utf8"), {
@@ -24,11 +26,11 @@ function fixture(options = {}) {
   ]);
   let sequence = 0;
   const db = {
-    collection: name => ({ doc: id => ({ path: `${name}/${id || "audit-" + ++sequence}` }), where:(field,op,value)=>({collection:name,field,value}) }),
+      collection: name => ({ doc: id => ({ id, path: `${name}/${id || "audit-" + ++sequence}` }), where:(field,op,value)=>({collection:name,field,value}) }),
     async runTransaction(action) {
       const working = new Map(structuredClone([...records]));
       let wrote=false;
-      const result=await action({ get: async ref => {assert.equal(wrote,false,"Read before write");return ref.collection?{docs:[...working].filter(([path,data])=>path.startsWith(ref.collection+"/")&&data[ref.field]===ref.value).map(([path,data])=>({id:path.split("/")[1],data:()=>structuredClone(data)}))}:{exists:working.has(ref.path),data:()=>structuredClone(working.get(ref.path))};},
+      const result=await action({ get: async ref => {assert.equal(wrote,false,"Read before write");return ref.collection?{docs:[...working].filter(([path,data])=>path.startsWith(ref.collection+"/")&&data[ref.field]===ref.value).map(([path,data])=>({id:path.split("/")[1],data:()=>structuredClone(data)}))}:{id:ref.id,exists:working.has(ref.path),data:()=>structuredClone(working.get(ref.path))};},
         set:(ref,values)=>{wrote=true;working.set(ref.path,values);},
         update: (ref, values) => {wrote=true;assert.ok(working.has(ref.path));working.set(ref.path, { ...working.get(ref.path), ...values });},
         create: (ref, values) => {wrote=true;assert.equal(working.has(ref.path),false);working.set(ref.path, values);} });
@@ -48,6 +50,7 @@ function fixture(options = {}) {
       staffApiError: error => Response.json({ error: error.message }, { status: error instanceof policy.StaffAccessError ? error.status : 500 }),
     },
     "@/lib/staff-access": policy,
+    "@/lib/scheduling-time":schedulingTime,"@/lib/event-form":eventForm,
     "@/lib/report-workflow": workflow,"@/lib/report-action":actions,"@/lib/schedule-policy":schedules,"@/lib/community-publication":{communityPublication},"@/lib/notification-delivery":{queuePhoneNotification:async()=>{if(options.pushFails)throw new Error("Simulated provider failure");}},
   };
   const exported = {};
@@ -154,4 +157,22 @@ test("A planned collection saves its announcement atomically and retains it afte
   assert.equal(result.saved,true);assert.equal(result.queued,false);assert.ok(result.deliveryError);
   const notice=app.records.get("notifications/"+result.notificationId);assert.equal(notice.recipients,"Poblacion");assert.equal(notice.type,"schedule");assert.equal(app.records.get("reports/one").status,"Endorsed");
   const before=structuredClone([...app.records]);await app.invoke(app.lastRequest);assert.deepEqual([...app.records],before);
+});
+
+test("A selected posted collection supplies the authoritative date/time and rejects stale or incompatible selections",async()=>{
+  const options={profile:{role:"Admin",barangay:""},report:{status:"For MENRO Review",menroReviewedAt:"timestamp"}};
+  const app=fixture(options);app.records.set("schedules/selected",{barangay:"Poblacion",date:"2099-11-06",time:"8:30 AM",status:"Active",statusRevision:3});
+  await app.post({status:"Endorsed",actionKind:"Collection",actionNotes:"Use the posted route",scheduleId:"selected",scheduleRevision:3,actionDate:"2020-01-01",actionTime:"22:00"});
+  assert.equal(app.records.get("reports/one").actionDate,"2099-11-06");assert.equal(app.records.get("reports/one").actionTime,"08:30");assert.equal(app.records.get("reports/one").scheduleId,"selected");
+  for(const changed of [{status:"Completed"},{barangay:"Sala"},{statusRevision:4},{date:"2020-01-01"}]){
+    const denied=fixture(options);denied.records.set("schedules/selected",{barangay:"Poblacion",date:"2099-11-06",time:"08:30",status:"Active",statusRevision:3,...changed});const before=structuredClone([...denied.records]);
+    await denied.post({status:"Endorsed",actionKind:"Collection",actionNotes:"Use posted route",scheduleId:"selected",scheduleRevision:3},changed.date?400:409);assert.deepEqual([...denied.records],before);
+  }
+});
+
+test("Legacy status spelling can progress with a fresh version while stale versions remain rejected",async()=>{
+  const app=fixture({report:{status:"Under Review"}});
+  await app.post({expectedStatus:"UnderReview",status:"Resolved",severity:"Minor",collectionConfirmed:true,remarks:"Barangay team completed the local action."});
+  assert.equal(app.records.get("reports/one").verificationNotes,"Barangay team completed the local action.");
+  assert.ok([...app.records.values()].some(record=>record.action==="report.status"&&record.findings==="Barangay team completed the local action."));
 });

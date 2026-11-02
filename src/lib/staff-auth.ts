@@ -4,6 +4,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getSecurityRules } from "firebase-admin/security-rules";
 import { getFirebaseAdminApp } from "./firebase-admin";
 import { StaffAccessError, staffAccessProblem, staffRole, STAFF_RECENT_SECONDS } from "./staff-access";
+import { matchesFirestorePolicy } from "./security-policy";
 
 export async function authenticatedAccount(request: Request) {
   const token = request.headers.get("authorization")?.match(/^Bearer (\S+)$/)?.[1];
@@ -35,7 +36,7 @@ export function requireApprovedStaff(request: Request, account: Awaited<ReturnTy
 
 export async function requireStaffSecurity() {
   const expected = process.env.STAFF_SECURITY_RULESET;
-  if (!expected || (await getSecurityRules(getFirebaseAdminApp()).getFirestoreRuleset()).name !== expected) {
+  if (!expected || !matchesFirestorePolicy(await getSecurityRules(getFirebaseAdminApp()).getFirestoreRuleset(), expected)) {
     throw new StaffAccessError("Staff access setup is not active yet. Contact MENRO.", 503);
   }
 }
