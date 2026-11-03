@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { ArrowLeft, ArrowRight, Headset, KeyRound, Mail, MapPin } from "lucide-react";
+import { Brand } from "@/components/layout/Brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { passwordResetFeedback } from "@/lib/password-reset";
+import styles from "./recovery.module.css";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -29,75 +32,48 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-white relative">
-      
-      {/* Absolute Logo on top left */}
-      <div className="absolute top-8 left-8 z-20">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded bg-[#2E7D32] flex items-center justify-center">
-            <span className="text-white font-bold">T</span>
-          </div>
-          <span className="font-outfit font-bold text-xl text-slate-900">TrashTrack</span>
+    <main className={styles.page}>
+      <aside className={styles.scene}>
+        <Image src="/images/balete-real-photo.webp" alt="" fill sizes="(max-width: 760px) 100vw, 46vw" preload className={styles.photo} />
+        <Link href="/login" className={styles.brand} aria-label="TrashTrack sign in">
+          <Brand light subtitle="Balete staff workspace" />
+        </Link>
+        <div className={styles.sceneCopy}>
+          <p className={styles.location}><MapPin size={15} aria-hidden="true" /> Balete, Batangas</p>
+          <p className={styles.sceneTitle}>Let’s get you<br />back to work.</p>
         </div>
-      </div>
-
-      {/* Left Side: Illustration */}
-      <div className="hidden md:flex w-full md:w-1/2 bg-slate-50/50 items-center justify-center p-12 relative min-h-screen border-r border-slate-100">
-        <div className="w-full max-w-[600px] aspect-square relative mt-12">
-          <Image 
-            src="/images/forgot_password_illustration.png" 
-            alt="Forgot Password Illustration" 
-            fill
-            className="object-contain mix-blend-multiply"
-            priority
-          />
-        </div>
-      </div>
-
-      {/* Right Side: Form */}
-      <div className="w-full md:w-1/2 flex flex-col justify-center px-8 md:px-24 lg:px-32 min-h-screen relative">
-        <div className="w-full max-w-sm mx-auto">
-          <h1 className="text-4xl md:text-[42px] font-bold text-slate-900 leading-tight mb-8">
-            Forgot<br/>Your Password ?
-          </h1>
-
-          <form onSubmit={handleSubmit} className="space-y-6 w-full">
-            {message && <p role={accepted ? "status" : "alert"} className={"rounded-xl p-4 text-sm " + (accepted ? "bg-green-50 text-green-900" : "bg-red-50 text-red-800")}>{message}</p>}
-            <p className="text-sm text-slate-600">Use the same official email you registered with. If no message arrives, check Spam/Junk and ask MENRO to verify the account email and email service.</p>
-            <div className="space-y-2">
-              <Input
-                id="email"
-                value={email}
-                onChange={event => setEmail(event.target.value)}
-                autoComplete="username"
-                type="email"
-                placeholder="Email Address"
-                required
-                className="bg-slate-50 border-0 h-14 px-6 text-sm rounded-xl focus-visible:ring-2 focus-visible:ring-[#2E7D32]/50 font-medium text-slate-700 placeholder:text-slate-400"
-              />
+      </aside>
+      <section className={styles.pane} aria-labelledby="recovery-title">
+        <div className={styles.content}>
+          <Link href="/login" className={styles.back}><ArrowLeft size={17} aria-hidden="true" /> Back to sign in</Link>
+          <div className={styles.card}>
+            <span className={styles.mark}><KeyRound size={25} aria-hidden="true" /></span>
+            <p className={styles.eyebrow}>MENRO &amp; barangay staff</p>
+            <h1 id="recovery-title">Reset your password</h1>
+            <p className={styles.intro}>Enter the official email address you use to sign in to TrashTrack.</p>
+            <form onSubmit={handleSubmit} className={styles.form}>
+              <label htmlFor="email">Official email address</label>
+              <div className={styles.field}>
+                <Mail size={18} aria-hidden="true" />
+                <Input id="email" value={email} onChange={event => setEmail(event.target.value)}
+                  autoComplete="username" type="email" placeholder="Enter your email" required />
+              </div>
+              {message && (
+                <p role={accepted ? "status" : "alert"} className={accepted ? styles.status : styles.error}>{message}</p>
+              )}
+              <Button type="submit" disabled={busy || cooldown > 0} className={styles.submit}>
+                {busy ? "Requesting…" : cooldown ? `Request again in ${cooldown}s` : "Send reset link"}
+                {!busy && !cooldown && <ArrowRight aria-hidden="true" />}
+              </Button>
+            </form>
+            <div className={styles.help}>
+              <Headset size={19} aria-hidden="true" />
+              <p><strong>Need help?</strong> Check Spam or Junk for the reset email. Contact the MENRO office if you can’t access your registered address.</p>
             </div>
-            
-            <Button 
-              type="submit" 
-              disabled={busy || cooldown > 0}
-              className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl h-14 text-sm font-bold uppercase tracking-wider transition-colors shadow-lg shadow-green-900/20" 
-            >
-              {busy ? "Requesting…" : cooldown ? `Request again in ${cooldown}s` : "Reset Password"}
-            </Button>
-            
-            <div className="flex justify-center pt-2">
-              <Link href="/login" className="text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors">
-                Back to signin
-              </Link>
-            </div>
-          </form>
-
-          <div className="absolute bottom-8 left-0 right-0 text-center text-[10px] text-slate-400">
-            &copy; {new Date().getFullYear()} Municipality of Balete, Batangas. All rights reserved.
           </div>
+          <p className={styles.footer}>TrashTrack · Municipality of Balete, Batangas</p>
         </div>
-      </div>
-
-    </div>
+      </section>
+    </main>
   );
 }

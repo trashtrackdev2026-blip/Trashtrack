@@ -185,6 +185,19 @@ test("An incomplete event draft can be resumed and published exactly once withou
   await app.draft(draft,409);
 });
 
+test("An event draft keeps the original cover filename and replaces it with the image", async () => {
+  const app = fixture();
+  const draft = { id: "cover-draft", title: "Lakeside clean-up", barangay: "Sala", certificateEnabled: false };
+  const img = "https://res.cloudinary.com/example/image/upload/first.jpg";
+  await app.draft({ ...draft, img, coverFileName: "C:\\fakepath\\Lakeside clean-up.jpg" });
+  await app.draft({ ...draft, img, description: "Bring gloves." });
+  assert.equal(app.records.get("events/cover-draft").coverFileName, "Lakeside clean-up.jpg");
+  const replacement = "https://res.cloudinary.com/example/image/upload/second.webp";
+  await app.draft({ ...draft, img: replacement, coverFileName: "Balete lakeshore.webp" });
+  assert.equal(app.records.get("events/cover-draft").img, replacement);
+  assert.equal(app.records.get("events/cover-draft").coverFileName, "Balete lakeshore.webp");
+});
+
 test("Revoked staff, barangay staff, and another official cannot overwrite an event draft",async()=>{
   const body={id:"draft",title:"Cleanup",barangay:"Sala",certificateEnabled:false};
   for(const options of [{signedOut:true},{profile:{role:"Semi-Admin",barangay:"Sala"}},{profile:{accessStatus:"suspended"}}]){
