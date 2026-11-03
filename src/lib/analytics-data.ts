@@ -1,5 +1,6 @@
 import { normalizeReportStatus } from "./report-workflow.ts";
-import { collectionStatus } from "./schedule-policy.ts";
+import { collectionStatus, COLLECTION_STATUSES } from "./schedule-policy.ts";
+import { REPORT_CATEGORIES, reportCategory } from "./report-categories.ts";
 import { reportDate } from "./menro-reports.ts";
 
 type RecordData = Record<string, unknown>;
@@ -30,13 +31,12 @@ export function summarizeAnalytics(reports: RecordData[], events: RecordData[], 
   const months = Array.from({ length: 6 }, (_, index) => new Date(Date.UTC(manila.getFullYear(), manila.getMonth() - 5 + index, 1, 4)));
   const trendData = months.map(month => ({ name: month.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "Asia/Manila" }),
     value: reports.filter(report => { const date = analyticsReportDate(report);return date && date <= now && monthKey(date) === monthKey(month); }).length }));
-  const categoryNames = ["Illegal Dumping", "Uncollected Waste", "Blocked Drainage", "Mixed Waste", "Others"];
-  const colors = ["#c05248", "#c58d4d", "#5e96ac", "#68916b", "#8c7fa4"];
+  const categoryNames = REPORT_CATEGORIES;
+  const colors = ["#c58d4d", "#c05248", "#68916b", "#8c7fa4"];
   const categoryData = categoryNames.map((name, index) => ({ name, color: colors[index], value: 0 }));
   for (const report of reports) {
-    const type = String(report.type || report.category || "").toLowerCase();
-    const index = categoryNames.findIndex(name => type.includes(name.toLowerCase()));
-    categoryData[index < 0 ? 4 : index].value++;
+    const category = reportCategory(report.type || report.category);
+    categoryData.find(item => item.name === category)!.value++;
   }
   const percentages = categoryData.map(item => ({ ...item, value: reports.length ? Math.round(item.value / reports.length * 100) : 0 }));
   const eventData = ["Clean-Up Drives", "Tree Planting", "Seminars", "Other events"].map(name => ({ name, value: 0 }));
@@ -44,12 +44,16 @@ export function summarizeAnalytics(reports: RecordData[], events: RecordData[], 
     const text = `${event.category || ""} ${event.title || ""}`.toLowerCase();
     eventData[text.includes("clean") ? 0 : text.includes("tree") ? 1 : text.includes("seminar") ? 2 : 3].value++;
   }
-  const collectionData = ["Active", "Completed", "Unfinished", "Failed", "Inactive", "Unknown"].map(name => ({ name, value: 0 }));
-  for (const schedule of schedules) collectionData.find(item => item.name === (collectionStatus(schedule.status) || "Unknown"))!.value++;
+  const collectionData = COLLECTION_STATUSES.map(name => ({ name, value: 0 }));
+  let historicalCollections = 0;
+  for (const schedule of schedules) {
+    const row = collectionData.find(item => item.name === collectionStatus(schedule.status));
+    if (row) row.value++; else historicalCollections++;
+  }
   const resolutionData = ["Barangay", "MENRO", "Not recorded"].map(name => ({ name, value: 0 }));
   for (const report of reports.filter(report => normalizeReportStatus(String(report.status)) === "Resolved")) {
     resolutionData[report.resolvedByRole === "Semi-Admin" ? 0 : report.resolvedByRole === "Admin" ? 1 : 2].value++;
   }
   return { stats, trendData, categoryData: percentages, eventData, collectionData, resolutionData,
-    totalCollections: schedules.length, undatedReports: reports.filter(report => !analyticsReportDate(report)).length };
+    totalCollections: schedules.length, historicalCollections, undatedReports: reports.filter(report => !analyticsReportDate(report)).length };
 }

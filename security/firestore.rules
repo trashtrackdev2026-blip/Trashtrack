@@ -3,7 +3,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
-    function activeAccount() { return signedIn() && !(profile().get('accessStatus', '') in ['suspended', 'disabled']); }
+    function activeAccount() {
+      return signedIn() && !(profile().get('accessStatus', '') in ['suspended', 'disabled'])
+        && (profile().get('role', '').lower() != 'resident' || request.auth.token.get('email_verified', false) == true);
+    }
     function validBarangay(value) {
       return value in ['Alangilan', 'Calawit', 'Looc', 'Magapi', 'Makina', 'Malabanan', 'Paligawan',
         'Palsara', 'Poblacion', 'Sala', 'Sampalocan', 'Solis', 'San Sebastian'];

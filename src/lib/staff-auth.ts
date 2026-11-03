@@ -14,6 +14,9 @@ export async function authenticatedAccount(request: Request) {
   const db = getFirestore(app);
   const profile = (await db.collection("users").doc(identity.uid).get()).data() || {};
   if (["suspended", "disabled"].includes(String(profile.accessStatus))) throw new StaffAccessError("This account is suspended. Contact MENRO.");
+  if (String(profile.role).trim().toLowerCase() === "resident" && identity.email_verified !== true) {
+    throw new StaffAccessError("Verify your email address before using TrashTrack. Open the verification link, then sign in again.", 403, "resident/email-verification-required");
+  }
   return { app, db, identity, profile };
 }
 
