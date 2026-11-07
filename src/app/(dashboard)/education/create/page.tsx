@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import styles from "./editor.module.css";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
@@ -113,7 +114,7 @@ export default function CreateEducationResourcePage() {
 
   return (
     <>
-      <div className="space-y-8 max-w-[1400px] mx-auto">
+      <div className="space-y-8 mx-auto">
 
         {/* Header */}
         <div className="tt-legacy-heading flex flex-col gap-2">
@@ -131,7 +132,7 @@ export default function CreateEducationResourcePage() {
         {/* Main Content Area */}
         <div className="flex flex-col lg:flex-row gap-8">
 
-          <div className="flex-1 tt-surface p-8">
+          <div className={`tt-surface ${styles.panel}`}>
             {isSuccess ? (
               <div className="flex flex-col items-center justify-center text-center py-12">
                 <div className="w-20 h-20 bg-[#E8F5E9] rounded-full flex items-center justify-center mb-6 relative">
@@ -154,19 +155,9 @@ export default function CreateEducationResourcePage() {
             ) : (
               <div className="space-y-8">
 
-                <div className="space-y-6 max-w-2xl">
-                  <div className="rounded-2xl border border-[#cbd9c7] bg-[#f7f4e9] p-5">
-                    <p className="font-semibold">Cover photo <span className="text-xs font-normal">(optional)</span></p>
-                    <p className="mt-1 text-sm text-muted-foreground">PDF pages and supported video frames appear automatically. Add your own cover here.</p>
-                    <label className="mt-4 flex cursor-pointer flex-wrap items-center gap-3 rounded-xl border-2 border-dashed border-[#8ba88f] bg-white/70 p-5 focus-within:ring-2 focus-within:ring-green-800">
-                      <UploadCloud aria-hidden="true" className="h-8 w-8 shrink-0 text-[#194f40]"/>
-                      <span className="flex-1"><strong className="block">{isUploading ? "Uploading…" : "Choose a cover photo"}</strong><small>JPG, PNG or WebP · up to 8 MB</small></span>
-                      <span className="rounded-full bg-[#194f40] px-4 py-2 text-sm font-semibold text-white">Browse files</span>
-                      <input aria-label="Choose a cover photo" type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploading||isSubmitting} onChange={event=>void uploadCover(event)} className="sr-only"/>
-                    </label>
-                    {coverPreview && learningResourceType(coverPreview)==="image" && <div className="mt-3 flex items-center gap-3"><div className="relative h-20 w-28 overflow-hidden rounded-xl"><Image unoptimized src={coverPreview} alt="Selected cover" fill sizes="112px" className="object-cover"/></div><Button type="button" variant="outline" onClick={()=>setForm(current=>({...current,coverUrl:""}))}>Remove cover</Button></div>}
-                  </div>
-                  <label className="block text-sm font-semibold">Cover image URL (optional)<Input type="url" value={form.coverUrl} onChange={e=>setForm({...form,coverUrl:e.target.value})} placeholder="https://.../cover.jpg" className="mt-2"/><span className="mt-2 block text-xs font-normal text-slate-600">Use a cover photo for a document or video. The original learning file stays separate.</span></label>
+                <div className={styles.editor}>
+                <section className={styles.details} aria-label="Resource details">
+                  <div><h2>Resource details</h2><p className="mt-1 text-sm text-muted-foreground">Give your residents something useful to learn.</p></div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Resource Title <span className="text-red-500">*</span></label>
                     <Input 
@@ -225,9 +216,25 @@ export default function CreateEducationResourcePage() {
                   </div>
 
                   {form.type==="Article" && <p className="rounded-xl bg-[#eaf0df] p-4 text-sm">Write the article above, or attach a document or public article link below. An attachment and cover photo are optional for a written article.</p>}
+
+                </section>
+                <section className={styles.media} aria-label="Cover and attachments">
+                  <div><h2>Cover &amp; attachments</h2><p className="mt-1 text-sm text-muted-foreground">Choose how your resource appears and opens.</p></div>
+                  <div className="rounded-2xl border border-[#cbd9c7] bg-[#f7f4e9] p-5">
+                    <p className="font-semibold">Cover photo <span className="text-xs font-normal">(optional)</span></p>
+                    <p className="mt-1 text-sm text-muted-foreground">PDF pages and supported video frames appear automatically. Add your own cover here.</p>
+                    <label className="mt-4 flex cursor-pointer flex-wrap items-center gap-3 rounded-xl border-2 border-dashed border-[#8ba88f] bg-white/70 p-5 focus-within:ring-2 focus-within:ring-green-800">
+                      <UploadCloud aria-hidden="true" className="h-8 w-8 shrink-0 text-[#194f40]"/>
+                      <span className="flex-1"><strong className="block">{isUploading ? "Uploading…" : "Choose a cover photo"}</strong><small>JPG, PNG or WebP · up to 8 MB</small></span>
+                      <span className="rounded-full bg-[#194f40] px-4 py-2 text-sm font-semibold text-white">Browse files</span>
+                      <input aria-label="Choose a cover photo" type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploading||isSubmitting} onChange={event=>void uploadCover(event)} className="sr-only"/>
+                    </label>
+                    {coverPreview && learningResourceType(coverPreview)==="image" && <div className="mt-3 flex items-center gap-3"><div className="relative h-20 w-28 overflow-hidden rounded-xl"><Image unoptimized src={coverPreview} alt="Selected cover" fill sizes="112px" className="object-cover"/></div><Button type="button" variant="outline" onClick={()=>setForm(current=>({...current,coverUrl:""}))}>Remove cover</Button></div>}
+                  </div>
+                  <label className="block text-sm font-semibold">Cover image URL (optional)<Input type="url" value={form.coverUrl} onChange={e=>setForm({...form,coverUrl:e.target.value})} placeholder="https://.../cover.jpg" className="mt-2"/><span className="mt-2 block text-xs font-normal text-slate-600">Use a cover photo for a document or video. The original learning file stays separate.</span></label>
                   {/* File Upload Section */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
                         {form.type === "Video" ? "Video File, Stream URL, or Cover" : "Cover Image, Video or Document"}
                       </label>
@@ -332,10 +339,11 @@ export default function CreateEducationResourcePage() {
                       </label>
                     )}
                   </div>
+                </section>
                 </div>
 
                 {uploadError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{uploadError}</p>}
-                <div className="mt-10 flex items-center justify-end gap-3 pt-6 border-t border-slate-100 max-w-2xl">
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-6 border-t border-slate-200">
                   <Link href="/education">
                     <Button variant="outline" className="px-6 h-11 border-slate-200 text-slate-600 font-semibold rounded-xl">
                       Cancel
