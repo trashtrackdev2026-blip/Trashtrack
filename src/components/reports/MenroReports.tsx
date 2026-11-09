@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, FileCheck2, ImageIcon, Search, Send, Truck } from "lucide-react";
+import { AlertCircle, Archive, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, FileCheck2, ImageIcon, Search, Send, Truck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useReports, type CommunityReport } from "@/hooks/use-reports";
 import { updateReportStatus } from "@/lib/update-report";
@@ -25,7 +25,7 @@ const stageStyles: Record<MenroStage, string> = {
   collection: "bg-orange-50 text-orange-700 border-orange-100",
   resolved: "bg-green-50 text-green-800 border-green-100",
 };
-const stageIcons = { ready: Send, submitted: FileCheck2, review: Clock3, collection: Truck, resolved: CheckCircle2 };
+const stageIcons = { ready: Send, submitted: FileCheck2, review: Clock3, collection: Truck, resolved: Archive };
 const selectClass = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-2 focus:outline-green-700";
 
 function StatusBadge({ status }: { status: string }) {
@@ -128,6 +128,7 @@ export function MenroReportsView({ reports, loading, error, retry, role, baranga
     </div>
 
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {stage === "resolved" && <p className="border-b border-slate-100 px-5 py-3 text-sm text-green-900">Resolved reports are archived automatically. Open a report to review its evidence and final action details.</p>}
       <nav aria-label="Report progress" className="flex gap-5 overflow-x-auto border-b border-slate-100 px-5">
         {MENRO_STAGES.map(item => <button key={item.id} type="button" onClick={() => chooseStage(item.id)} aria-pressed={stage === item.id} className={`shrink-0 border-b-2 py-4 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-green-700 ${stage === item.id ? "border-green-700 text-green-800" : "border-transparent text-slate-500 hover:text-green-800"}`}>{item.label}</button>)}
       </nav>

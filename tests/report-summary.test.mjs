@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { filterReportSummary } from "../src/lib/report-summary.ts";
+import { isReportArchived, canUpdateReport } from "../src/lib/report-workflow.ts";
 
 const reports = [
   { id: "pending", status: "pending", location: "Sala" },
@@ -36,4 +37,28 @@ test("empty and resolved-only lists never leak a report from a different categor
     assert.deepEqual(filterReportSummary(resolved, "pending", role), []);
     assert.deepEqual(filterReportSummary(resolved, "resolved", role), resolved);
   }
+});
+
+test("resolution automatically moves current and legacy reports from active to archived without removing history", () => {
+  const records = [...reports, {id:"legacy",status:" Resolved ",location:"Sala",description:"Original details"},
+    {id:"incorrect-flag",status:"Endorsed",location:"Sala",archived:true}];
+  const archived = filterReportSummary(records,"archived","Admin");
+  const active = filterReportSummary(records,"active","Admin");
+  assert.deepEqual(ids(archived),["resolved","legacy"]);
+  assert.ok(active.some(report => report.id === "incorrect-flag"), "Only resolved reports are archived");
+  assert.equal(active.length + archived.length, records.length);
+  assert.equal(archived[1].description,"Original details");
+  assert.equal(filterReportSummary(records,"all","Admin").length,records.length);
+  assert.equal(isReportArchived({status:"For MENRO Review"}),false);
+  assert.equal(isReportArchived({}),false);
+  for (const report of archived) assert.equal(canUpdateReport("Admin",null,report,"Endorsed"),false);
+});
+
+test("archived views retain the barangay scope and a resolved report switches views immediately", () => {
+  const scoped = reports.filter(report => report.location === "Sala");
+  const activeBefore = filterReportSummary(scoped,"active","Semi-Admin");
+  const changed = scoped.map(report => report.id === "verified" ? {...report,status:"Resolved"} : report);
+  assert.equal(filterReportSummary(changed,"active","Semi-Admin").length,activeBefore.length-1);
+  assert.deepEqual(ids(filterReportSummary(changed,"archived","Semi-Admin")),["verified","resolved"]);
+  assert.ok(filterReportSummary(changed,"archived","Semi-Admin").every(report=>report.location==="Sala"));
 });

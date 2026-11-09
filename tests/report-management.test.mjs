@@ -201,3 +201,35 @@ test("Private delivery failure keeps status, final resolution notes, history and
 test("MENRO final resolution requires the final action details",async()=>{
  const app=fixture({profile:{role:"Admin",barangay:""},report:{status:"Endorsed"}}),before=structuredClone([...app.records]);await app.post({status:"Resolved",collectionConfirmed:true,remarks:" "},400);assert.deepEqual([...app.records],before);
 });
+
+test("MENRO and barangay resolution archive the report atomically with server-owned metadata and one resident update",async()=>{
+ for (const options of [
+  {profile:{role:"Admin",barangay:""},report:{status:"Endorsed"}},
+  {report:{status:"UnderReview"}},
+ ]) {
+  const app=fixture({...options,privatePushFails:true,report:{...options.report,description:"Original resident concern",attachments:[{url:"https://example.invalid/evidence.jpg",type:"image"}]}});
+  const result=await app.post({status:"Resolved",severity:"Minor",collectionConfirmed:true,remarks:"The team completed the cleanup.",archived:false,archivedBy:"forged",archivedAt:"fake date",archivedByRole:"Resident"});
+  const report=app.records.get("reports/one");
+  assert.equal(report.status,"Resolved");assert.equal(report.archived,true);
+  assert.equal(report.archivedAt,"server timestamp");assert.equal(report.archivedBy,"official");
+  assert.equal(report.archivedByRole,options.profile?.role || "Semi-Admin");
+  assert.equal(report.description,"Original resident concern");assert.equal(report.attachments.length,1);
+  assert.equal(report.progressHistory.length,1);assert.equal(report.progressHistory[0].status,"Resolved");
+  assert.ok(app.records.has("resident_notifications/"+result.progressId));assert.ok(result.deliveryError);
+  const audits=[...app.records].filter(([key])=>key.startsWith("audit_logs/"));
+  assert.equal(audits.length,1);assert.equal(audits[0][1].archived,true);
+  const before=structuredClone([...app.records]);await app.invoke(app.lastRequest);assert.deepEqual([...app.records],before);
+ }
+});
+
+test("unresolved transitions and rejected resolution requests cannot archive reports",async()=>{
+ const app=fixture();await app.post({archived:true,archivedBy:"forged"});
+ assert.equal(app.records.get("reports/one").archived,undefined);
+ assert.equal(app.records.get("reports/one").archivedAt,undefined);
+ for(const body of [{collectionConfirmed:false},{remarks:" "},{expectedRevision:9}]) {
+  const denied=fixture({profile:{role:"Admin",barangay:""},report:{status:"Endorsed"}});
+  const before=structuredClone([...denied.records]);
+  await denied.post({status:"Resolved",collectionConfirmed:true,remarks:"Work completed",...body},body.expectedRevision?409:body.collectionConfirmed===false?403:400);
+  assert.deepEqual([...denied.records],before);
+ }
+});

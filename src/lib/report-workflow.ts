@@ -21,6 +21,12 @@ export function reportWorkflowStatus(report: { status?: unknown; menroReviewedAt
   return normalizeReportStatus(status) === "For MENRO Review" && report.menroReviewedAt != null ? "MENRO Under Review" : status;
 }
 
+// Resolution is the archive boundary, including reports saved before archive metadata existed.
+// Keep the resident-facing status as Resolved so timelines and analytics retain their meaning.
+export function isReportArchived(report: { status?: unknown }): boolean {
+  return typeof report.status === "string" && normalizeReportStatus(report.status) === "Resolved";
+}
+
 export function nextReportStatuses(role: ReportRole, status: string): ReportStatus[] {
   const current = normalizeReportStatus(status);
   if (role === "Semi-Admin") {

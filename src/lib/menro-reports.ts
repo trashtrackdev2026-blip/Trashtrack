@@ -9,7 +9,7 @@ export const MENRO_STAGES: { id: MenroStage; label: string; description: string 
   { id: "submitted", label: "Submitted to MENRO", description: "Waiting for MENRO review" },
   { id: "review", label: "Under MENRO Review", description: "Being reviewed by MENRO" },
   { id: "collection", label: "In Progress", description: "Response action planned" },
-  { id: "resolved", label: "Resolved", description: "MENRO action completed" },
+  { id: "resolved", label: "Archived", description: "Resolved reports kept for reference" },
 ];
 
 export function menroStage(status: string): MenroStage | null {
@@ -24,6 +24,7 @@ export function menroStage(status: string): MenroStage | null {
 }
 
 export function menroStatusLabel(status: string) {
+  if (menroStage(status) === "resolved") return "Resolved";
   return MENRO_STAGES.find(stage => stage.id === menroStage(status))?.label || "Pending verification";
 }
 

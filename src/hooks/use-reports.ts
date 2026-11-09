@@ -5,7 +5,7 @@ import { collection, doc, getDoc, query, where, type DocumentData, type QueryDoc
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { subscribeWithDeadline } from "@/lib/live-data";
-import { reportWorkflowStatus } from "@/lib/report-workflow";
+import { isReportArchived, reportWorkflowStatus } from "@/lib/report-workflow";
 
 export interface CommunityReport {
   id: string;
@@ -29,6 +29,8 @@ export interface CommunityReport {
   resolvedByRole?: string;
   resolvedByName?: string;
   resolvedAt?: string;
+  archived?: boolean;
+  archivedAt?: string;
   actionKind?: string;
   actionNotes?: string;
   actionDate?: string;
@@ -72,6 +74,7 @@ export function useReports() {
               forwardedByName: typeof data.forwardedByName === "string" ? data.forwardedByName : "",
               forwardedAt: data.forwardedAt?.toDate?.().toISOString() || "",
               statusRevision: Number(data.statusRevision || 0), resolvedByRole: data.resolvedByRole || "", resolvedByName: data.resolvedByName || "", resolvedAt: data.resolvedAt?.toDate?.().toISOString() || "",
+              archived: isReportArchived(data), archivedAt: data.archivedAt?.toDate?.().toISOString() || "",
               actionKind: data.actionKind || "", actionNotes: data.actionNotes || "", actionDate: data.actionDate || "", actionTime: data.actionTime || "",
             } satisfies CommunityReport;
           }).sort((a, b) => b.date.localeCompare(a.date));

@@ -82,8 +82,8 @@ export async function POST(request: Request) {
         ...(next === "For MENRO Review" ? { forwardedBy: identity.uid, forwardedByName: actorName, forwardedAt: FieldValue.serverTimestamp() } : {}),
         ...(next === "MENRO Under Review" ? { menroReviewedBy: identity.uid, menroReviewedByName: actorName, menroReviewedAt: FieldValue.serverTimestamp() } : {}),
         ...(next === "Endorsed" ? { endorsedBy: identity.uid, endorsedAt: FieldValue.serverTimestamp() } : {}),
-        ...(next === "Resolved" ? { resolvedBy: identity.uid, resolvedByName: actorName, resolvedByRole: role, resolvedAt: FieldValue.serverTimestamp(), resolutionNotes: body.remarks.trim(), collectedBy: identity.uid, collectedAt: FieldValue.serverTimestamp() } : {}) });
-      const audit = { action: "report.status", actor: identity.uid, actorRole:role, target: body.reportId, barangay: report.location, from: currentStatus, to: next, findings:body.remarks.trim(), ...action, ...(scheduleId ? { scheduleId } : {}), at: FieldValue.serverTimestamp() };
+        ...(next === "Resolved" ? { resolvedBy: identity.uid, resolvedByName: actorName, resolvedByRole: role, resolvedAt: FieldValue.serverTimestamp(), resolutionNotes: body.remarks.trim(), collectedBy: identity.uid, collectedAt: FieldValue.serverTimestamp(), archived: true, archivedAt: FieldValue.serverTimestamp(), archivedBy: identity.uid, archivedByRole: role } : {}) });
+      const audit = { action: "report.status", actor: identity.uid, actorRole:role, target: body.reportId, barangay: report.location, from: currentStatus, to: next, findings:body.remarks.trim(), ...action, ...(next === "Resolved" ? { archived: true } : {}), ...(scheduleId ? { scheduleId } : {}), at: FieldValue.serverTimestamp() };
       tx.create(db.collection("audit_logs").doc(), audit);
       tx.create(operation, { ...audit, changeHash, notificationId:scheduleNoticeId,progressId });
       return {notificationId:scheduleNoticeId,progressId};

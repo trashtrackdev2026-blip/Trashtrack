@@ -6,9 +6,9 @@ import { ReportEvidence } from "@/components/reports/ReportEvidence";
 import { ReportActionFields } from "./ReportActionFields";
 import { reportActionFields, type ReportActionInput } from "@/lib/report-action";
 import type { ReportUpdateInput } from "@/lib/update-report";
-import { normalizeReportStatus } from "@/lib/report-workflow";
+import { isReportArchived, normalizeReportStatus } from "@/lib/report-workflow";
 import { useRef, useState } from "react";
-import { Search, FileText, Clock, CheckCircle2, AlertTriangle, Check, Send, ArrowUpRight } from "lucide-react";
+import { Search, FileText, Clock, Archive, AlertTriangle, Check, Send, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -48,7 +48,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const preservedDraft = useRef<{id:string; status:string; remarks:string; confirmed:boolean; action:ReportActionInput} | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [saveMessage,setSaveMessage]=useState("");
-  const [summaryFilter, setSummaryFilter] = useState<ReportSummaryFilter>("all");
+  const [summaryFilter, setSummaryFilter] = useState<ReportSummaryFilter>("active");
 
   const [search, setSearch] = useState("");
   const [barangayFilter, setBarangayFilter] = useState("all");
@@ -66,8 +66,9 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     const draft=preservedDraft.current?.id===report.id?preservedDraft.current:null;
     setActiveReportId(report.id);setNewStatus(draft&&nextReportStatuses(role,report.status).some(status=>status===draft.status)?draft.status:"");setRemarks(draft?.remarks||"");setCollectionConfirmed(false);setActionInput(draft?.action||{});setOpenedVersion({expectedStatus:report.status,expectedRevision:report.statusRevision||0});setUpdateError(null);
   };
-  const summaryLabels = { all: "All reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
-    review: role === "Semi-Admin" ? "For MENRO Review" : "Under Review", resolved: role === "Semi-Admin" ? "Resolved" : "Resolved Reports" };
+  const summaryLabels = { all: "All reports", active: "Active reports", archived: "Archived reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
+    review: role === "Semi-Admin" ? "For MENRO Review" : "Under Review", resolved: "Archived reports" };
+  const archiveSelected = summaryFilter === "archived" || summaryFilter === "resolved";
   const selectSummary = (filter: ReportSummaryFilter) => {
     if (isUpdating) return;
     setShowConfirm(false); setSummaryFilter(filter); setActiveReportId(null); setNewStatus(""); setRemarks(""); setCollectionConfirmed(false); setUpdateError(null);
@@ -97,7 +98,8 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     setUpdateError(null);
     try {
       const result=await onUpdate(activeReport, newStatus, remarks, collectionConfirmed, {...actionInput,...openedVersion});
-      setSaveMessage(result?.deliveryError ? "Report update saved. Phone delivery is pending; resident progress notices retry when the app reconnects." : "Report update saved.");
+      const saved = normalizeReportStatus(newStatus) === "Resolved" ? "Report resolved and automatically archived. Open Archived reports to review it." : "Report update saved.";
+      setSaveMessage(saved + (result?.deliveryError ? " Phone delivery is pending; resident progress notices retry when the app reconnects." : ""));
       setShowConfirm(false);
       setNewStatus("");
       setRemarks("");
@@ -162,11 +164,11 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
             />
           )}
           <KpiCard
-            {...cardFilter("resolved")}
-            title={role === "Semi-Admin" ? "Resolved" : "Resolved Reports"}
-            value={filterReportSummary(reports, "resolved", role).length.toString()}
-            subtitle={role === "Semi-Admin" ? "Already addressed" : "Successfully resolved"}
-            icon={<CheckCircle2 className="w-7 h-7" />}
+            {...cardFilter("archived")}
+            title="Archived Reports"
+            value={filterReportSummary(reports, "archived", role).length.toString()}
+            subtitle="Automatically archived on resolution"
+            icon={<Archive className="w-7 h-7" />}
             iconBgColor="bg-[#E8F5E9]"
             iconColor="text-[#2E7D32]"
           />
@@ -187,10 +189,17 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
         <div className="min-w-0">
 
           {/* Main Table Area */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <nav aria-label="Report storage" className="tt-tabs">
+              <button type="button" aria-pressed={summaryFilter === "active"} disabled={isUpdating} onClick={() => selectSummary("active")}>Active reports ({filterReportSummary(reports, "active", role).length})</button>
+              <button type="button" aria-pressed={archiveSelected} disabled={isUpdating} onClick={() => selectSummary("archived")}>Archived reports ({filterReportSummary(reports, "archived", role).length})</button>
+            </nav>
+            <p className="text-xs text-muted-foreground">Resolved reports are archived automatically and remain available for reference.</p>
+          </div>
           <div id="reports-table" className="min-w-0 flex-1 tt-surface flex flex-col overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 p-4">
               <h2 className="text-sm font-semibold text-slate-900">{summaryLabels[summaryFilter]}</h2>
-              {summaryFilter !== "all" && <button type="button" onClick={() => selectSummary("all")} className="rounded text-xs font-semibold text-green-800 underline focus-visible:outline-2 focus-visible:outline-green-700">Show all reports</button>}
+              {summaryFilter !== "active" && <button type="button" disabled={isUpdating} onClick={() => selectSummary("active")} className="rounded text-xs font-semibold text-green-800 underline focus-visible:outline-2 focus-visible:outline-green-700">Back to active reports</button>}
             </div>
 
             <div className="tt-filter-bar mx-4 mt-4">
@@ -201,9 +210,9 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
             <div className="px-4 pb-2">
               {visibleReports.map(report => { const photo=report.imageUrl || report.attachments.find(item => item.type === "image")?.url;return <button key={report.id} type="button" disabled={isUpdating} className="tt-report-item" aria-pressed={activeReport?.id === report.id} onClick={() => openReport(report)}>
                 <span className="tt-report-thumbnail">{photo ? <Image src={photo} alt="Report evidence" fill sizes="93px" className="object-cover" /> : <FileText aria-hidden="true" />}</span>
-                <span className="tt-report-item-copy"><strong>{report.type}</strong><small>…{report.id.slice(-6)}</small><small>{report.location} · {report.date || "Date not recorded"}</small></span><span className={"tt-status " + (report.status.toLowerCase() === "pending" ? "tt-status-pending" : "")}>{REPORT_STATUS_LABELS[report.status as keyof typeof REPORT_STATUS_LABELS] || report.status}</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="tt-report-item-copy"><strong>{report.type}</strong><small>…{report.id.slice(-6)}{isReportArchived(report) ? " · Archived" : ""}</small><small>{report.location} · {report.date || "Date not recorded"}</small></span><span className={"tt-status " + (report.status.toLowerCase() === "pending" ? "tt-status-pending" : "")}>{REPORT_STATUS_LABELS[report.status as keyof typeof REPORT_STATUS_LABELS] || report.status}</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               </button>;})}
-              {!loading && visibleReports.length === 0 && <p className="tt-empty">No reports match this view.</p>}
+              {!loading && visibleReports.length === 0 && <p className="tt-empty">{archiveSelected && !search && barangayFilter === "all" && typeFilter === "all" ? "No archived reports yet. Reports appear here automatically when resolved." : "No reports match this view."}</p>}
             </div>
 
             {/* Pagination */}
@@ -230,6 +239,13 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
               </div>
 
               <div className="p-5 space-y-6">
+
+                {isReportArchived(activeReport) && <div className="flex items-start gap-3 rounded-xl border border-[#cbd9c7] bg-[#e9edd9] p-4 text-sm text-[#194f3d]">
+                  <Archive className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                  <div><p className="font-semibold">Archived report</p><p>This report was resolved and archived automatically. Its evidence and resolution details are kept below.</p>
+                    {(activeReport.archivedAt || activeReport.resolvedAt) && <p className="mt-1 text-xs">Resolved on {new Date(activeReport.archivedAt || activeReport.resolvedAt!).toLocaleString("en-PH", {timeZone:"Asia/Manila",year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</p>}
+                  </div>
+                </div>}
 
                 {/* Evidence */}
                 <div>
@@ -293,7 +309,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                   <p className="whitespace-pre-wrap">{activeReport.remarks}</p>
                 </div>}
                 {/* Update Status Form */}
-                <div className="tt-dark-panel tt-report-review mt-2">
+                {allowedStatuses.length > 0 && <div className="tt-dark-panel tt-report-review mt-2">
                   <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-4">Update Status</h4>
 
                   <div className="space-y-4">
@@ -311,9 +327,6 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                       </Select>
                     </div>
 
-                    {allowedStatuses.length === 0 && <p className="text-xs text-slate-600">
-                      {role === "Semi-Admin" ? "Forwarded reports are handled by MENRO. Resolved reports remain available for reference." : "MENRO can schedule a report after the Barangay Captain verifies and forwards it."}
-                    </p>}
                     <ReportActionFields role={role} status={newStatus} value={actionInput} onChange={setActionInput} disabled={isUpdating} barangay={activeReport.location} />
                     {newStatus === "Resolved" && <label className="flex gap-2 items-start text-xs text-slate-700">
                       <input type="checkbox" checked={collectionConfirmed} onChange={event => setCollectionConfirmed(event.target.checked)} className="mt-0.5" />
@@ -340,7 +353,11 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                       Update Status
                     </Button>
                   </div>
-                </div>
+                </div>}
+
+                {allowedStatuses.length === 0 && !isReportArchived(activeReport) && <p className="text-sm text-muted-foreground">
+                  {role === "Semi-Admin" ? "Forwarded reports are handled by MENRO." : "MENRO can plan a response after the barangay official verifies and forwards the report."}
+                </p>}
 
               </div>
       <Dialog open={showConfirm && !!newStatus && !!activeReport} onOpenChange={open => { if (!isUpdating) setShowConfirm(open); }}>
@@ -357,7 +374,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
               <dt className="text-xs font-semibold text-slate-500">New Status:</dt>
               <dd><span className={`inline-block rounded-full px-2 py-1 text-xs font-bold ${getStatusColor(newStatus)}`}>{REPORT_STATUS_LABELS[newStatus as keyof typeof REPORT_STATUS_LABELS] || newStatus}</span></dd>
             </dl>
-            <DialogDescription className="text-center text-sm text-slate-600">Are you sure you want to update this report?</DialogDescription>
+            <DialogDescription className="text-center text-sm text-slate-600">{normalizeReportStatus(newStatus) === "Resolved" ? "Confirm resolution? The report will move to Archived reports automatically and the resident will receive the resolution update." : "Are you sure you want to update this report?"}</DialogDescription>
             {updateError && <div className="space-y-3"><p role="alert" className="text-sm text-red-700">{updateError}</p>{updateError.includes("changed") && <Button variant="outline" onClick={() => {preservedDraft.current={id:activeReport.id,status:newStatus,remarks,confirmed:collectionConfirmed,action:actionInput};setShowConfirm(false);setActiveReportId(null);retry();setSaveMessage("Reloading the latest reports. Reopen this report to review its current stage; your notes and action draft are kept. Confirm the action again after reviewing.");}}>Review latest report</Button>}</div>}
           </div>
           <DialogFooter className="sticky bottom-0 mx-0 mb-0 flex-row gap-3 border-t border-slate-100 bg-white p-4">
