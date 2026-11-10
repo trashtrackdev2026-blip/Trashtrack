@@ -13,6 +13,7 @@ import { auth, db } from "@/lib/firebase";
 import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { staffRequest } from "@/lib/staff-client";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { manilaDateTime } from "@/lib/scheduling-time";
 
 export default function CreateNotificationPage() {
   const router = useRouter();
@@ -27,7 +28,8 @@ export default function CreateNotificationPage() {
     category: "Collection Schedule",
     recipients: "All Barangays",
     message: "Waste collection in Barangay Poblacion will take place on Monday at 8:00 AM. Please place garbage outside before collection time.",
-    push: true
+    push: true,
+    endDate: "",
   });
 
   const handleSendNotification = async () => {
@@ -38,7 +40,7 @@ export default function CreateNotificationPage() {
     try {
       const result = await staffRequest<{ saved: boolean; queued: boolean; deliveryError?: string }>("/api/notifications/create", {
         id: notificationId, title: form.title, message: form.message, recipients: form.recipients,
-        type: form.category === "Collection Schedule" ? "schedule" : form.category === "System Alert" ? "alert" : "event", push: form.push,
+        type: form.category === "Collection Schedule" ? "schedule" : form.category === "System Alert" ? "alert" : "event", push: form.push, endDate: form.endDate,
       });
       if (result.saved) setSavedNotificationId(notificationId);
       if (form.push && !result.queued) throw new Error(result.deliveryError || "Phone delivery is pending. Retry this saved notification.");
@@ -155,6 +157,14 @@ export default function CreateNotificationPage() {
                   </span>
                 </div>
               </div>
+
+              <label className="block max-w-xs text-sm font-semibold">
+                End date (optional)
+                <Input type="date" className="mt-2" min={manilaDateTime().date} value={form.endDate}
+                  disabled={isSending || savedNotificationId !== null}
+                  onChange={event => setForm({ ...form, endDate: event.target.value })} />
+                <span className="mt-2 block text-xs font-normal text-muted-foreground">Editing closes after this date in Philippine time.</span>
+              </label>
 
               <div className="space-y-3 pt-2">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Delivery Options <span className="text-red-500">*</span></label>

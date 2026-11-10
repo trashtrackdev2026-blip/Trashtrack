@@ -224,7 +224,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           {/* Report details open only after a report is selected. */}
           <Dialog open={!!activeReport} onOpenChange={open => { if (!open && !isUpdating) { setActiveReportId(null);setShowConfirm(false);setNewStatus("");setRemarks(""); } }}>
           {activeReport && (
-            <DialogContent key={activeReport.id} className="tt-content tt-report-dialog gap-0 p-0 sm:max-w-3xl" showCloseButton={!isUpdating}>
+            <DialogContent key={activeReport.id} className="tt-content tt-report-dialog gap-0 p-0" showCloseButton={!isUpdating}>
               <DialogDescription className="sr-only">Review the submitted evidence, location and report status.</DialogDescription>
               <div className="p-5 pr-12 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
                 <div className="flex flex-col">
@@ -238,25 +238,18 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                 </div>
               </div>
 
-              <div className="p-5 space-y-6">
-
-                {isReportArchived(activeReport) && <div className="flex items-start gap-3 rounded-xl border border-[#cbd9c7] bg-[#e9edd9] p-4 text-sm text-[#194f3d]">
-                  <Archive className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-                  <div><p className="font-semibold">Archived report</p><p>This report was resolved and archived automatically. Its evidence and resolution details are kept below.</p>
-                    {(activeReport.archivedAt || activeReport.resolvedAt) && <p className="mt-1 text-xs">Resolved on {new Date(activeReport.archivedAt || activeReport.resolvedAt!).toLocaleString("en-PH", {timeZone:"Asia/Manila",year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</p>}
-                  </div>
-                </div>}
-
+              <div className="tt-report-workspace">
+                <section className="tt-report-pane" aria-label="Report evidence and information" tabIndex={0}>
                 {/* Evidence */}
                 <div>
-                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-3">Evidence photos and videos</h4>
+                  <h4 className="tt-report-section-title">Evidence photos and videos</h4>
                   <ReportEvidence report={activeReport} />
                 </div>
 
                 {/* Report Information */}
                 <div>
-                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Information</h4>
-                  <div className="grid grid-cols-2 gap-y-4 gap-x-2">
+                  <h4 className="tt-report-section-title">Report information</h4>
+                  <div className="grid grid-cols-2 gap-3 rounded-lg bg-[#f8faf3] p-3 sm:grid-cols-4">
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] font-semibold text-slate-500">Submitted By</span>
                       <span className="text-xs font-bold text-slate-900">{activeReport.reporterName}</span>
@@ -278,7 +271,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
 
                 {/* Report Details */}
                 <div>
-                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Description</h4>
+                  <h4 className="tt-report-section-title">Description</h4>
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                     <span className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
                       {activeReport.description || "No description provided."}
@@ -289,8 +282,8 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                 {/* Location Map */}
                 {(activeReport.latitude && activeReport.longitude) && (
                   <div>
-                    <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-3">Pinned Location</h4>
-                    <div className="w-full h-48 rounded-xl overflow-hidden shadow-sm border border-slate-200">
+                    <h4 className="tt-report-section-title">Pinned location</h4>
+                    <div className="tt-report-map">
                       <ReportMap
                         latitude={activeReport.latitude}
                         longitude={activeReport.longitude}
@@ -299,17 +292,24 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                     </div>
                   </div>
                 )}
-
+                </section>
+                <section className="tt-report-pane" aria-label="Report status and actions" tabIndex={0}>
+                {isReportArchived(activeReport) && <div className="flex items-start gap-3 rounded-xl border border-[#cbd9c7] bg-[#e9edd9] p-4 text-sm text-[#194f3d]">
+                  <Archive className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                  <div><p className="font-semibold">Archived report</p><p>This report was resolved and archived automatically.</p>
+                    {(activeReport.archivedAt || activeReport.resolvedAt) && <p className="mt-1 text-xs">Resolved on {new Date(activeReport.archivedAt || activeReport.resolvedAt!).toLocaleString("en-PH", {timeZone:"Asia/Manila",year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</p>}
+                  </div>
+                </div>}
                 {(activeReport.resolvedByName || activeReport.actionKind) && <div className="rounded-lg bg-green-50 p-3 text-sm text-green-900">
                   {activeReport.resolvedByName && <p>Resolved by {activeReport.resolvedByName} ({activeReport.resolvedByRole === "Semi-Admin" ? "Barangay" : "MENRO"})</p>}
                   {activeReport.actionKind && <><p className="font-semibold">Response: {activeReport.actionKind}</p><p>{activeReport.actionNotes}</p><p>{activeReport.actionDate} {activeReport.actionTime}</p></>}
                 </div>}
                 {activeReport.remarks && <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
-                  <p className="font-semibold mb-1">Last review remarks</p>
+                  <p className="font-semibold mb-1">{isReportArchived(activeReport) ? "Resolution details" : "Last review remarks"}</p>
                   <p className="whitespace-pre-wrap">{activeReport.remarks}</p>
                 </div>}
                 {/* Update Status Form */}
-                {allowedStatuses.length > 0 && <div className="tt-dark-panel tt-report-review mt-2">
+                {allowedStatuses.length > 0 && <div className="tt-dark-panel tt-report-review">
                   <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-4">Update Status</h4>
 
                   <div className="space-y-4">
@@ -359,6 +359,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                   {role === "Semi-Admin" ? "Forwarded reports are handled by MENRO." : "MENRO can plan a response after the barangay official verifies and forwards the report."}
                 </p>}
 
+                </section>
               </div>
       <Dialog open={showConfirm && !!newStatus && !!activeReport} onOpenChange={open => { if (!isUpdating) setShowConfirm(open); }}>
         {activeReport && <DialogContent className="z-[60] max-h-[calc(100dvh-2rem)] overflow-y-auto gap-0 p-0 sm:max-w-sm" showCloseButton={!isUpdating}>

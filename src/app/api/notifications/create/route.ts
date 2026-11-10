@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
 import { StaffAccessError, staffAccessProblem, staffRole } from "@/lib/staff-access";
-import { notificationPublication } from "@/lib/notification-publication";
+import { announcementExpired, notificationPublication } from "@/lib/notification-publication";
 import { queuePhoneNotification } from "@/lib/notification-delivery";
 
 export const runtime = "nodejs";
@@ -24,6 +24,7 @@ export async function POST(request: Request) {
         if (existing.data()?.createdBy !== identity.uid || existing.data()?.publicationHash !== publicationHash) throw new StaffAccessError("This notification was already saved with different details.", 409);
         return;
       }
+      if (announcementExpired(publication.endDate)) throw new StaffAccessError("Choose today or a future announcement end date (Philippine time).", 400);
       tx.create(reference, { ...publication, publicationHash, createdBy: identity.uid, isRead: false,
         pushStatus: publication.push ? "pending" : "disabled", createdAt: FieldValue.serverTimestamp(), timestamp: FieldValue.serverTimestamp() });
     });

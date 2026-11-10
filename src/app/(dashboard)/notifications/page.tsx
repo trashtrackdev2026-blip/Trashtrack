@@ -27,7 +27,8 @@ import { staffRequest } from "@/lib/staff-client";
 import { EditNotificationDialog } from "@/components/notifications/EditNotificationDialog";
 import { notificationCategory, notificationCategoryLabel } from "@/lib/notification-categories";
 import { notificationDeliveryLabel } from "@/lib/notification-edit";
-import { phoneDeliveryDue } from "@/lib/notification-publication";
+import { announcementExpired, phoneDeliveryDue } from "@/lib/notification-publication";
+import { useSchedulingClock } from "@/lib/use-scheduling-clock";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface NotificationData {
@@ -38,6 +39,7 @@ interface NotificationData {
   type: string;
   isRead: boolean;
   date?: string;
+  endDate?: string;
   recipients: string;
   push: boolean;
   pushStatus: string;
@@ -50,6 +52,7 @@ interface NotificationData {
 
 export default function NotificationsPage() {
   const { role } = useAuth();
+  const announcementClock = useSchedulingClock();
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -99,6 +102,7 @@ export default function NotificationsPage() {
           title: data.title || "Notification",
           message: data.message || "",
           outcomeNotes:typeof data.outcomeNotes === "string" ? data.outcomeNotes : "",
+          endDate: typeof data.endDate === "string" ? data.endDate : undefined,
           type: data.type || "general",
           isRead: data.isRead || false,
           recipients: data.recipients || "All Barangays", push: data.push === true, pushStatus: data.pushStatus || (data.push ? "pending" : "disabled"),
@@ -279,6 +283,8 @@ export default function NotificationsPage() {
                     <td className="py-4 px-6">
                       <div className="flex flex-col">
                         <span className="text-xs font-semibold text-slate-900">{notif.date || 'Recently'}</span>
+                        {notif.endDate && <span className="mt-1 text-xs text-slate-600">Ends {notif.endDate}</span>}
+                        {announcementExpired(notif.endDate, announcementClock) && <span className="mt-1 text-xs font-semibold text-amber-900">Expired</span>}
                       </div>
                     </td>
                     <td className="py-4 px-6">
@@ -297,7 +303,7 @@ export default function NotificationsPage() {
                         >
                           <Eye className="w-3.5 h-3.5 mr-1.5" /> View
                         </Button>
-                        <Button variant="ghost" size="icon" aria-label={"Edit " + notif.title} disabled={notif.pushStatus === "sending"} onClick={()=>setEditingNotice(notif)}><Pencil/></Button>
+                        <Button variant="ghost" size="icon" aria-label={"Edit " + notif.title} disabled={notif.pushStatus === "sending" || announcementExpired(notif.endDate, announcementClock)} onClick={()=>setEditingNotice(notif)}><Pencil/></Button>
                         <Button aria-label={"Delete " + notif.title} onClick={() => {setDeleteTarget(notif);setDeleteError("");}} variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50">
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -411,6 +417,7 @@ export default function NotificationsPage() {
               </div>
 
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                {selectedNotif.endDate && <p className="mb-3 text-xs font-semibold text-slate-700">End date: {selectedNotif.endDate} (Philippine time){announcementExpired(selectedNotif.endDate, announcementClock) ? " · Expired, read-only" : ""}</p>}
                 <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{selectedNotif.message}</p>
                 {selectedNotif.outcomeNotes && <div className="mt-4 rounded-xl border bg-muted/30 p-4"><h3 className="text-sm font-semibold">Full outcome notes</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm">{selectedNotif.outcomeNotes}</p></div>}
               </div>

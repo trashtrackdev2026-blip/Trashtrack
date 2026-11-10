@@ -8,7 +8,7 @@ import * as policy from "../src/lib/staff-access.ts";
 import * as certificates from "../src/lib/certificate-data.ts";
 import { buildPhonePush } from "../src/lib/phone-push.ts";
 import { eventRegistrationClosed } from "../src/lib/event-lifecycle.ts";
-import { notificationPublication, phoneDeliveryDue } from "../src/lib/notification-publication.ts";
+import { announcementExpired, notificationPublication, phoneDeliveryDue } from "../src/lib/notification-publication.ts";
 import { eventFormFields, normalizedEventTime } from "../src/lib/event-form.ts";
 import { notificationEdit } from "../src/lib/notification-edit.ts";
 import * as clock from "../src/lib/scheduling-time.ts";
@@ -50,7 +50,7 @@ function fixture(options = {}) {
       pushes.push(payload); if ((options.failFirstPush && !failed) || (options.failSecondPush && pushes.length===2)) { failed = true; throw new Error("Messaging unavailable"); } return "test-message";
     } }) }, "./barangay-geofence": { BALETE_BARANGAYS: policy.STAFF_BARANGAYS }, "./phone-push": { buildPhonePush }, "./staff-access": policy,
     "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/schedule-policy": schedules, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates,
-    "@/lib/notification-publication": { notificationPublication }, "@/lib/event-form": {eventFormFields,normalizedEventTime}, "@/lib/notification-edit": {notificationEdit},
+    "@/lib/notification-publication": { announcementExpired, notificationPublication }, "@/lib/event-form": {eventFormFields,normalizedEventTime}, "@/lib/notification-edit": {notificationEdit},
     "@/lib/scheduling-time":clock,"@/lib/collection-outcome-notice":{collectionOutcomeNotice} };
   const delivery = {}; new Function("require","exports",deliveryCode)(name => modules[name] || require(name), delivery);
   modules["@/lib/notification-delivery"] = delivery;
@@ -313,6 +313,31 @@ test("An in-app-only announcement edit stays in-app and cannot escalate its audi
   const edit={id:notice.id,changeId:"in-app-edit",expectedRevision:0,title:"Changed title",message:notice.message,type:"general"};
   const result=await app.edit(edit);assert.equal(result.queued,false);assert.equal(app.pushes.length,0);assert.equal(app.records.get("notifications/"+result.notificationId).pushStatus,"disabled");
   await app.edit({...edit,changeId:"escalation",expectedRevision:1,push:true},400);
+});
+
+test("announcement expiry includes the entire selected Manila day", () => {
+  const existing = { ...notice, endDate: "2026-11-10" };
+  const beforeMidnight = Date.parse("2026-11-10T15:59:59.999Z");
+  const atMidnight = Date.parse("2026-11-10T16:00:00Z");
+  assert.equal(announcementExpired(existing.endDate, beforeMidnight), false);
+  assert.equal(announcementExpired(existing.endDate, atMidnight), true);
+  assert.equal(announcementExpired(undefined, atMidnight), false);
+});
+
+test("a staff member can set an end date but cannot reopen an expired announcement", async () => {
+  const app = fixture();
+  await app.create({ ...notice, endDate: "2099-02-30" }, 400);
+  await app.create({ ...notice, endDate: "2020-01-01" }, 400);
+  await app.create({ ...notice, push: false });
+  const ref = `notifications/${notice.id}`;
+  const edit = { id: notice.id, expectedRevision: 0, title: notice.title, message: notice.message, type: notice.type, endDate: "2099-12-31" };
+  assert.equal((await app.edit(edit)).changed, true);
+  assert.equal(app.records.get(ref).endDate, "2099-12-31");
+  app.records.set(ref, { ...app.records.get(ref), endDate: "2020-01-01" });
+  const before = [...app.records];
+  await app.edit({ ...edit, expectedRevision: 1 }, 409);
+  assert.deepEqual([...app.records], before);
+  assert.equal(app.pushes.length, 0);
 });
 
 test("Edited-notice phone failures keep the saved revision and retry the same new notice",async()=>{

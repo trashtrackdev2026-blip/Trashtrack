@@ -1,14 +1,28 @@
 "use client";
 import Image from "next/image";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import type { CommunityReport } from "@/hooks/use-reports";
 
 export function ReportEvidence({ report }: { report: CommunityReport }) {
+  const [index, setIndex] = useState(0);
   const attachments = report.attachments.length ? report.attachments
     : report.imageUrl ? [{ url: report.imageUrl, type: "image" as const }] : [];
-  if (!attachments.length) return <p className="rounded-xl border border-dashed p-5 text-sm text-slate-500">No evidence attached.</p>;
-  return <div className="tt-report-evidence grid gap-3 sm:grid-cols-2">{attachments.map((item, index) => <div key={`${item.url}:${index}`} className="min-w-0 overflow-hidden rounded-xl border bg-slate-50">
-    {item.type === "video" ? <video src={item.url} controls preload="metadata" playsInline className="h-48 w-full bg-black object-contain" />
-      : <a href={item.url} target="_blank" rel="noopener noreferrer"><Image src={item.url} alt={`Evidence photo ${index + 1}`} width={1000} height={700} unoptimized className="h-48 w-full object-contain" /></a>}
-    <a href={item.url} target="_blank" rel="noopener noreferrer" className="block p-2 text-xs font-semibold text-green-800 underline">Open {item.type === "video" ? "video" : "photo"} {index + 1}</a>
-  </div>)}</div>;
+  if (!attachments.length) return <p className="rounded-lg border border-dashed p-3 text-sm text-slate-500">No evidence attached.</p>;
+  const visibleIndex = Math.min(index, attachments.length - 1);
+  const item = attachments[visibleIndex];
+  const label = `${item.type === "video" ? "video" : "photo"} ${visibleIndex + 1}`;
+  const navigationClass = "grid size-9 place-items-center rounded-full border border-[#c8dac5] bg-white text-[#174c39] hover:bg-green-50 disabled:opacity-35";
+  return <div className="overflow-hidden rounded-lg border border-[#c8dac5] bg-[#f8faf3]">
+    {item.type === "video" ? <video key={item.url} src={item.url} controls preload="metadata" playsInline className="tt-evidence-media bg-black" />
+      : <a href={item.url} target="_blank" rel="noopener noreferrer" className="block"><Image src={item.url} alt={`Evidence ${label}`} width={1000} height={700} unoptimized className="tt-evidence-media" /></a>}
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#c8dac5] px-2 py-1.5">
+      <div className="flex items-center gap-2">
+        {attachments.length > 1 && <button type="button" className={navigationClass} aria-label="Previous attachment" disabled={visibleIndex === 0} onClick={() => setIndex(visibleIndex - 1)}><ChevronLeft size={17} /></button>}
+        <span aria-live="polite" className="text-xs font-medium">{visibleIndex + 1} of {attachments.length}</span>
+        {attachments.length > 1 && <button type="button" className={navigationClass} aria-label="Next attachment" disabled={visibleIndex === attachments.length - 1} onClick={() => setIndex(visibleIndex + 1)}><ChevronRight size={17} /></button>}
+      </div>
+      <a href={item.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 px-2 text-xs font-semibold text-green-800 underline">Open {label}<ExternalLink size={13} aria-hidden="true" /></a>
+    </div>
+  </div>;
 }

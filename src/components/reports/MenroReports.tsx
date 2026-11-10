@@ -13,7 +13,7 @@ import { canUpdateReport, type ReportRole } from "@/lib/report-workflow";
 import { filterMenroReports, MENRO_STAGES, menroStage, menroStatusLabel, reportDate, type MenroStage } from "@/lib/menro-reports";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const ReportMap = dynamic(() => import("@/components/ReportMap"), { ssr: false,
   loading: () => <div className="h-full w-full animate-pulse rounded-xl bg-slate-100" aria-label="Loading report location" /> });
@@ -151,19 +151,25 @@ export function MenroReportsView({ reports, loading, error, retry, role, baranga
     </div>
 
     <Dialog open={selectedId !== null} onOpenChange={open => { if (!open && !submitting.current) setSelectedId(null); }}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl" showCloseButton={!saving}>
-        <DialogHeader><DialogTitle>{canSend ? "Send report to MENRO" : "Report details"}</DialogTitle><DialogDescription>{canSend ? "Review the report and confirm its location before forwarding it to MENRO." : "Follow the report's current status and review its submitted evidence."}</DialogDescription></DialogHeader>
-        {selected ? <>
-          <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{selected.type}</p><StatusBadge status={selected.status} /></div>
-          <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 text-xs"><div><p className="mb-1 text-slate-500">Barangay</p><p className="font-semibold">{selected.location}</p></div><div><p className="mb-1 text-slate-500">Reported by</p><p className="font-semibold">{selected.reporterName}</p></div><div><p className="mb-1 text-slate-500">Date reported</p><DateReported value={selected.date} /></div><div><p className="mb-1 text-slate-500">Report ID</p><p className="break-all">{selected.id}</p></div></div>
-          <div><p className="mb-2 text-xs font-semibold text-slate-700">Description</p><p className="whitespace-pre-wrap rounded-lg border border-slate-100 p-3 text-sm leading-6 text-slate-600">{selected.description || "No description provided."}</p></div>
-          <ReportEvidence report={selected} />
-          {typeof selected.latitude === "number" && typeof selected.longitude === "number" && Number.isFinite(selected.latitude) && Number.isFinite(selected.longitude) && <div><p className="mb-2 text-xs font-semibold text-slate-700">Pinned location</p><div className="h-[280px] min-h-[280px] w-full sm:h-[360px]"><ReportMap latitude={selected.latitude} longitude={selected.longitude} label={selected.location} /></div></div>}
+      <DialogContent className="tt-content tt-report-dialog gap-0 p-0" showCloseButton={!saving}>
+        <DialogHeader className="border-b border-[#cbd9c7] bg-slate-50/50 px-5 py-4 pr-12"><DialogTitle>{canSend ? "Send report to MENRO" : "Report details"}</DialogTitle><DialogDescription>{canSend ? "Review the report and confirm its location before forwarding it to MENRO." : "Follow the report's current status and review its submitted evidence."}</DialogDescription></DialogHeader>
+        {selected ? <div className="tt-report-workspace" key={selected.id}>
+          <section className="tt-report-pane" aria-label="Report evidence and information" tabIndex={0}>
+          <div><h4 className="tt-report-section-title">Evidence photos and videos</h4><ReportEvidence report={selected} /></div>
+          <p className="font-semibold text-slate-900">{selected.type}</p>
+          <div><h4 className="tt-report-section-title">Report information</h4><div className="grid grid-cols-2 gap-3 rounded-lg bg-[#f8faf3] p-3 text-xs sm:grid-cols-4"><div><p className="mb-1 text-slate-500">Barangay</p><p className="font-semibold">{selected.location}</p></div><div><p className="mb-1 text-slate-500">Reported by</p><p className="font-semibold">{selected.reporterName}</p></div><div><p className="mb-1 text-slate-500">Date reported</p><DateReported value={selected.date} /></div><div><p className="mb-1 text-slate-500">Report ID</p><p className="break-all">{selected.id}</p></div></div></div>
+          <div><h4 className="tt-report-section-title">Description</h4><p className="whitespace-pre-wrap break-words rounded-lg bg-[#f8faf3] p-3 text-sm text-slate-600">{selected.description || "No description provided."}</p></div>
+          {typeof selected.latitude === "number" && typeof selected.longitude === "number" && Number.isFinite(selected.latitude) && Number.isFinite(selected.longitude) && <div><h4 className="tt-report-section-title">Pinned location</h4><div className="tt-report-map"><ReportMap latitude={selected.latitude} longitude={selected.longitude} label={selected.location} /></div></div>}
+          </section>
+          <section className="tt-report-pane" aria-label="Report status and actions" tabIndex={0}>
+          <h4 className="tt-report-section-title">{canSend ? "Forward report" : "Report status"}</h4>
+          <div><StatusBadge status={selected.status} /></div>
           {selected.forwardedAt && <p className="text-xs text-slate-500">Forwarded {reportDate(selected.forwardedAt)?.toLocaleString("en-PH", { timeZone: "Asia/Manila" })} by {selected.forwardedByName || "the barangay official"}.</p>}
           {canSend ? <><div><label htmlFor="forward-remarks" className="mb-2 block text-xs font-semibold text-slate-700">Verified findings and reason MENRO assistance is needed</label><textarea id="forward-remarks" rows={3} maxLength={2000} value={remarks} disabled={saving} onChange={event => setRemarks(event.target.value)} placeholder="Add the location details or findings MENRO should know…" className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:outline-2 focus:outline-green-700" /></div><label className="flex items-start gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-sm leading-5 text-green-900"><input type="checkbox" checked={confirmed} disabled={saving} onChange={event => setConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-green-800" />I verified the report and its location in {barangay}, assessed it as major and beyond barangay capacity, and confirm it needs MENRO assistance.</label></> : selected.remarks && <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><p className="mb-1 font-semibold">Latest remarks</p><p className="whitespace-pre-wrap">{selected.remarks}</p></div>}
           {sendError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{sendError}</p>}
-          <DialogFooter><Button variant="outline" disabled={saving} onClick={() => setSelectedId(null)}>{canSend ? "Cancel" : "Close"}</Button>{canSend && <Button disabled={!confirmed || !remarks.trim() || saving || loading || !!error} onClick={send} className="bg-green-800 text-white hover:bg-green-900"><Send className="h-4 w-4" />{saving ? "Sending…" : "Send to MENRO"}</Button>}{role === "Admin" && <Link href="/reports" className="inline-flex items-center justify-center rounded-lg bg-green-800 px-4 py-2 font-medium text-white hover:bg-green-900">Review in report management</Link>}</DialogFooter>
-        </> : <p className="py-6 text-sm text-slate-600">This report is no longer available. Close this dialog and refresh the list.</p>}
+          <div className="flex flex-wrap items-center gap-2"><Button variant="outline" disabled={saving} onClick={() => setSelectedId(null)}>{canSend ? "Cancel" : "Close"}</Button>{canSend && <Button disabled={!confirmed || !remarks.trim() || saving || loading || !!error} onClick={send} className="bg-green-800 text-white hover:bg-green-900"><Send className="h-4 w-4" />{saving ? "Sending…" : "Send to MENRO"}</Button>}{role === "Admin" && <Link href="/reports" className="inline-flex items-center justify-center rounded-lg bg-green-800 px-4 py-2 font-medium text-white hover:bg-green-900">Review in report management</Link>}</div>
+          </section>
+        </div> : <p className="p-5 text-sm text-slate-600">This report is no longer available. Close this dialog and refresh the list.</p>}
       </DialogContent>
     </Dialog>
   </section>;

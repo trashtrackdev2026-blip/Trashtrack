@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       const current = snap.data();if(!current) throw new StaffAccessError("Notification not found.",404);
       if(Number(current.revision || 0) !== body.expectedRevision) throw new StaffAccessError("This notification changed. Reopen it before editing.",409);
       const fields=notificationEdit(body,current);
-      if (fields.title === current.title && fields.message === current.message && fields.type === current.type) return {changed:false,push:false};
+      if (fields.title === current.title && fields.message === current.message && fields.type === current.type && fields.endDate === (current.endDate || "")) return {changed:false,push:false};
       tx.update(ref,{...fields,revision:body.expectedRevision+1,updatedBy:identity.uid,updatedAt:FieldValue.serverTimestamp()});
       tx.create(updateRef,{...fields,title:("Updated · " + fields.title).slice(0,100),originalNotificationId:body.id,sourceId:current.sourceId || body.id,
         recipients:current.recipients,push:current.push === true,pushStatus:current.push === true ? "pending" : "disabled",isRead:false,changeHash,sourceRevision:body.expectedRevision+1,createdBy:identity.uid,createdAt:FieldValue.serverTimestamp(),timestamp:FieldValue.serverTimestamp()});
