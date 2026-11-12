@@ -95,7 +95,13 @@ export async function generateCertificatePdf(snapshot: CertificateSnapshot): Pro
     positionSize -= 0.5;
     positionLines = wrapCertificateText(position, serif, positionSize, positionWidth);
   }
-  const positionY = baleteTemplate && !officerAboveLine ? Math.min(HEIGHT * 0.085, HEIGHT * 0.121 - (signatoryLines.length - 1) * signatorySize * 1.1 - positionSize * 1.2) : HEIGHT * 0.085;
+  let positionY = HEIGHT * 0.085;
+  if (officerAboveLine) {
+    positionY = HEIGHT * 0.117;
+  } else if (baleteTemplate) {
+    const lastSignatoryLine = signatoryY - (signatoryLines.length - 1) * signatorySize * 1.1;
+    positionY = Math.min(positionY, lastSignatoryLine - positionSize * 1.2);
+  }
   positionLines.forEach((line, index) => centered(line, serif, positionSize, positionY - index * positionSize * 1.1, bodyInk));
   pdf.setTitle("Certificate of Appreciation - " + snapshot.participantName);
   pdf.setAuthor(snapshot.organizer);

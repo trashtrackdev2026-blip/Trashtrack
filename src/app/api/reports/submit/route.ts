@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         }).length;
       }
       if (count >= dailyLimit) {
-        throw new StaffAccessError("You've reached today's limit of 5 reports. Your draft is still here. You can submit again after midnight (Philippine time).", 429);
+        throw new StaffAccessError("You've reached today's limit of 5 reports. You can submit again after midnight (Philippine time).", 429);
       }
       tx.create(ref, { ...report, userId: identity.uid, date: `${date} ${time}`, createdAt: FieldValue.serverTimestamp() });
       tx.set(quotaRef, { day: date, count: count + 1 });

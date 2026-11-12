@@ -19,6 +19,7 @@ import { CertificateNameCorrection } from "@/components/events/CertificateNameCo
 import { EventCertificateSettings } from "@/components/events/EventCertificateSettings";
 import { CertificatePreview } from "@/components/events/CertificatePreview";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { DeleteConfirmation } from "@/components/ui/DeleteConfirmation";
 import { EditEventDialog, type EditableEvent } from "@/components/events/EditEventDialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -68,6 +69,9 @@ export default function EventsPage() {
   const [attempt, setAttempt] = useState(0);
   const retryData = () => { setLoading(true); setDataError(null); setAttempt(value => value + 1); };
   const [editingEvent, setEditingEvent] = useState<EditableEvent | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EventData | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [selectedEventId, setActiveEventId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<{id: string; userId: string; userName: string; barangay: string; registeredAt: number; attended: boolean}[]>([]);
   const [participantsEventId, setParticipantsEventId] = useState<string | null>(null);
@@ -172,16 +176,20 @@ export default function EventsPage() {
     finally { setDownloadingCertificate(null); }
   };
 
-  const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm("Are you sure you want to delete this event?")) return;
+  const handleDeleteEvent = async () => {
+    if (!deleteTarget || deleting) return;
+    const eventId = deleteTarget.id;
+    setDeleting(true);
+    setDeleteError("");
     try {
       await deleteDoc(doc(db, "events", eventId));
-      if (activeEventId === eventId) {
-        setActiveEventId(current => current === eventId ? null : current);
-      }
+      setActiveEventId(current => current === eventId ? null : current);
+      setDeleteTarget(null);
     } catch (error) {
       console.error("Error deleting event:", error);
-      alert("Failed to delete event.");
+      setDeleteError("Could not delete the event. Please try again.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -301,7 +309,7 @@ export default function EventsPage() {
                     <span className="tt-event-thumbnail" aria-hidden="true">{event.img ? <Image src={event.img} alt="" fill sizes="(max-width:480px) 48px, (max-width:767px) 80px, 126px" /> : <Calendar />}</span>
                     <span className="tt-event-copy"><strong>{event.title}</strong><small>{event.barangay}</small><small>{event.date} · {event.time?.split(" - ").map(collectionTimeLabel).join(" – ")}</small><small>{event.participants || 0} registered · {event.status}</small></span>
                   </button>
-                  <div className="tt-event-row-actions"><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end">{event.status.toLowerCase() !== "completed" && <DropdownMenuItem onClick={() => {if(event.status === "Draft")router.push("/events/create?draft="+encodeURIComponent(event.id));else setEditingEvent(event);}}><Pencil />{event.status === "Draft"?"Continue draft":"Edit event"}</DropdownMenuItem>}<DropdownMenuItem className="text-red-700" onClick={() => void handleDeleteEvent(event.id)}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+                  <div className="tt-event-row-actions"><DropdownMenu><DropdownMenuTrigger className="tt-icon-control" aria-label={"Actions for " + event.title}><MoreVertical /></DropdownMenuTrigger><DropdownMenuContent align="end">{event.status.toLowerCase() !== "completed" && <DropdownMenuItem onClick={() => {if(event.status === "Draft")router.push("/events/create?draft="+encodeURIComponent(event.id));else setEditingEvent(event);}}><Pencil />{event.status === "Draft"?"Continue draft":"Edit event"}</DropdownMenuItem>}<DropdownMenuItem className="text-red-700" onClick={() => { setDeleteError(""); setDeleteTarget(event); }}><Trash2 />Delete event</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
                 </article>;})}
                 {!loading && filteredEvents.length === 0 && <p className="tt-empty">No events match your filters.</p>}
               </div>
@@ -534,6 +542,15 @@ export default function EventsPage() {
         </div>
       </div>
       {editingEvent && <EditEventDialog key={editingEvent.id} event={editingEvent} onClose={() => setEditingEvent(null)} />}
+      <DeleteConfirmation
+        open={deleteTarget !== null}
+        title="Delete this event?"
+        description={deleteTarget ? `“${deleteTarget.title}” will be removed from TrashTrack.` : ""}
+        busy={deleting}
+        error={deleteError}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDeleteEvent()}
+      />
     </>
   );
 }
