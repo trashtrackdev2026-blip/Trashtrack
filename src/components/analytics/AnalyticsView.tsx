@@ -76,7 +76,7 @@ export default function AnalyticsView() {
     let cancelled = false;
     void loadBaleteBoundaries().then(boundaries => {
       if (cancelled) return;
-      const next = periodReports.map(report => ({ barangay:assignReportBarangay(boundaries, report).barangay,
+      const next = periodReports.filter(report => normalizeReportStatus(String(report.status)) !== "Rejected").map(report => ({ barangay:assignReportBarangay(boundaries, report).barangay,
         type:reportCategory(report.type || report.category), resolved:normalizeReportStatus(String(report.status)) === "Resolved", date:analyticsReportDate(report) }));
       setMapped(next);
       const missing = next.filter(report => !report.barangay).length;
@@ -98,7 +98,7 @@ export default function AnalyticsView() {
   const tableRows = mapStats.filter(row => selectedBarangay === "all-barangays" || row.name === selectedBarangay);
   const tableTotal = tableRows.reduce((sum, row) => ({ total:sum.total + row.total,resolved:sum.resolved + row.resolved,pending:sum.pending + row.pending }), {total:0,resolved:0,pending:0});
   const sections: AnalyticsPdfSection[] = [
-    {title:"Report summary - " + periodLabel,rows:[{name:"Total reports",value:stats.totalReports},{name:"Resolved",value:stats.resolvedReports},{name:"Pending (all unresolved stages)",value:stats.pendingReports}]},
+    {title:"Report summary - " + periodLabel,rows:[{name:"Total reports",value:stats.totalReports},{name:"Resolved",value:stats.resolvedReports},{name:"Rejected",value:stats.rejectedReports},{name:"Pending (all active stages)",value:stats.pendingReports}]},
     {title:selectedMonth ? "Report submissions - " + periodLabel : "Waste concern trend - last six months",rows:trendData},
     {title:"Report categories (%)",rows:categoryData}, {title:"Community events",rows:eventData},
     {title:"Collection outcomes - " + periodLabel,rows:collectionData},

@@ -23,6 +23,7 @@ function fixture(options = {}) {
   const identity = { uid: "official", email_verified: true, auth_time: now, staffRole: policy.staffRole(profile.role), staffBarangay: profile.barangay, ...options.identity };
   const records = new Map([
     ["users/official", { ...profile, ...options.currentProfile }],
+    ["users/resident-owner", { role: "Resident", reportAbuseWarnings: 1 }],
     ["reports/one", { userId:"resident-owner", status: "UnderReview", location: "Poblacion", ...options.report }],
   ]);
   let sequence = 0;
@@ -81,6 +82,48 @@ test("Sending to MENRO records the authenticated official and status audit atomi
   const snapshot = structuredClone([...app.records]);
   await app.invoke(app.lastRequest);
   assert.deepEqual([...app.records], snapshot, "A repeated send must not duplicate or overwrite submission");
+});
+
+test("rejection saves the staff reason, private resident notice and one confirmed misuse warning", async () => {
+  const app = fixture();
+  await app.post({ status: "Rejected", rejectionReason: "Confirmed prank", remarks: "Reviewed the unrelated selfie and confirmed intentional misuse." });
+  const report = app.records.get("reports/one");
+  assert.equal(report.status, "Rejected");
+  assert.equal(report.rejectedByName, "Test Official");
+  assert.equal(report.rejectionReason, "Confirmed prank");
+  assert.equal(report.archived, undefined);
+  const notice = [...app.records].find(([key]) => key.startsWith("resident_notifications/"))[1];
+  assert.equal(notice.recipientId, "resident-owner");
+  assert.equal(notice.status, "Rejected");
+  assert.match(notice.fullMessage, /intentional misuse/);
+  assert.match(notice.fullMessage, /Repeated prank reports/);
+  assert.equal(app.records.get("users/resident-owner").reportAbuseWarnings, 2);
+  const before = structuredClone([...app.records]);
+  await app.invoke(app.lastRequest);
+  assert.deepEqual([...app.records], before, "Lost-response retry must not duplicate warnings or notifications");
+});
+
+test("rejection requires verified findings and cannot cross barangays or close resolved reports", async () => {
+  for (const body of [{ remarks: "" }, { verificationConfirmed: false }, { rejectionReason: "invented" }]) {
+    const app = fixture();
+    const before = structuredClone([...app.records]);
+    await app.post({ status: "Rejected", rejectionReason: "Unrelated photo", ...body }, 400);
+    assert.deepEqual([...app.records], before);
+  }
+  for (const report of [{ location: "Sala" }, { status: "Resolved" }, { status: "Endorsed" }]) {
+    const app = fixture({ report });
+    await app.post({ status: "Rejected", rejectionReason: "Confirmed prank" }, 403);
+    assert.equal(app.records.get("users/resident-owner").reportAbuseWarnings, 1);
+  }
+});
+
+test("MENRO can reject a report after planning a response while keeping the review history", async () => {
+  const app = fixture({ profile: { role: "Admin", barangay: "" }, report: { status: "Endorsed", actionKind: "Cleanup", actionNotes: "Crew assigned" } });
+  await app.post({ status: "Rejected", rejectionReason: "Duplicate report", remarks: "Verified that the same concern is handled under the original report." });
+  const report = app.records.get("reports/one");
+  assert.equal(report.status, "Rejected");
+  assert.equal(report.actionNotes, "Crew assigned");
+  assert.equal(app.records.get("users/resident-owner").reportAbuseWarnings, 1);
 });
 
 test("Wrong barangay, unverified reports, suspended staff and client role injection cannot forward", async () => {

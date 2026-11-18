@@ -1,11 +1,11 @@
 import { collectionTimeLabel } from "./collection-calendar.ts";
 import type {ReportStatus} from "./report-workflow.ts";
 
-export const REPORT_PROGRESS_LABELS:Record<ReportStatus,string>={Pending:"Report submitted",UnderReview:"Barangay review started","For MENRO Review":"Forwarded to MENRO","MENRO Under Review":"MENRO review started",Endorsed:"Response action planned",Resolved:"Report resolved"};
+export const REPORT_PROGRESS_LABELS:Record<ReportStatus,string>={Pending:"Report submitted",UnderReview:"Barangay review started","For MENRO Review":"Forwarded to MENRO","MENRO Under Review":"MENRO review started",Endorsed:"Response action planned",Resolved:"Report resolved",Rejected:"Report rejected"};
 export function reportProgressEntry(reportId:string,recipientId:string,status:ReportStatus,role:string,remarks:string,action:Record<string,unknown>,revision:number) {
   const actionNotes=String(action.actionNotes || "").trim();
   const date=String(action.actionDate || ""),time=String(action.actionTime || "");
-  const details=[action.actionKind ? `${action.actionKind}: ${actionNotes}` : "",date ? `${date}${time?" at "+collectionTimeLabel(time):""}` : "",remarks.trim()].filter(Boolean).join("\n");
+  const details=[action.rejectionReason ? `Reason: ${action.rejectionReason}` : "", action.actionKind ? `${action.actionKind}: ${actionNotes}` : "",date ? `${date}${time?" at "+collectionTimeLabel(time):""}` : "",remarks.trim(), action.rejectionReason === "Confirmed prank" ? "Please submit genuine waste concerns. Repeated prank reports may lead to account suspension after MENRO review." : ""].filter(Boolean).join("\n");
   const title=REPORT_PROGRESS_LABELS[status];
   const prefix=`Report REF-${reportId.slice(0,8).toUpperCase()}: ${title}.`;
   const fullMessage=prefix+(details?"\n"+details:"");

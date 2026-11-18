@@ -14,6 +14,15 @@ const reports = [
 ];
 const ids = list => list.map(report => report.id);
 
+test("rejected reports remain visible separately and never count as active or resolved", () => {
+  const rejected = { id: "prank", status: "Rejected", location: "Sala" };
+  const records = [...reports, rejected];
+  assert.deepEqual(filterReportSummary(records, "rejected", "Admin"), [rejected]);
+  assert.equal(filterReportSummary(records, "active", "Admin").some(report => report.id === "prank"), false);
+  assert.equal(isReportArchived(rejected), false);
+  assert.deepEqual(filterReportSummary(records, "all", "Admin"), records);
+});
+
 test("MENRO summary cards show their corresponding stage and Total restores every report", () => {
   assert.deepEqual(ids(filterReportSummary(reports, "pending", "Admin")), ["pending"]);
   assert.deepEqual(ids(filterReportSummary(reports, "review", "Admin")), ["review", "legacy-review"]);

@@ -40,6 +40,9 @@ export async function POST(request: Request) {
       const next = normalizeReportStatus(body.status)!;
       let action: Record<string, unknown> = reportActionFields(role, next, body);
       const actorName = typeof actor?.name === "string" ? actor.name.trim().slice(0, 120) : "";
+      const reporterRef = db.collection("users").doc(String(report.userId || "missing"));
+      const reporter = next === "Rejected" && action.rejectionReason === "Confirmed prank" && report.userId
+        ? await tx.get(reporterRef) : null;
       // Read the reservation before writing. Related reports can join the same
       // active collection when their selected barangay, date and time agree.
       let scheduleId = "";
@@ -82,7 +85,9 @@ export async function POST(request: Request) {
         ...(next === "For MENRO Review" ? { forwardedBy: identity.uid, forwardedByName: actorName, forwardedAt: FieldValue.serverTimestamp() } : {}),
         ...(next === "MENRO Under Review" ? { menroReviewedBy: identity.uid, menroReviewedByName: actorName, menroReviewedAt: FieldValue.serverTimestamp() } : {}),
         ...(next === "Endorsed" ? { endorsedBy: identity.uid, endorsedAt: FieldValue.serverTimestamp() } : {}),
+        ...(next === "Rejected" ? { rejectedBy: identity.uid, rejectedByName: actorName, rejectedByRole: role, rejectedAt: FieldValue.serverTimestamp(), rejectionNotes: body.remarks.trim() } : {}),
         ...(next === "Resolved" ? { resolvedBy: identity.uid, resolvedByName: actorName, resolvedByRole: role, resolvedAt: FieldValue.serverTimestamp(), resolutionNotes: body.remarks.trim(), collectedBy: identity.uid, collectedAt: FieldValue.serverTimestamp(), archived: true, archivedAt: FieldValue.serverTimestamp(), archivedBy: identity.uid, archivedByRole: role } : {}) });
+      if (reporter?.exists) tx.update(reporterRef, { reportAbuseWarnings: (Number(reporter.data()?.reportAbuseWarnings) || 0) + 1, lastReportWarningAt: FieldValue.serverTimestamp() });
       const audit = { action: "report.status", actor: identity.uid, actorRole:role, target: body.reportId, barangay: report.location, from: currentStatus, to: next, findings:body.remarks.trim(), ...action, ...(next === "Resolved" ? { archived: true } : {}), ...(scheduleId ? { scheduleId } : {}), at: FieldValue.serverTimestamp() };
       tx.create(db.collection("audit_logs").doc(), audit);
       tx.create(operation, { ...audit, changeHash, notificationId:scheduleNoticeId,progressId });

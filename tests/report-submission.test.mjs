@@ -20,6 +20,7 @@ function fixture(options = {}) {
   const records = new Map([["users/resident", { role: "Resident", barangay: "Sala", name: "Verified resident", ...options.currentProfile }]]);
   let now = Date.parse("2026-11-10T15:59:59Z");
   let pending = Promise.resolve();
+  let photoReviews = 0;
   const db = {
     collection: name => ({
       doc: id => ({ path: `${name}/${id}`, id }),
@@ -48,16 +49,22 @@ function fixture(options = {}) {
     "@/lib/staff-auth": {
       authenticatedAccount: async () => {
         if (options.signedOut) throw new access.StaffAccessError("Sign in", 401);
-        return { db, identity: { uid: "resident" }, profile: { role: "Resident", barangay: "Sala" } };
+        return { db, identity: { uid: "resident" }, profile: records.get("users/resident") };
       },
       staffApiError: error => Response.json({ error: error.message }, { status: error instanceof access.StaffAccessError ? error.status : 500 }),
     },
     "@/lib/staff-access": access, "@/lib/barangay-geofence": geofence, "@/lib/report-submission": submission,
     "@/lib/scheduling-time": { manilaDateTime: (time = now) => manilaDateTime(time) }, "@/lib/analytics-data": { analyticsReportDate },
+    "@/lib/report-photo-review": { reviewReportPhotos: async () => {
+      photoReviews++;
+      if (options.rejectPhoto) throw new access.StaffAccessError("Please replace attachment 1 with a clear photo related to your waste concern.", 422);
+      if (options.profileAfterPhotoReview) records.set("users/resident", { ...records.get("users/resident"), ...options.profileAfterPhotoReview });
+      return { status: "review", checks: [], checkedAt: "2026-11-10T15:59:59Z", version: 1 };
+    } },
   };
   const exported = {};
   new Function("require", "exports", code)(name => modules[name] || require(name), exported);
-  return { records, setNow: time => { now = Date.parse(time); }, post: input => exported.POST(new Request("http://localhost/api/reports/submit", { method: "POST", body: JSON.stringify(input) })) };
+  return { records, get photoReviews() { return photoReviews; }, setNow: time => { now = Date.parse(time); }, post: input => exported.POST(new Request("http://localhost/api/reports/submit", { method: "POST", body: JSON.stringify(input) })) };
 }
 
 test("report save retries commit exactly once and use the authenticated reporter", async () => {
@@ -70,6 +77,28 @@ test("report save retries commit exactly once and use the authenticated reporter
   assert.equal(reports.length, 1);
   assert.equal(reports[0][1].userId, "resident");
   assert.equal(reports[0][1].reporterName, "Verified resident");
+  assert.equal(app.photoReviews, 1, "A saved retry must not repeat the AI call");
+});
+
+test("replacement requests never create reports or consume the daily submission quota", async () => {
+  const app = fixture({ rejectPhoto: true });
+  const result = await app.post(body);
+  assert.equal(result.status, 422);
+  assert.match((await result.json()).error, /replace attachment 1/);
+  assert.equal(app.records.has("resident_report_quota/resident"), false);
+  assert.equal([...app.records.keys()].filter(key => key.startsWith("reports/")).length, 0);
+});
+
+test("the server owns review flags and checks account changes after photo analysis", async () => {
+  const app = fixture();
+  assert.equal((await app.post({ ...body, photoReview: { status: "accepted" } })).status, 200);
+  const saved = [...app.records].find(([key]) => key.startsWith("reports/"))[1];
+  assert.equal(saved.photoReview.status, "review");
+  for (const profileAfterPhotoReview of [{ barangay: "Malabanan" }, { accessStatus: "suspended" }]) {
+    const changed = fixture({ profileAfterPhotoReview });
+    assert.ok([400, 403].includes((await changed.post(body)).status));
+    assert.equal(changed.records.has("resident_report_quota/resident"), false);
+  }
 });
 
 test("report submission rereads the profile in the transaction and rejects changed or suspended accounts", async () => {

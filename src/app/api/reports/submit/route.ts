@@ -7,22 +7,43 @@ import { validateBaleteBoundaries } from "@/lib/barangay-geofence";
 import { reportSubmission } from "@/lib/report-submission";
 import { manilaDateTime } from "@/lib/scheduling-time";
 import { analyticsReportDate } from "@/lib/analytics-data";
+import { reviewReportPhotos } from "@/lib/report-photo-review";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 const boundaries = validateBaleteBoundaries(JSON.parse(readFileSync(path.join(process.cwd(), "public/geojson/balete_barangays.json"), "utf8")));
 const dailyLimit = 5;
 
 export async function POST(request: Request) {
   try {
-    const { db, identity } = await authenticatedAccount(request);
+    const { db, identity, profile } = await authenticatedAccount(request);
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object") throw new StaffAccessError("Provide valid report details.", 400);
+    const submitted = reportSubmission(body, profile, boundaries, process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "");
+    const ref = db.collection("reports").doc(`${identity.uid}_${body.requestId}`);
+    const existing = await db.runTransaction(async tx => {
+      if ((await tx.get(ref)).exists) return true;
+      const quota = (await tx.get(db.collection("resident_report_quota").doc(identity.uid))).data();
+      if (quota?.day === manilaDateTime().date && quota.count >= dailyLimit) {
+        throw new StaffAccessError("You've reached today's limit of 5 reports. You can submit again after midnight (Philippine time).", 429);
+      }
+      if (submitted.attachments.some(item => item.type === "image")) {
+        const limitRef = db.collection("api_limits").doc(`${identity.uid}_report_photos`);
+        const limit = (await tx.get(limitRef)).data();
+        const bucket = Math.floor(Date.now() / 60000);
+        const count = limit?.bucket === bucket ? Number(limit.count) : 0;
+        if (count >= 15) throw new StaffAccessError("Please wait a minute before checking more report photos.", 429);
+        tx.set(limitRef, { bucket, count: count + 1 });
+      }
+      return false;
+    });
+    if (existing) return Response.json({ id: ref.id }, { headers: { "Cache-Control": "no-store" } });
+    const photoReview = await reviewReportPhotos(submitted);
     // The profile and pin are validated together so a changed assignment cannot race submission.
     const id = await db.runTransaction(async tx => {
       const profile = (await tx.get(db.collection("users").doc(identity.uid))).data() || {};
       if (["suspended", "disabled"].includes(profile.accessStatus)) throw new StaffAccessError("This account is suspended.");
       const report = reportSubmission(body, profile, boundaries, process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "");
-      const ref = db.collection("reports").doc(`${identity.uid}_${body.requestId}`);
       const previous = await tx.get(ref);
       if (previous.exists) return ref.id;
 
@@ -41,7 +62,7 @@ export async function POST(request: Request) {
       if (count >= dailyLimit) {
         throw new StaffAccessError("You've reached today's limit of 5 reports. You can submit again after midnight (Philippine time).", 429);
       }
-      tx.create(ref, { ...report, userId: identity.uid, date: `${date} ${time}`, createdAt: FieldValue.serverTimestamp() });
+      tx.create(ref, { ...report, photoReview, userId: identity.uid, date: `${date} ${time}`, createdAt: FieldValue.serverTimestamp() });
       tx.set(quotaRef, { day: date, count: count + 1 });
       return ref.id;
     });

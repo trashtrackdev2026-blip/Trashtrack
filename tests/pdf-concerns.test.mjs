@@ -38,7 +38,7 @@ test("MENRO acts after endorsement and confirms collection before resolving", ()
   assert.equal(canUpdateReport("Admin", null, { ...report, status: "Endorsed" }, "Resolved", true), true);
   assert.equal(canUpdateReport("Resident", "Makina", report, "Endorsed"), false);
   assert.deepEqual(nextReportStatuses("Admin", "Resolved"), []);
-  assert.deepEqual(nextReportStatuses("Admin", "Pending"), []);
+  assert.deepEqual(nextReportStatuses("Admin", "Pending"), ["Rejected"]);
   assert.equal(normalizeReportStatus("ForMenroReview"), "For MENRO Review");
 });
 

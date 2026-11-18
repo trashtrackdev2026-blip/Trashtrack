@@ -31,6 +31,7 @@ interface UserData {
   date: string;
   time: string;
   reports: number;
+  reportAbuseWarnings: number;
 }
 
 export default function UsersPage() {
@@ -110,6 +111,7 @@ export default function UsersPage() {
             date: userDate,
             time: userTime,
             reports: 0,
+            reportAbuseWarnings: Number(data.reportAbuseWarnings) || 0,
           });
         });
         setUsers(usersList);
@@ -355,6 +357,7 @@ export default function UsersPage() {
                   <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Reports Submitted</span>
                   <span className="font-semibold text-slate-900">{countsReady ? users.find(user => user.id === selectedUser.id)?.reports ?? "—" : "—"}</span>
                 </div>
+                {(users.find(user => user.id === selectedUser.id)?.reportAbuseWarnings ?? selectedUser.reportAbuseWarnings) > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Confirmed prank report warnings · {users.find(user => user.id === selectedUser.id)?.reportAbuseWarnings ?? selectedUser.reportAbuseWarnings}</div>}
               </div>
 
               <div className="pt-4 mt-2 border-t border-slate-100 flex justify-end gap-3">

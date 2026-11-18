@@ -3,8 +3,16 @@ import { assertFutureSchedule } from "./scheduling-time.ts";
 import type { ReportRole, ReportStatus } from "./report-workflow.ts";
 
 export const REPORT_ACTIONS = ["Collection", "Cleanup", "Recollection", "Other"] as const;
-export type ReportActionInput = { verificationConfirmed?: boolean; severity?: string; actionKind?: string; actionNotes?: string; actionDate?: string; actionTime?: string; scheduleId?: string; scheduleRevision?: number };
+export const REPORT_REJECTION_REASONS = ["Unrelated photo", "Inappropriate content", "Duplicate report", "Confirmed prank", "Other"] as const;
+export type ReportActionInput = { rejectionReason?: string; verificationConfirmed?: boolean; severity?: string; actionKind?: string; actionNotes?: string; actionDate?: string; actionTime?: string; scheduleId?: string; scheduleRevision?: number };
 export function reportActionFields(role: ReportRole, next: ReportStatus, body: Record<string, unknown>, now = Date.now()) {
+  if (next === "Rejected") {
+    if (!REPORT_REJECTION_REASONS.includes(body.rejectionReason as typeof REPORT_REJECTION_REASONS[number])
+      || typeof body.remarks !== "string" || !body.remarks.trim() || body.remarks.length > 2000 || body.verificationConfirmed !== true) {
+      throw new StaffAccessError("Choose a rejection reason, explain your findings and confirm your review.", 400);
+    }
+    return { rejectionReason: String(body.rejectionReason) };
+  }
   if (role === "Semi-Admin" && ["Resolved", "For MENRO Review"].includes(next)) {
     if (body.verificationConfirmed !== true) throw new StaffAccessError("Verify the report, location and severity before choosing its resolution path.", 400);
     const severity = next === "Resolved" ? "Minor" : "Major";

@@ -1,5 +1,5 @@
 export type ReportRole = "Admin" | "Semi-Admin" | "Resident" | null;
-export type ReportStatus = "Pending" | "UnderReview" | "For MENRO Review" | "MENRO Under Review" | "Endorsed" | "Resolved";
+export type ReportStatus = "Pending" | "UnderReview" | "For MENRO Review" | "MENRO Under Review" | "Endorsed" | "Resolved" | "Rejected";
 
 export function normalizeReportStatus(status: string): ReportStatus | null {
   switch (status.replace(/\s/g, "").toLowerCase()) {
@@ -10,6 +10,7 @@ export function normalizeReportStatus(status: string): ReportStatus | null {
     case "menrounderreview": return "MENRO Under Review";
     case "endorsed": return "Endorsed";
     case "resolved": return "Resolved";
+    case "rejected": return "Rejected";
     default: return null;
   }
 }
@@ -30,13 +31,14 @@ export function isReportArchived(report: { status?: unknown }): boolean {
 export function nextReportStatuses(role: ReportRole, status: string): ReportStatus[] {
   const current = normalizeReportStatus(status);
   if (role === "Semi-Admin") {
-    if (current === "Pending") return ["UnderReview"];
-    if (current === "UnderReview") return ["Resolved", "For MENRO Review"];
+    if (current === "Pending") return ["UnderReview", "Rejected"];
+    if (current === "UnderReview") return ["Resolved", "For MENRO Review", "Rejected"];
   }
   if (role === "Admin") {
-    if (current === "For MENRO Review") return ["MENRO Under Review"];
-    if (current === "MENRO Under Review") return ["Endorsed"];
-    if (current === "Endorsed") return ["Resolved"];
+    if (current === "Pending" || current === "UnderReview") return ["Rejected"];
+    if (current === "For MENRO Review") return ["MENRO Under Review", "Rejected"];
+    if (current === "MENRO Under Review") return ["Endorsed", "Rejected"];
+    if (current === "Endorsed") return ["Resolved", "Rejected"];
   }
   return [];
 }
@@ -58,6 +60,7 @@ export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
   "MENRO Under Review": "Under MENRO Review",
   Endorsed: "In Progress",
   Resolved: "Resolved",
+  Rejected: "Rejected",
 };
 
-export const REPORT_ACTION_LABELS = { ...REPORT_STATUS_LABELS, UnderReview: "Start barangay review", "For MENRO Review": "Forward major report to MENRO", "MENRO Under Review": "Start MENRO review", Endorsed: "Plan response action", Resolved: "Confirm resolution" };
+export const REPORT_ACTION_LABELS = { ...REPORT_STATUS_LABELS, UnderReview: "Start barangay review", "For MENRO Review": "Forward major report to MENRO", "MENRO Under Review": "Start MENRO review", Endorsed: "Plan response action", Resolved: "Confirm resolution", Rejected: "Reject report" };

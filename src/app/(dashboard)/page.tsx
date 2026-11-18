@@ -34,7 +34,7 @@ export default function Dashboard() {
     const fetchData = async () => {
       setLoading(true); setError(null);
       try {
-        const [usersCount, schedulesSnap, reportsCount, pendingCount, resolvedCount, notificationsCount, eventsSnap, pendingSnap] = await withTimeout(Promise.all([
+        const [usersCount, schedulesSnap, reportsCount, pendingCount, resolvedCount, notificationsCount, eventsSnap, pendingSnap, rejectedCount] = await withTimeout(Promise.all([
           getCountFromServer(collection(db, "users")), getDocs(collection(db, "schedules")),
           getCountFromServer(collection(db, "reports")),
           getCountFromServer(query(collection(db, "reports"), where("status", "in", ["Pending", "pending"]))),
@@ -42,15 +42,16 @@ export default function Dashboard() {
           getCountFromServer(collection(db, "notifications")),
           getDocs(query(collection(db, "events"), where("status", "in", ["Upcoming", "upcoming", "UPCOMING"]))),
           getDocs(query(collection(db, "reports"), where("status", "in", ["Pending", "pending"]), limit(3))),
+          getCountFromServer(query(collection(db, "reports"), where("status", "in", ["Rejected", "rejected"]))),
         ]), "Dashboard data is taking too long. Check the internet connection and retry.", 15_000);
         if (cancelled) return;
         const todays = schedulesSnap.docs.filter(doc => { const data = doc.data(); return scheduleOccursOn({ day: data.day || "", status: data.status || "", date: data.date }, new Date()); });
         setTodayCount(todays.length);
         setStats({ totalUsers: usersCount.data().count, activeSchedules: schedulesSnap.docs.filter(doc => doc.data().status === "Active").length,
-          pendingReports: pendingCount.data().count, unresolvedIssues: reportsCount.data().count - resolvedCount.data().count,
+          pendingReports: pendingCount.data().count, unresolvedIssues: reportsCount.data().count - resolvedCount.data().count - rejectedCount.data().count,
           recentNotifications: notificationsCount.data().count, upcomingEvents: eventsSnap.size });
         setTodaySchedules(todays.map(doc => ({ id: doc.id, barangay: doc.data().barangay || "All barangays", time: doc.data().time || "Time to be announced", description: doc.data().description || doc.data().notes || "Collection schedule" })).sort((a, b) => a.time.localeCompare(b.time)).slice(0, 4));
-        setRecentReports(pendingSnap.docs.map(doc => { const data = doc.data(); const attachment = Array.isArray(data.attachments) ? data.attachments.find(item => item?.type === "image" && typeof item.url === "string") : null; return { id: doc.id, type: data.type || "Community concern", location: data.location || "Balete", date: data.date || "", image: typeof data.imageUrl === "string" && data.imageUrl ? data.imageUrl : attachment?.url || "" }; }));
+        setRecentReports(pendingSnap.docs.map(doc => { const data = doc.data(); const attachment = Array.isArray(data.attachments) ? data.attachments.find(item => item?.type === "image" && typeof item.url === "string") : null; return { id: doc.id, type: data.type || "Community concern", location: data.location || "Balete", date: data.date || "", image: data.photoReview?.status === "review" ? "" : typeof data.imageUrl === "string" && data.imageUrl ? data.imageUrl : attachment?.url || "" }; }));
         const events = eventsSnap.docs.map(doc => ({ id: doc.id, title: doc.data().title || "Community event", date: doc.data().dateISO || doc.data().date || "", location: doc.data().location || doc.data().barangay || "Balete", time: doc.data().time || "" })).sort((a, b) => a.date.localeCompare(b.date));
         setNextEvent(events[0] || null);
       } catch (failure) { if (!cancelled) setError(failure instanceof Error ? failure.message : "Unable to load dashboard data."); }

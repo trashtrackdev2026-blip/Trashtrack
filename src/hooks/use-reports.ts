@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { subscribeWithDeadline } from "@/lib/live-data";
 import { isReportArchived, reportWorkflowStatus } from "@/lib/report-workflow";
+import type { ReportPhotoReview } from "@/lib/report-photo-review";
 
 export interface CommunityReport {
   id: string;
@@ -35,6 +36,10 @@ export interface CommunityReport {
   actionNotes?: string;
   actionDate?: string;
   actionTime?: string;
+  photoReview?: ReportPhotoReview;
+  rejectionReason?: string;
+  rejectionNotes?: string;
+  rejectedByName?: string;
 }
 
 export function useReports() {
@@ -76,6 +81,7 @@ export function useReports() {
               statusRevision: Number(data.statusRevision || 0), resolvedByRole: data.resolvedByRole || "", resolvedByName: data.resolvedByName || "", resolvedAt: data.resolvedAt?.toDate?.().toISOString() || "",
               archived: isReportArchived(data), archivedAt: data.archivedAt?.toDate?.().toISOString() || "",
               actionKind: data.actionKind || "", actionNotes: data.actionNotes || "", actionDate: data.actionDate || "", actionTime: data.actionTime || "",
+              photoReview: data.photoReview, rejectionReason: data.rejectionReason || "", rejectionNotes: data.rejectionNotes || "", rejectedByName: data.rejectedByName || "",
             } satisfies CommunityReport;
           }).sort((a, b) => b.date.localeCompare(a.date));
       setState({ owner, reports, loading: false, error: null });

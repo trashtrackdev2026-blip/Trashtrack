@@ -24,8 +24,9 @@ const monthKey = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "A
 
 export function summarizeAnalytics(reports: RecordData[], events: RecordData[], resources: number, schedules: RecordData[], now = new Date()) {
   const resolvedReports = reports.filter(report => normalizeReportStatus(String(report.status)) === "Resolved").length;
+  const rejectedReports = reports.filter(report => normalizeReportStatus(String(report.status)) === "Rejected").length;
   // Pending here means every unresolved concern, at every review/collection stage.
-  const stats = { totalReports: reports.length, resolvedReports, pendingReports: reports.length - resolvedReports,
+  const stats = { totalReports: reports.length, resolvedReports, rejectedReports, pendingReports: reports.length - resolvedReports - rejectedReports,
     totalEvents: events.length, totalResources: resources, eventParticipants: events.reduce((sum, event) => sum + (Number(event.participants) || 0), 0) };
   const manila = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
   const months = Array.from({ length: 6 }, (_, index) => new Date(Date.UTC(manila.getFullYear(), manila.getMonth() - 5 + index, 1, 4)));
