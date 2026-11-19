@@ -5,6 +5,10 @@ import type { ReportRole, ReportStatus } from "./report-workflow.ts";
 export const REPORT_ACTIONS = ["Collection", "Cleanup", "Recollection", "Other"] as const;
 export const REPORT_REJECTION_REASONS = ["Unrelated photo", "Inappropriate content", "Duplicate report", "Confirmed prank", "Other"] as const;
 export type ReportActionInput = { rejectionReason?: string; verificationConfirmed?: boolean; severity?: string; actionKind?: string; actionNotes?: string; actionDate?: string; actionTime?: string; scheduleId?: string; scheduleRevision?: number };
+export function requiredBarangaySeverity(status: string): "Minor" | "Major" | undefined {
+  if (status === "Resolved") return "Minor";
+  if (status === "For MENRO Review") return "Major";
+}
 export function reportActionFields(role: ReportRole, next: ReportStatus, body: Record<string, unknown>, now = Date.now()) {
   if (next === "Rejected") {
     if (!REPORT_REJECTION_REASONS.includes(body.rejectionReason as typeof REPORT_REJECTION_REASONS[number])
@@ -13,9 +17,9 @@ export function reportActionFields(role: ReportRole, next: ReportStatus, body: R
     }
     return { rejectionReason: String(body.rejectionReason) };
   }
-  if (role === "Semi-Admin" && ["Resolved", "For MENRO Review"].includes(next)) {
+  const severity = role === "Semi-Admin" ? requiredBarangaySeverity(next) : undefined;
+  if (severity) {
     if (body.verificationConfirmed !== true) throw new StaffAccessError("Verify the report, location and severity before choosing its resolution path.", 400);
-    const severity = next === "Resolved" ? "Minor" : "Major";
     if (body.severity !== severity) throw new StaffAccessError(next === "Resolved" ? "Only a minor report within barangay capacity can be resolved locally." : "Assess the report as major before forwarding it to MENRO.", 400);
     if (typeof body.remarks !== "string" || !body.remarks.trim()) throw new StaffAccessError("Describe the verified findings and action taken or reason for forwarding.", 400);
     return { severity };

@@ -4,7 +4,7 @@ import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { ReportEvidence } from "@/components/reports/ReportEvidence";
 
 import { ReportActionFields } from "./ReportActionFields";
-import { reportActionFields, type ReportActionInput } from "@/lib/report-action";
+import { reportActionFields, requiredBarangaySeverity, type ReportActionInput } from "@/lib/report-action";
 import type { ReportUpdateInput } from "@/lib/update-report";
 import { isReportArchived, normalizeReportStatus } from "@/lib/report-workflow";
 import { useRef, useState } from "react";
@@ -58,8 +58,10 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     && (barangayFilter === "all" || reportBarangayLabel(report.location) === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
   const activeReport = visibleReports.find(report => report.id === activeReportId);
   const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
+  const barangaySeverity = role === "Semi-Admin" ? requiredBarangaySeverity(newStatus) : undefined;
+  const actionDetails = barangaySeverity ? { ...actionInput, severity: barangaySeverity } : actionInput;
   let actionValid = true, actionError = "";
-  try { const next=normalizeReportStatus(newStatus);if(next)reportActionFields(role,next,{...actionInput,remarks}); } catch (failure) { actionValid=false;actionError=failure instanceof Error?failure.message:"Complete the action details."; }
+  try { const next=normalizeReportStatus(newStatus);if(next)reportActionFields(role,next,{...actionDetails,remarks}); } catch (failure) { actionValid=false;actionError=failure instanceof Error?failure.message:"Complete the action details."; }
   const canSave = !!activeReport && actionValid && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
   const openReport = (report: CommunityReport) => {
     setShowConfirm(false);
@@ -98,7 +100,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     setIsUpdating(true);
     setUpdateError(null);
     try {
-      const result=await onUpdate(activeReport, newStatus, remarks, collectionConfirmed, {...actionInput,...openedVersion});
+      const result=await onUpdate(activeReport, newStatus, remarks, collectionConfirmed, {...actionDetails,...openedVersion});
       const saved = normalizeReportStatus(newStatus) === "Resolved" ? "Report resolved and automatically archived. Open Archived reports to review it." : "Report update saved.";
       setSaveMessage(saved + (result?.deliveryError ? " Phone delivery is pending; resident progress notices retry when the app reconnects." : ""));
       setShowConfirm(false);
@@ -324,7 +326,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                         </SelectTrigger>
                         <SelectContent>
                           {allowedStatuses.map(status => (
-                            <SelectItem key={status} value={status}>{REPORT_ACTION_LABELS[status]}</SelectItem>
+                            <SelectItem key={status} value={status}>{role === "Semi-Admin" && status === "Resolved" ? "Resolve minor report locally" : REPORT_ACTION_LABELS[status]}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -336,14 +338,14 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                       I confirm the reported concern has been addressed and the action is complete.
                     </label>}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700">{newStatus === "Rejected" ? "Reason for the resident (required)" : role === "Admin" && newStatus === "Resolved" ? "Resolution details (required)" : "Findings / action taken (required for barangay resolution or forwarding)"}</label>
+                      <label className="text-[11px] font-bold text-slate-700">{newStatus === "Rejected" ? "Reason for the resident (required)" : newStatus === "Resolved" ? "Resolution details (required)" : barangaySeverity === "Major" ? "Verified findings and reason for forwarding (required)" : "Review remarks"}</label>
                       <textarea
                         aria-label="Review remarks" maxLength={2000}
                         rows={3}
                         value={remarks}
                         onChange={(e) => setRemarks(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#2E7D32] resize-none"
-                        placeholder="Describe your verified findings and action taken or reason for forwarding..."
+                        placeholder={barangaySeverity === "Major" ? "Explain why this concern needs MENRO assistance…" : newStatus === "Resolved" ? "Describe the work that addressed the concern…" : "Describe your findings…"}
                       />
                     </div>
                     {newStatus && actionError && <p role="status" className="text-xs leading-relaxed">{actionError}</p>}
@@ -353,7 +355,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                       disabled={!canSave || isUpdating}
                       className="w-full h-10 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm disabled:opacity-50"
                     >
-                      Update Status
+                      {barangaySeverity === "Major" ? "Forward to MENRO" : barangaySeverity === "Minor" ? "Resolve locally" : "Update Status"}
                     </Button>
                   </div>
                 </div>}
@@ -378,7 +380,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
               <dt className="text-xs font-semibold text-slate-500">New Status:</dt>
               <dd><span className={`inline-block rounded-full px-2 py-1 text-xs font-bold ${getStatusColor(newStatus)}`}>{REPORT_STATUS_LABELS[newStatus as keyof typeof REPORT_STATUS_LABELS] || newStatus}</span></dd>
             </dl>
-            <DialogDescription className="text-center text-sm text-slate-600">{newStatus === "Rejected" ? "Reject this report? The resident will receive your reason and the report will appear in Rejected reports." : normalizeReportStatus(newStatus) === "Resolved" ? "Confirm resolution? The report will move to Archived reports automatically and the resident will receive the resolution update." : "Are you sure you want to update this report?"}</DialogDescription>
+            <DialogDescription className="text-center text-sm text-slate-600">{newStatus === "Rejected" ? "Reject this report? The resident will receive your reason and the report will appear in Rejected reports." : newStatus === "Resolved" ? "Confirm resolution? The report will move to Archived reports automatically and the resident will receive the resolution update." : barangaySeverity === "Major" ? "Forward this report and your verified findings to MENRO for review?" : "Are you sure you want to update this report?"}</DialogDescription>
             {updateError && <div className="space-y-3"><p role="alert" className="text-sm text-red-700">{updateError}</p>{updateError.includes("changed") && <Button variant="outline" onClick={() => {preservedDraft.current={id:activeReport.id,status:newStatus,remarks,confirmed:collectionConfirmed,action:actionInput};setShowConfirm(false);setActiveReportId(null);retry();setSaveMessage("Reloading the latest reports. Reopen this report to review its current stage; your notes and action draft are kept. Confirm the action again after reviewing.");}}>Review latest report</Button>}</div>}
           </div>
           <DialogFooter className="sticky bottom-0 mx-0 mb-0 flex-row gap-3 border-t border-slate-100 bg-white p-4">

@@ -2,7 +2,7 @@
 import { DetailPanel, useWideWorkspace } from "@/components/layout/DetailPanel";
 
 
-import { Users, Search, MapPin, Calendar, CalendarCheck, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, MoreVertical, Download } from "lucide-react";
+import { Users, Search, MapPin, Calendar, CalendarCheck, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, MoreVertical, Download, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -18,7 +18,7 @@ import { eventRequest } from "@/lib/event-client";
 import { CertificateNameCorrection } from "@/components/events/CertificateNameCorrection";
 import { EventCertificateSettings } from "@/components/events/EventCertificateSettings";
 import { CertificatePreview } from "@/components/events/CertificatePreview";
-import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
 import { DeleteConfirmation } from "@/components/ui/DeleteConfirmation";
 import { EditEventDialog, type EditableEvent } from "@/components/events/EditEventDialog";
 import Link from "next/link";
@@ -72,6 +72,9 @@ export default function EventsPage() {
   const [deleteTarget, setDeleteTarget] = useState<EventData | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [completion, setCompletion] = useState<{ event: EventData; confirmed: number; total: number; done: boolean } | null>(null);
+  const [completing, setCompleting] = useState(false);
+  const [completionError, setCompletionError] = useState("");
   const [selectedEventId, setActiveEventId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<{id: string; userId: string; userName: string; barangay: string; registeredAt: number; attended: boolean}[]>([]);
   const [participantsEventId, setParticipantsEventId] = useState<string | null>(null);
@@ -150,17 +153,22 @@ export default function EventsPage() {
     } finally { setBusyAttendance(null); }
   };
 
+  const openCompletion = () => {
+    if (!activeEvent || loadingParticipants || busyAttendance || completing) return;
+    setCompletionError("");
+    setCompletion({ event: activeEvent, confirmed: participants.filter(participant => participant.attended).length, total: participants.length, done: false });
+  };
+
   const handleMarkCompleted = async () => {
-    if (!activeEventId) return;
-    const confirmed = participants.filter(participant => participant.attended).length;
-    if (!confirm("Complete this event? " + confirmed + " participant(s) have confirmed attendance. Anyone still unconfirmed must scan the event QR or have MENRO confirm attendance before downloading a certificate.")) return;
+    if (!completion || completion.done || completing) return;
+    setCompleting(true);
+    setCompletionError("");
     try {
-      await eventRequest("/api/events/manage", { action: "complete", eventId: activeEventId });
-      alert("Event completed. Certificates are available only to participants whose attendance you confirmed.");
+      await eventRequest("/api/events/manage", { action: "complete", eventId: completion.event.id });
+      setCompletion({ ...completion, done: true });
     } catch (error) {
-      console.error("Error completing event:", error);
-      setActionError(error instanceof Error ? error.message : "Failed to mark event as completed.");
-    }
+      setCompletionError(error instanceof Error ? error.message : "Could not complete this event. Please try again.");
+    } finally { setCompleting(false); }
   };
 
   const downloadAttendeeCertificate = async (userId: string, name: string) => {
@@ -417,7 +425,7 @@ export default function EventsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`tt-event-status text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${activeEvent.status.toLowerCase() === 'completed' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-blue-50 text-blue-500'}`}>{activeEvent.status}</span>
                 {!["completed","draft"].includes(activeEvent.status.toLowerCase()) && (
-                  <Button onClick={handleMarkCompleted} disabled={loadingParticipants || busyAttendance !== null} size="sm" variant="outline" className="min-h-11 px-4 bg-green-50 border-green-200 text-green-800 hover:bg-green-100">
+                  <Button onClick={openCompletion} disabled={loadingParticipants || busyAttendance !== null || completing} size="sm" variant="outline" className="min-h-11 px-4 bg-green-50 border-green-200 text-green-800 hover:bg-green-100">
                     Mark Completed
                   </Button>
                 )}
@@ -542,6 +550,37 @@ export default function EventsPage() {
         </div>
       </div>
       {editingEvent && <EditEventDialog key={editingEvent.id} event={editingEvent} onClose={() => setEditingEvent(null)} />}
+      <Dialog open={completion !== null} onOpenChange={open => { if (!open && !completing) setCompletion(null); }}>
+        {completion && <DialogContent className="tt-themed-dialog sm:max-w-md" showCloseButton={!completing}>
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e1edda] text-[#21543b]"><CalendarCheck aria-hidden="true" /></span>
+          <DialogHeader>
+            <DialogTitle>{completion.done ? "Event completed" : "Mark this event as completed?"}</DialogTitle>
+            <DialogDescription className="break-words leading-relaxed">
+              {completion.done ? <>“{completion.event.title}” is now marked as completed.</> : <>This will close registration for “{completion.event.title}”.</>}
+            </DialogDescription>
+          </DialogHeader>
+          {!completion.done && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#eaf1e2] px-4 py-3 text-sm text-[#234937]">
+            <span>Confirmed attendance</span><strong>{completion.confirmed} of {completion.total} registered</strong>
+          </div>}
+          {completion.event.certificateEnabled !== false && <p className="text-sm leading-relaxed text-[#3f584a]">
+            {completion.done
+              ? "Participants can access their certificate once their attendance is confirmed."
+              : "Participants need confirmed attendance before they can access a certificate. You can still confirm attendance after completing the event."}
+          </p>}
+          {completionError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{completionError}</p>}
+          <DialogFooter className="gap-3">
+            {completion.done
+              ? <Button onClick={() => setCompletion(null)} className="bg-[#1b513d] text-white hover:bg-[#123d2e]">Done</Button>
+              : <>
+                <Button variant="outline" disabled={completing} onClick={() => setCompletion(null)}>Cancel</Button>
+                <Button disabled={completing} onClick={() => void handleMarkCompleted()} className="bg-[#1b513d] text-white hover:bg-[#123d2e]">
+                  {completing && <Loader2 className="animate-spin" aria-hidden="true" />}
+                  {completing ? "Completing…" : "Mark completed"}
+                </Button>
+              </>}
+          </DialogFooter>
+        </DialogContent>}
+      </Dialog>
       <DeleteConfirmation
         open={deleteTarget !== null}
         title="Delete this event?"
