@@ -103,7 +103,7 @@ export default function AnalyticsView() {
     {title:"Report categories (%)",rows:categoryData}, {title:"Community events",rows:eventData},
     {title:"Collection outcomes - " + periodLabel,rows:collectionData},
     {title:"Barangay totals - " + selectedType + ", " + selectedPeriod,rows:tableRows.flatMap(row => [{name:row.name + ": total",value:row.total},{name:row.name + ": resolved",value:row.resolved},{name:row.name + ": pending",value:row.pending}])},
-    {title:"Report resolution responsibility",rows:summary.resolutionData},
+    {title:"Recorded resolutions by office",rows:summary.resolutionData},
     {title:"Report records - " + periodLabel,rows:[],records:recordRows},
   ];
   async function exportPdf(section?: number,print=false) {
@@ -147,7 +147,7 @@ export default function AnalyticsView() {
       <KpiCard title="Rejected Reports" value={metric(stats.rejectedReports)} subtitle={periodLabel} icon={<CircleX />} />
       <KpiCard title="Community Events" value={metric(stats.totalEvents)} subtitle={periodLabel} icon={<CalendarDays />} />
     </section>
-    <section aria-label="Resolution responsibility" className="tt-surface flex flex-wrap gap-5 p-4">{summary.resolutionData.map(row=><p key={row.name} className="text-sm"><strong>{row.name}</strong>: {metric(row.value)} resolved</p>)}</section>
+    <section aria-label="Recorded resolutions by office" className="tt-surface flex flex-wrap gap-5 p-4">{summary.resolutionData.map(row=><p key={row.name} className="text-sm"><strong>{row.name}</strong>: {metric(row.value)} resolved</p>)}</section>
     <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950" role="note">{CALAWIT_SERVICE_NOTE}</p>
     <div className="grid gap-5 xl:grid-cols-2">
       <section className="tt-surface min-w-0 overflow-hidden">

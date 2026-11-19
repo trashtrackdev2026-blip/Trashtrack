@@ -23,7 +23,8 @@ export function analyticsReportDate(data: RecordData): Date | null {
 const monthKey = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit" }).format(date).replace(/\D/g, "");
 
 export function summarizeAnalytics(reports: RecordData[], events: RecordData[], resources: number, schedules: RecordData[], now = new Date()) {
-  const resolvedReports = reports.filter(report => normalizeReportStatus(String(report.status)) === "Resolved").length;
+  const resolved = reports.filter(report => normalizeReportStatus(String(report.status)) === "Resolved");
+  const resolvedReports = resolved.length;
   const rejectedReports = reports.filter(report => normalizeReportStatus(String(report.status)) === "Rejected").length;
   // Pending here means every unresolved concern, at every review/collection stage.
   const stats = { totalReports: reports.length, resolvedReports, rejectedReports, pendingReports: reports.length - resolvedReports - rejectedReports,
@@ -51,10 +52,10 @@ export function summarizeAnalytics(reports: RecordData[], events: RecordData[], 
     const row = collectionData.find(item => item.name === collectionStatus(schedule.status));
     if (row) row.value++; else historicalCollections++;
   }
-  const resolutionData = ["Barangay", "MENRO", "Not recorded"].map(name => ({ name, value: 0 }));
-  for (const report of reports.filter(report => normalizeReportStatus(String(report.status)) === "Resolved")) {
-    resolutionData[report.resolvedByRole === "Semi-Admin" ? 0 : report.resolvedByRole === "Admin" ? 1 : 2].value++;
-  }
+  const resolutionData = [
+    { name: "Barangay", value: resolved.filter(report => report.resolvedByRole === "Semi-Admin").length },
+    { name: "MENRO", value: resolved.filter(report => report.resolvedByRole === "Admin").length },
+  ];
   return { stats, trendData, categoryData: percentages, eventData, collectionData, resolutionData,
     totalCollections: schedules.length, historicalCollections, undatedReports: reports.filter(report => !analyticsReportDate(report)).length };
 }

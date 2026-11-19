@@ -34,7 +34,9 @@ test("Learning covers stay separate from PDF/video content and only trusted YouT
 });
 test("Analytics counts actual resolver roles and MENRO views exclude locally resolved reports",()=>{
   const reports=[{status:"Resolved",resolvedByRole:"Semi-Admin"},{status:"Resolved",resolvedByRole:"Admin"},{status:"Resolved"},{status:"UnderReview"}];
-  const summary=summarizeAnalytics(reports,[],0,[]);assert.equal(summary.stats.resolvedReports,3);assert.deepEqual(summary.resolutionData.map(row=>row.value),[1,1,1]);
+  const summary = summarizeAnalytics(reports, [], 0, []);
+  assert.equal(summary.stats.resolvedReports, 3);
+  assert.deepEqual(summary.resolutionData, [{ name: "Barangay", value: 1 }, { name: "MENRO", value: 1 }]);
   const common={id:"one",type:"Overflow",description:"Test",location:"Sala",date:"2026-11-02",reporterName:"Test Resident"};
   const result=filterMenroReports(reports.slice(0,3).map((report,i)=>({...common,...report,id:String(i)})),{stage:"resolved",search:"",status:"all",barangay:"all",days:0});assert.deepEqual(result.map(report=>report.id),["1","2"]);
 });
