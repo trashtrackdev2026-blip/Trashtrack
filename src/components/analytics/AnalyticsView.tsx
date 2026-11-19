@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { collection, type DocumentData } from "firebase/firestore";
-import { Printer, Download, FileText, CheckCircle2, Clock, CalendarDays, Maximize2 } from "lucide-react";
+import { Printer, Download, FileText, CheckCircle2, CircleX, Clock, CalendarDays, Maximize2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeWithDeadline } from "@/lib/live-data";
@@ -112,9 +112,9 @@ export default function AnalyticsView() {
       const { downloadAnalyticsPdf,openPrintableAnalyticsPdf } = await import("@/lib/analytics-pdf");
       const documentSections=section === undefined ? sections : [sections[section]];
       const notes=["Selected period: " + periodLabel + ".",
-        "Pending includes all reports that have not been resolved. Counts update from live records.", CALAWIT_SERVICE_NOTE,
+        "Pending includes reports awaiting review or action. Rejected and resolved reports have their own counts.", CALAWIT_SERVICE_NOTE,
         "Geographic filters apply only to barangay totals: " + selectedBarangay + ", " + selectedType + ", " + selectedPeriod + ". All sections use the selected month or all dates.",
-        "Reports use submission date; events use event date; collections use collection date; learning resources use publication date. Unresolved/resolved are current saved statuses.",
+        "Reports use submission date; events use event date; collections use collection date; learning resources use publication date. Report counts reflect current saved statuses.",
         ...(summary.historicalCollections ? [summary.historicalCollections + " historical collections use retired or unrecognized statuses and are excluded from the four outcome counts."] : []),
         ...(summary.undatedReports ? [summary.undatedReports + " reports have no valid submission date and are excluded from the monthly trend."] : []),
         ...(gisNotice ? [gisNotice] : []),
@@ -140,10 +140,11 @@ export default function AnalyticsView() {
     </section>
     <div className="flex flex-wrap justify-end gap-3"><Button variant="outline" disabled={pdfDisabled || gisLoading} onClick={()=>void exportPdf(undefined,true)}><Printer/>Open printable PDF</Button><Button variant="outline" disabled={pdfDisabled || gisLoading} onClick={() => void exportPdf()}><Download />{exporting ? "Preparing PDF…" : "Download analytics PDF"}</Button><Button variant="outline" disabled={loading || gisLoading || !!dataError} onClick={exportCsv}>Export CSV</Button></div>
     {exportError && <p role="alert" className="text-sm text-red-700">{exportError}</p>}
-    <section className="tt-metric-strip" aria-label="Analytics summary">
+    <section className="tt-metric-strip tt-analytics-metrics" aria-label="Analytics summary">
       <KpiCard title="Total Waste Reports" value={metric(stats.totalReports)} subtitle={periodLabel} icon={<FileText />} />
       <KpiCard title="Resolved Reports" value={metric(stats.resolvedReports)} subtitle="Reported concerns addressed" icon={<CheckCircle2 />} />
-      <KpiCard title="Pending Reports" value={metric(stats.pendingReports)} subtitle="All unresolved stages" icon={<Clock />} />
+      <KpiCard title="Pending Reports" value={metric(stats.pendingReports)} subtitle="Awaiting review or action" icon={<Clock />} />
+      <KpiCard title="Rejected Reports" value={metric(stats.rejectedReports)} subtitle={periodLabel} icon={<CircleX />} />
       <KpiCard title="Community Events" value={metric(stats.totalEvents)} subtitle={periodLabel} icon={<CalendarDays />} />
     </section>
     <section aria-label="Resolution responsibility" className="tt-surface flex flex-wrap gap-5 p-4">{summary.resolutionData.map(row=><p key={row.name} className="text-sm"><strong>{row.name}</strong>: {metric(row.value)} resolved</p>)}</section>
@@ -155,10 +156,10 @@ export default function AnalyticsView() {
         <div className="relative isolate h-[350px]"><MapComponent barangayStats={mapStats} selectedBarangay={selectedBarangay} /></div>
         <p className="p-4 text-xs text-muted-foreground">Map colors use unresolved reports: low 0–9, moderate 10–29, high 30+. {gisLoading ? "Loading geographic counts…" : gisNotice}</p>
       </section>
-      <div className="min-w-0 space-y-3"><ReportTrendChart trendData={trendData} totalReports={stats.totalReports} resolvedReports={stats.resolvedReports} pendingReports={stats.pendingReports} /><Button variant="outline" disabled={pdfDisabled} onClick={() => void exportPdf(1)}><Download />Download trend PDF</Button></div>
+      <div className="min-w-0 space-y-3"><ReportTrendChart trendData={trendData} counts={stats} /><Button variant="outline" disabled={pdfDisabled} onClick={() => void exportPdf(1)}><Download />Download trend PDF</Button></div>
     </div>
     <section className="tt-surface overflow-hidden"><div className="border-b p-5"><h2>Waste Reports by Barangay</h2><p className="mt-1 text-xs text-muted-foreground">Uses the map filters above. Pending includes all unresolved stages.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["Barangay","Total Reports","Resolved","Pending"].map(label => <th key={label} className="p-4">{label}</th>)}</tr></thead><tbody>{tableRows.map(row => <tr key={row.name} className="border-t"><td className="p-4">{row.name}{row.name === "Calawit" && <small className="block text-muted-foreground">Relocated residents served in Makina</small>}</td><td className="p-4">{gisLoading ? "—" : row.total}</td><td className="p-4">{gisLoading ? "—" : row.resolved}</td><td className="p-4">{gisLoading ? "—" : row.pending}</td></tr>)}<tr className="border-t bg-muted/30 font-semibold"><td className="p-4">Total in this view</td><td className="p-4">{gisLoading ? "—" : tableTotal.total}</td><td className="p-4">{gisLoading ? "—" : tableTotal.resolved}</td><td className="p-4">{gisLoading ? "—" : tableTotal.pending}</td></tr></tbody></table></div></section>
-    {!loading && !dataError && <Charts hideTrend trendData={trendData} categoryData={categoryData} eventData={eventData} stats={stats} />}
+    {!loading && !dataError && <Charts categoryData={categoryData} eventData={eventData} stats={stats} />}
     <section className="tt-surface p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2>Collection analytics</h2><p className="mt-1 text-xs text-muted-foreground">{summary.totalCollections} saved schedules · {periodLabel} · current saved outcomes</p></div><Button variant="outline" disabled={pdfDisabled} onClick={() => void exportPdf(4)}><Download />Download collection PDF</Button></div><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{collectionData.map(item => <div key={item.name} className="rounded-xl border p-4"><span className="text-xs text-muted-foreground">{item.name}</span><strong className="mt-1 block text-2xl">{metric(item.value)}</strong><div className="mt-3 h-2 overflow-hidden rounded bg-muted"><div className="h-full bg-green-700" style={{width:(summary.totalCollections ? item.value / summary.totalCollections * 100 : 0) + "%"}} /></div></div>)}</div>{summary.historicalCollections>0 && <p className="mt-4 text-xs text-muted-foreground">{summary.historicalCollections} historical schedules use retired or unrecognized statuses and are excluded from these four outcome counts.</p>}</section>
     <section className="tt-surface overflow-hidden" aria-label="Report records for selected period"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div><h2>Report records · {periodLabel}</h2><p className="mt-1 text-xs text-muted-foreground">{recordRows.length} submissions. The printable PDF includes every record in this period.</p></div><Button variant="outline" disabled={pdfDisabled} onClick={()=>void exportPdf(7,true)}><Printer/>Print report records</Button></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["Submitted (PH)","Reference","Barangay","Concern","Current status"].map(label=><th key={label} className="p-4">{label}</th>)}</tr></thead><tbody>{recordRows.slice((safeRecordPage-1)*20,safeRecordPage*20).map(row=><tr key={row.reference} className="border-t"><td className="p-4">{row.date}</td><td className="max-w-48 break-all p-4">{row.reference}</td><td className="p-4">{row.barangay}</td><td className="p-4">{row.type}</td><td className="p-4">{row.status}</td></tr>)}{!loading && !recordRows.length && <tr><td colSpan={5} className="tt-empty">No report submissions for this period.</td></tr>}</tbody></table></div><div className="flex items-center justify-between gap-3 border-t p-4"><Button variant="outline" disabled={safeRecordPage===1} onClick={()=>setRecordPage(safeRecordPage-1)}>Previous</Button><span className="text-sm">Page {safeRecordPage} of {Math.max(1,Math.ceil(recordRows.length/20))}</span><Button variant="outline" disabled={safeRecordPage*20>=recordRows.length} onClick={()=>setRecordPage(safeRecordPage+1)}>Next</Button></div></section>
     <p className="text-sm text-muted-foreground">{stats.totalResources} educational resources available. {summary.undatedReports > 0 && summary.undatedReports + " reports without a valid date are excluded from the monthly trend."}</p>

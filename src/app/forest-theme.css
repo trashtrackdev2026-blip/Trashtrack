@@ -88,6 +88,17 @@
 .tt-metric-button:hover, .tt-metric-button[aria-pressed=true] { background: #6e94523b; }
 .tt-metric-button[aria-pressed=true]:after { bottom: -8px; background: #c9dc9d; }
 .tt-metric-button:focus-visible { outline-color: #d9e9bc; }
+@media (min-width: 1280px) {
+  .tt-content .tt-metric-strip.tt-analytics-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tt-analytics-metrics .tt-metric { gap: 12px; padding-inline: 14px; }
+}
+@media (768px <= width < 1280px) {
+  .tt-content .tt-metric-strip.tt-analytics-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; }
+  .tt-analytics-metrics .tt-metric:nth-child(4) { border-left: 0; }
+}
+@media (max-width: 767px) {
+  .tt-analytics-metrics .tt-metric:last-child { grid-column: 1 / -1; }
+}
 .tt-surface, .tt-content [data-slot=card] {
   background: #ecf3e4d9;
   border: 1px solid #f3f8e773;

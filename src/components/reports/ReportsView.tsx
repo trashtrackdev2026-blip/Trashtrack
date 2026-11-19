@@ -4,7 +4,7 @@ import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { ReportEvidence } from "@/components/reports/ReportEvidence";
 
 import { ReportActionFields } from "./ReportActionFields";
-import { reportActionFields, requiredBarangaySeverity, type ReportActionInput } from "@/lib/report-action";
+import { reportActionFields, type ReportActionInput } from "@/lib/report-action";
 import type { ReportUpdateInput } from "@/lib/update-report";
 import { isReportArchived, normalizeReportStatus } from "@/lib/report-workflow";
 import { useRef, useState } from "react";
@@ -57,16 +57,29 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
     (!search.trim() || [report.id, report.type, report.description, report.location, report.reporterName].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
     && (barangayFilter === "all" || reportBarangayLabel(report.location) === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
   const activeReport = visibleReports.find(report => report.id === activeReportId);
-  const allowedStatuses = activeReport ? nextReportStatuses(role, activeReport.status) : [];
-  const barangaySeverity = role === "Semi-Admin" ? requiredBarangaySeverity(newStatus) : undefined;
-  const actionDetails = barangaySeverity ? { ...actionInput, severity: barangaySeverity } : actionInput;
+  const allowedStatuses = activeReport
+    ? nextReportStatuses(role, activeReport.status).filter(status => status !== "For MENRO Review")
+    : [];
+  const canOpenForwarding = !!activeReport && canUpdateReport(role, userBarangay, activeReport, "For MENRO Review");
+  const resolvesLocally = role === "Semi-Admin" && newStatus === "Resolved";
+  const actionDetails = resolvesLocally ? { ...actionInput, severity: "Minor" } : actionInput;
   let actionValid = true, actionError = "";
   try { const next=normalizeReportStatus(newStatus);if(next)reportActionFields(role,next,{...actionDetails,remarks}); } catch (failure) { actionValid=false;actionError=failure instanceof Error?failure.message:"Complete the action details."; }
-  const canSave = !!activeReport && actionValid && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
+  const canSave = !!activeReport && allowedStatuses.some(status => status === newStatus) && actionValid
+    && canUpdateReport(role, userBarangay, activeReport, newStatus, collectionConfirmed);
   const openReport = (report: CommunityReport) => {
+    const draft = preservedDraft.current?.id === report.id ? preservedDraft.current : null;
+    const draftStatus = draft?.status;
+    const canRestore = draftStatus && draftStatus !== "For MENRO Review"
+      && nextReportStatuses(role, report.status).some(status => status === draftStatus);
     setShowConfirm(false);
-    const draft=preservedDraft.current?.id===report.id?preservedDraft.current:null;
-    setActiveReportId(report.id);setNewStatus(draft&&nextReportStatuses(role,report.status).some(status=>status===draft.status)?draft.status:"");setRemarks(draft?.remarks||"");setCollectionConfirmed(false);setActionInput(draft?.action||{});setOpenedVersion({expectedStatus:report.status,expectedRevision:report.statusRevision||0});setUpdateError(null);
+    setActiveReportId(report.id);
+    setNewStatus(canRestore ? draftStatus : "");
+    setRemarks(draft?.remarks || "");
+    setCollectionConfirmed(false);
+    setActionInput(draft?.action || {});
+    setOpenedVersion({ expectedStatus: report.status, expectedRevision: report.statusRevision || 0 });
+    setUpdateError(null);
   };
   const summaryLabels = { all: "All reports", active: "Active reports", archived: "Archived reports", pending: role === "Semi-Admin" ? "Pending Review" : "Pending Validation",
     review: role === "Semi-Admin" ? "For MENRO Review" : "Under Review", resolved: "Archived reports", rejected: "Rejected reports" };
@@ -183,7 +196,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           </h1>
           <p className="text-sm text-slate-500">
             {role === "Semi-Admin"
-              ? "Review reports in your barangay, verify the location, and forward confirmed reports to MENRO."
+              ? "Review reports in your barangay and resolve concerns within barangay capacity."
               : "Receive verified reports from Barangay Captains, schedule collection, and resolve reports after collection."}
           </p>
           {role === "Semi-Admin" && <Link href="/reports-to-menro" className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-50"><Send className="h-4 w-4" />Reports to MENRO</Link>}
@@ -338,14 +351,14 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                       I confirm the reported concern has been addressed and the action is complete.
                     </label>}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700">{newStatus === "Rejected" ? "Reason for the resident (required)" : newStatus === "Resolved" ? "Resolution details (required)" : barangaySeverity === "Major" ? "Verified findings and reason for forwarding (required)" : "Review remarks"}</label>
+                      <label className="text-[11px] font-bold text-slate-700">{newStatus === "Rejected" ? "Reason for the resident (required)" : newStatus === "Resolved" ? "Resolution details (required)" : "Review remarks"}</label>
                       <textarea
                         aria-label="Review remarks" maxLength={2000}
                         rows={3}
                         value={remarks}
                         onChange={(e) => setRemarks(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#2E7D32] resize-none"
-                        placeholder={barangaySeverity === "Major" ? "Explain why this concern needs MENRO assistance…" : newStatus === "Resolved" ? "Describe the work that addressed the concern…" : "Describe your findings…"}
+                        placeholder={newStatus === "Resolved" ? "Describe the work that addressed the concern…" : "Describe your findings…"}
                       />
                     </div>
                     {newStatus && actionError && <p role="status" className="text-xs leading-relaxed">{actionError}</p>}
@@ -355,9 +368,16 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                       disabled={!canSave || isUpdating}
                       className="w-full h-10 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm disabled:opacity-50"
                     >
-                      {barangaySeverity === "Major" ? "Forward to MENRO" : barangaySeverity === "Minor" ? "Resolve locally" : "Update Status"}
+                      {resolvesLocally ? "Resolve locally" : "Update Status"}
                     </Button>
                   </div>
+                </div>}
+
+                {canOpenForwarding && <div className="rounded-xl border border-[#cbd9c7] bg-[#e9edd9] p-4 text-sm text-[#194f3d]">
+                  <p>For concerns beyond barangay capacity, continue in Reports to MENRO.</p>
+                  <Link href="/reports-to-menro" className="mt-2 inline-flex min-h-9 items-center gap-2 font-semibold underline underline-offset-4">
+                    Open Reports to MENRO <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
                 </div>}
 
                 {allowedStatuses.length === 0 && !isReportArchived(activeReport) && activeReport.status !== "Rejected" && <p className="text-sm text-muted-foreground">
@@ -380,7 +400,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
               <dt className="text-xs font-semibold text-slate-500">New Status:</dt>
               <dd><span className={`inline-block rounded-full px-2 py-1 text-xs font-bold ${getStatusColor(newStatus)}`}>{REPORT_STATUS_LABELS[newStatus as keyof typeof REPORT_STATUS_LABELS] || newStatus}</span></dd>
             </dl>
-            <DialogDescription className="text-center text-sm text-slate-600">{newStatus === "Rejected" ? "Reject this report? The resident will receive your reason and the report will appear in Rejected reports." : newStatus === "Resolved" ? "Confirm resolution? The report will move to Archived reports automatically and the resident will receive the resolution update." : barangaySeverity === "Major" ? "Forward this report and your verified findings to MENRO for review?" : "Are you sure you want to update this report?"}</DialogDescription>
+            <DialogDescription className="text-center text-sm text-slate-600">{newStatus === "Rejected" ? "Reject this report? The resident will receive your reason and the report will appear in Rejected reports." : newStatus === "Resolved" ? "Confirm resolution? The report will move to Archived reports automatically and the resident will receive the resolution update." : "Are you sure you want to update this report?"}</DialogDescription>
             {updateError && <div className="space-y-3"><p role="alert" className="text-sm text-red-700">{updateError}</p>{updateError.includes("changed") && <Button variant="outline" onClick={() => {preservedDraft.current={id:activeReport.id,status:newStatus,remarks,confirmed:collectionConfirmed,action:actionInput};setShowConfirm(false);setActiveReportId(null);retry();setSaveMessage("Reloading the latest reports. Reopen this report to review its current stage; your notes and action draft are kept. Confirm the action again after reviewing.");}}>Review latest report</Button>}</div>}
           </div>
           <DialogFooter className="sticky bottom-0 mx-0 mb-0 flex-row gap-3 border-t border-slate-100 bg-white p-4">
