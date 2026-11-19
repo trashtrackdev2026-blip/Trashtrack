@@ -58,6 +58,7 @@ function fixture(options = {}) {
     "@/lib/report-photo-review": { reviewReportPhotos: async () => {
       photoReviews++;
       if (options.rejectPhoto) throw new access.StaffAccessError("Please replace attachment 1 with a clear photo related to your waste concern.", 422);
+      if (options.photoCheckUnavailable) throw new access.StaffAccessError("Please try again in a moment.", 503);
       if (options.profileAfterPhotoReview) records.set("users/resident", { ...records.get("users/resident"), ...options.profileAfterPhotoReview });
       return { status: "review", checks: [], checkedAt: "2026-11-10T15:59:59Z", version: 1 };
     } },
@@ -80,13 +81,18 @@ test("report save retries commit exactly once and use the authenticated reporter
   assert.equal(app.photoReviews, 1, "A saved retry must not repeat the AI call");
 });
 
-test("replacement requests never create reports or consume the daily submission quota", async () => {
-  const app = fixture({ rejectPhoto: true });
-  const result = await app.post(body);
-  assert.equal(result.status, 422);
-  assert.match((await result.json()).error, /replace attachment 1/);
-  assert.equal(app.records.has("resident_report_quota/resident"), false);
-  assert.equal([...app.records.keys()].filter(key => key.startsWith("reports/")).length, 0);
+test("replacement and failed checks never create reports or consume the daily submission quota", async () => {
+  for (const [options, status, message] of [
+    [{ rejectPhoto: true }, 422, /replace attachment 1/],
+    [{ photoCheckUnavailable: true }, 503, /try again/],
+  ]) {
+    const app = fixture(options);
+    const result = await app.post(body);
+    assert.equal(result.status, status);
+    assert.match((await result.json()).error, message);
+    assert.equal(app.records.has("resident_report_quota/resident"), false);
+    assert.equal([...app.records.keys()].filter(key => key.startsWith("reports/")).length, 0);
+  }
 });
 
 test("the server owns review flags and checks account changes after photo analysis", async () => {

@@ -20,6 +20,7 @@ function fixture(t, checks, options = {}) {
   globalThis.fetch = async (url, settings) => {
     fetched.push(String(url));
     assert.equal(settings.redirect, "error");
+    if (answer.photoUnavailable) return new Response(null, { status: 503 });
     return new Response(new Uint8Array([255, 216, 255]), { headers: { "Content-Type": "image/jpeg" } });
   };
   t.after(() => {
@@ -28,7 +29,8 @@ function fixture(t, checks, options = {}) {
   });
   const modules = {
     "@google/genai": { Type: {}, GoogleGenAI: class {
-      models = { generateContent: async () => {
+      models = { generateContent: async request => {
+        assert.equal(request.config.httpOptions.retryOptions.attempts, 2);
         if (answer.unavailable) throw new Error("Provider unavailable");
         return { text: JSON.stringify({ checks: answer.checks }) };
       } };
@@ -53,12 +55,24 @@ test("related evidence is accepted while an unrelated or inappropriate attachmen
   }
 });
 
-test("uncertain photos, videos and provider outages remain available for staff review", async t => {
+test("uncertain checked photos and videos remain available for staff review", async t => {
   const app = fixture(t, [{ attachment: 1, outcome: "review", reason: "unclear" }]);
   assert.equal((await app.review(report)).status, "review");
   assert.equal((await app.review({ ...report, attachments: [{ ...photo, type: "video" }] })).status, "review");
+});
+
+test("unchecked photos require a retry if the provider, upload, or configuration is unavailable", async t => {
+  const app = fixture(t, []);
+  const unavailable = { status: 503, code: "report/photo-check-unavailable" };
   app.answer.unavailable = true;
-  assert.equal((await app.review(report)).status, "review");
+  await assert.rejects(() => app.review(report), unavailable);
+  app.answer.unavailable = false;
+  await assert.rejects(() => app.review(report), unavailable);
+  app.answer.photoUnavailable = true;
+  await assert.rejects(() => app.review(report), unavailable);
+  delete process.env.GEMINI_API_KEY;
+  await assert.rejects(() => app.review(report), unavailable);
+  assert.equal((await app.review({ ...report, attachments: [{ ...photo, type: "video" }] })).status, "review");
 });
 
 test("invalid model indexes or incomplete answers cannot accidentally accept an unchecked photo", () => {
