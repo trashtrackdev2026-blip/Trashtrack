@@ -11,7 +11,8 @@ const pin = name => {
   const [longitude, latitude] = boundaries.features.find(item => item.properties.name === name).properties.labelPoint;
   return { latitude, longitude };
 };
-const body = { requestId: "1ed8f083-0b44-4c26-bfd7-d53f6cbec171", type: "Illegal Dumping", description: "Discarded bags near the road", ...pin("Sala"), attachments: [] };
+const body = { requestId: "1ed8f083-0b44-4c26-bfd7-d53f6cbec171", type: "Illegal Dumping", description: "Discarded bags near the road", ...pin("Sala"),
+  attachments: [{ type: "image", url: "https://res.cloudinary.com/demo/image/upload/photo.jpg" }] };
 const profile = { role: "Resident", barangay: "Sala", name: "Resident" };
 
 test("residents can report only inside their own registered barangay, even with a forged address", () => {

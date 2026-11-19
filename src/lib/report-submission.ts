@@ -15,7 +15,7 @@ export function reportSubmission(body: Record<string, unknown>, profile: Record<
       || typeof body.type !== "string" || !["Garbage Overflow", "Illegal Dumping", "Missed Collection", "Other"].includes(body.type)
       || typeof body.description !== "string" || !body.description.trim() || body.description.length > 5000
       || !Array.isArray(body.attachments) || body.attachments.length > 5) {
-    throw new StaffAccessError("Enter a description and attach up to five photos or videos.", 400);
+    throw new StaffAccessError("Enter a description and attach at least one photo. You can attach up to five photos or videos.", 400);
   }
   const attachments: ReportAttachment[] = body.attachments.map(value => {
     if (!value || typeof value !== "object" || !["image", "video"].includes(value.type) || typeof value.url !== "string") {
@@ -29,10 +29,14 @@ export function reportSubmission(body: Record<string, unknown>, profile: Record<
     }
     return { url: url.href, type: value.type };
   });
+  const photo = attachments.find(item => item.type === "image");
+  if (!photo) {
+    throw new StaffAccessError("Add at least one photo of the concern to continue.", 400, "report/photo-required");
+  }
   return {
     type: body.type, description: body.description.trim(), location: pin.barangay,
     latitude: body.latitude as number, longitude: body.longitude as number,
-    attachments, imageUrl: attachments.find(item => item.type === "image")?.url || "",
+    attachments, imageUrl: photo.url,
     status: "Pending", reporterName: String(profile.name || "Resident").slice(0, 120),
   };
 }

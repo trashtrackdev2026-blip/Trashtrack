@@ -14,7 +14,10 @@ const code = ts.transpileModule(fs.readFileSync(new URL("../src/app/api/reports/
 }).outputText;
 const data = JSON.parse(fs.readFileSync(new URL("../public/geojson/balete_barangays.json", import.meta.url)));
 const [longitude, latitude] = data.features.find(item => item.properties.name === "Sala").properties.labelPoint;
-const body = { requestId: "1ed8f083-0b44-4c26-bfd7-d53f6cbec171", type: "Other", description: "Uncollected waste", latitude, longitude, attachments: [] };
+process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = "demo";
+const photo = { type: "image", url: "https://res.cloudinary.com/demo/image/upload/photo.jpg" };
+const video = { type: "video", url: "https://res.cloudinary.com/demo/video/upload/clip.mp4" };
+const body = { requestId: "1ed8f083-0b44-4c26-bfd7-d53f6cbec171", type: "Other", description: "Uncollected waste", latitude, longitude, attachments: [photo] };
 
 function fixture(options = {}) {
   const records = new Map([["users/resident", { role: "Resident", barangay: "Sala", name: "Verified resident", ...options.currentProfile }]]);
@@ -123,6 +126,23 @@ test("signed-out requests and malformed submissions never create reports", async
     assert.equal((await app.post(input)).status, 400);
     assert.equal(app.records.size, 1);
   }
+});
+
+test("a report needs a photo before review or quota writes, and can include a video", async () => {
+  const app = fixture();
+  for (const attachments of [[], [video]]) {
+    const response = await app.post({ ...body, attachments });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /at least one photo/);
+    assert.equal(app.records.size, 1);
+    assert.equal(app.photoReviews, 0);
+  }
+
+  const response = await app.post({ ...body, attachments: [video, photo] });
+  assert.equal(response.status, 200);
+  const { id } = await response.json();
+  assert.equal(app.records.get(`reports/${id}`).imageUrl, photo.url);
+  assert.equal(app.photoReviews, 1);
 });
 
 test("the sixth report waits until Manila midnight while a saved submission can be retried", async () => {
