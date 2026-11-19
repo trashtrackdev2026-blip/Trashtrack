@@ -8,7 +8,7 @@ import { reportActionFields, type ReportActionInput } from "@/lib/report-action"
 import type { ReportUpdateInput } from "@/lib/update-report";
 import { isReportArchived, normalizeReportStatus } from "@/lib/report-workflow";
 import { useRef, useState } from "react";
-import { Search, FileText, Clock, Archive, AlertTriangle, Check, Send, ArrowUpRight } from "lucide-react";
+import { Search, FileText, Clock, Archive, AlertTriangle, Check, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -190,17 +190,12 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
           />
         </div>
 
-        <div className="tt-report-guidance">
-          <h1 className="tt-legacy-heading text-[26px] font-bold text-slate-900 leading-tight">
-            {role === "Semi-Admin" ? "Community Reports" : "Report Management"}
-          </h1>
+        {role === "Admin" && <div className="tt-report-guidance">
+          <h1 className="tt-legacy-heading text-[26px] font-bold text-slate-900 leading-tight">Report Management</h1>
           <p className="text-sm text-slate-500">
-            {role === "Semi-Admin"
-              ? "Review reports in your barangay and resolve concerns within barangay capacity."
-              : "Receive verified reports from Barangay Captains, schedule collection, and resolve reports after collection."}
+            Receive verified reports from Barangay Captains, schedule collection, and resolve reports after collection.
           </p>
-          {role === "Semi-Admin" && <Link href="/reports-to-menro" className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-50"><Send className="h-4 w-4" />Reports to MENRO</Link>}
-        </div>
+        </div>}
 
         <div className="min-w-0">
 
