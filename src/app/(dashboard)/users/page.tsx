@@ -18,6 +18,8 @@ import { useAuth } from "@/context/AuthContext";
 import { withTimeout } from "@/lib/request-timeout";
 import { DataState } from "@/components/ui/data-state";
 import { accountGroup as getAccountGroup } from "@/lib/account-group";
+import { formatAccountJoinDate } from "@/lib/account-join-date";
+import { staffRequest } from "@/lib/staff-client";
 
 interface UserData {
   id: string;
@@ -28,8 +30,7 @@ interface UserData {
   group: string;
   barangay: string;
   status: string;
-  date: string;
-  time: string;
+  date: string | null;
   reports: number;
   reportAbuseWarnings: number;
 }
@@ -42,6 +43,7 @@ export default function UsersPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [countsReady, setCountsReady] = useState(false);
+  const [joinDatesLoading, setJoinDatesLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
 
   // Pagination State
@@ -65,9 +67,27 @@ export default function UsersPage() {
 
   useEffect(() => {
     if (authLoading || !currentUser || role !== "Admin") return;
+    const adminId = currentUser.uid;
     let cancelled = false;
+    const resolveJoinDates = async (ids: string[]) => {
+      setJoinDatesLoading(ids.length > 0);
+      try {
+        for (let start = 0; start < ids.length && !cancelled; start += 100) {
+          const { dates } = await staffRequest<{ dates: { id: string; createdAt: string }[] }>(
+            "/api/staff/join-dates", { ids: ids.slice(start, start + 100) }, adminId,
+          );
+          if (cancelled) return;
+          const byId = new Map(dates.map(account => [account.id, formatAccountJoinDate(account.createdAt)]));
+          setUsers(previous => previous.map(user => user.date ? user : { ...user, date: byId.get(user.id) ?? null }));
+        }
+      } catch {
+        if (!cancelled) setDataError("Some account join dates could not be loaded. Retry to look them up again.");
+      } finally {
+        if (!cancelled) setJoinDatesLoading(false);
+      }
+    };
     const fetchUsers = async () => {
-      setLoading(true); setDataError(null); setCountsReady(false);
+      setLoading(true); setDataError(null); setCountsReady(false); setJoinDatesLoading(false);
       // Fetch report totals in parallel, without delaying the user list.
       const counts = withTimeout(getDocs(collection(db, "reports")), "Report totals are taking too long. Check your connection and retry.", 15_000)
         .then(snapshot => {
@@ -84,21 +104,6 @@ export default function UsersPage() {
         usersSnap.forEach((doc) => {
           const data = doc.data();
 
-          let userDate = "Recently";
-          let userTime = "";
-
-          if (data.createdAt && typeof data.createdAt.toDate === 'function') {
-            const dateObj = data.createdAt.toDate();
-            userDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            userTime = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-          } else if (data.timestamp) {
-            const dateObj = new Date(data.timestamp);
-            if (!isNaN(dateObj.getTime())) {
-              userDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-              userTime = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            }
-          }
-
           usersList.push({
             id: doc.id,
             name: data.name || "Unknown",
@@ -108,17 +113,17 @@ export default function UsersPage() {
             group: getAccountGroup(data.role, staffApplicants.has(doc.id)),
             barangay: data.barangay || "Unassigned",
             status: data.accessStatus || data.status || "Registered",
-            date: userDate,
-            time: userTime,
+            date: formatAccountJoinDate(data.createdAt) ?? formatAccountJoinDate(data.timestamp),
             reports: 0,
             reportAbuseWarnings: Number(data.reportAbuseWarnings) || 0,
           });
         });
         setUsers(usersList);
         setLoading(false);
+        void resolveJoinDates(usersList.filter(user => !user.date).map(user => user.id));
         const reportCounts = await counts;
         if (!cancelled && reportCounts) {
-          setUsers(usersList.map(user => ({ ...user, reports: reportCounts[user.id] || 0 })));
+          setUsers(previous => previous.map(user => ({ ...user, reports: reportCounts[user.id] || 0 })));
           setCountsReady(true);
         }
       } catch (error) {
@@ -225,7 +230,7 @@ export default function UsersPage() {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left"><thead><tr className="border-b"><th className="px-5 py-4">Name</th><th className="px-3 py-4">Barangay</th><th className="px-3 py-4">Role</th><th className="px-3 py-4">Status</th><th className="px-3 py-4">Joined</th><th className="px-4 py-4 text-right">Actions</th></tr></thead><tbody>{filteredUsers.slice((currentPage - 1) * itemsPerPage,currentPage * itemsPerPage).map(user=><tr key={user.id} className="border-b last:border-0"><td className="px-5 py-4"><button type="button" onClick={()=>setSelectedUser(user)} className="flex items-center gap-3 text-left"><span className="tt-avatar" aria-hidden="true">{user.name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join("").toUpperCase()}</span><span><strong className="block text-xs font-semibold">{user.name}</strong><small className="mt-1 block text-[10px] text-muted-foreground">{user.email}</small>{user.phone && <small className="mt-1 block text-xs text-muted-foreground">{user.phone}</small>}</span></button></td><td className="px-3 py-4 text-xs">{user.barangay || (user.role.toLowerCase()==="admin"?"All barangays":"Unassigned")}</td><td className="px-3 py-4 text-xs">{user.role}</td><td className="px-3 py-4"><span className="tt-status">{user.status}</span></td><td className="px-3 py-4 text-[11px] text-muted-foreground">{user.date}</td><td className="px-4 py-4 text-right"><Button variant="ghost" size="icon" aria-label={"View "+user.name} onClick={()=>setSelectedUser(user)}><Eye /></Button></td></tr>)}{!filteredUsers.length&&<tr><td colSpan={6} className="tt-empty">No users match your filters.</td></tr>}</tbody></table>
+            <table className="w-full min-w-[640px] text-left"><thead><tr className="border-b"><th className="px-5 py-4">Name</th><th className="px-3 py-4">Barangay</th><th className="px-3 py-4">Role</th><th className="px-3 py-4">Status</th><th className="px-3 py-4">Joined</th><th className="px-4 py-4 text-right">Actions</th></tr></thead><tbody>{filteredUsers.slice((currentPage - 1) * itemsPerPage,currentPage * itemsPerPage).map(user=><tr key={user.id} className="border-b last:border-0"><td className="px-5 py-4"><button type="button" onClick={()=>setSelectedUser(user)} className="flex items-center gap-3 text-left"><span className="tt-avatar" aria-hidden="true">{user.name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join("").toUpperCase()}</span><span><strong className="block text-xs font-semibold">{user.name}</strong><small className="mt-1 block text-[10px] text-muted-foreground">{user.email}</small>{user.phone && <small className="mt-1 block text-xs text-muted-foreground">{user.phone}</small>}</span></button></td><td className="px-3 py-4 text-xs">{user.barangay || (user.role.toLowerCase()==="admin"?"All barangays":"Unassigned")}</td><td className="px-3 py-4 text-xs">{user.role}</td><td className="px-3 py-4"><span className="tt-status">{user.status}</span></td><td className="px-3 py-4 text-[11px] text-muted-foreground">{user.date ?? (joinDatesLoading ? "Loading…" : "Date unavailable")}</td><td className="px-4 py-4 text-right"><Button variant="ghost" size="icon" aria-label={"View "+user.name} onClick={()=>setSelectedUser(user)}><Eye /></Button></td></tr>)}{!filteredUsers.length&&<tr><td colSpan={6} className="tt-empty">No users match your filters.</td></tr>}</tbody></table>
           </div>
 
           {/* Pagination */}
