@@ -7,6 +7,20 @@ export const STAFF_RECENT_SECONDS = 5 * 60;
 export const STAFF_IDLE_MS = 15 * 60 * 1000;
 export type StaffRole = "admin" | "semi-admin";
 export const STAFF_POSITIONS = ["Barangay Captain", "Secretary"] as const;
+export const STAFF_MOBILE_LENGTH = 11;
+export const STAFF_MOBILE_PATTERN = "09[0-9]{9}";
+export const STAFF_MOBILE_HELP = "Enter an 11-digit Philippine mobile number starting with 09.";
+
+export function staffMobileInput(value: string) {
+  return value.replace(/[^0-9]/g, "").slice(0, STAFF_MOBILE_LENGTH);
+}
+
+export function validateStaffMobile(contact: string) {
+  if (!new RegExp(`^${STAFF_MOBILE_PATTERN}$`).test(contact)) {
+    throw new StaffAccessError(STAFF_MOBILE_HELP, 400, "staff/invalid-contact");
+  }
+}
+
 export function staffPosition(value: unknown): string {
   const raw = String(value || "").trim();
   return STAFF_POSITIONS.find(position => position.toLowerCase() === raw.toLowerCase()) || (raw.toLowerCase() === "barangay secretary" ? "Secretary" : "");

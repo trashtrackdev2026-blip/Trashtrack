@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedAccount, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
-import { StaffAccessError, requestFields, staffRole } from "@/lib/staff-access";
+import { StaffAccessError, requestFields, staffRole, validateStaffMobile } from "@/lib/staff-access";
 
 export async function GET(request: Request) {
   try {
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
         throw new StaffAccessError("Your request is already awaiting MENRO review.", 409);
       }
       if (existing?.submittedAt?.toMillis && Date.now() - existing.submittedAt.toMillis() < 60 * 60 * 1000) throw new StaffAccessError("Wait one hour before submitting another request.", 429);
+      validateStaffMobile(details.contact);
       if (!profile) tx.set(profileRef, { name: details.name, email: identity.email, contact: details.contact, barangay: details.barangay, points: 0, role: "Semi-Admin", accessStatus: "needs-review", createdAt: FieldValue.serverTimestamp() });
       tx.set(ref, { ...details, userId: identity.uid, email: identity.email, status: "pending", submittedAt: FieldValue.serverTimestamp() });
       tx.create(db.collection("audit_logs").doc(), { action: "staff.request", actor: identity.uid, target: identity.uid, barangay: details.barangay, at: FieldValue.serverTimestamp() });

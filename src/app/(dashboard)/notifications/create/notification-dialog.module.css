@@ -1,0 +1,84 @@
+.dialog {
+  background: #fbf8ee;
+  color: #173f31;
+  outline-offset: 3px;
+}
+
+.banner {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+  padding: clamp(20px, 5vw, 32px);
+  background:
+    linear-gradient(100deg, #0e3328 0%, #123c2fe8 51%, #1846388c),
+    url("/images/balete-lakeside-1280.webp") center 48% / cover;
+}
+
+.mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 6px;
+  place-items: center;
+  border: 1px solid #e4eeaf;
+  border-radius: 14px;
+  background: #dceba9;
+  color: #0e3a28;
+}
+
+.mark svg { width: 21px; height: 21px; }
+
+.title {
+  color: #fffaeb;
+  font-size: clamp(1.65rem, 5vw, 2.1rem);
+  line-height: 1.1;
+  font-weight: 650;
+  letter-spacing: -.04em;
+}
+
+.description { max-width: 40ch; color: #f1f3db; line-height: 1.5; }
+
+.body { display: grid; gap: 16px; padding: clamp(16px, 4vw, 26px); }
+
+.preview {
+  display: grid;
+  gap: 5px;
+  padding: 14px 15px;
+  border: 1px solid #dae4cd;
+  border-inline-start: 4px solid #648747;
+  border-radius: 13px;
+  background: #eff4e5;
+  overflow-wrap: anywhere;
+}
+
+.category { color: #48654a; font-size: .75rem; font-weight: 650; }
+.preview h3 { font-size: 1.125rem; line-height: 1.3; font-weight: 700; }
+.message { color: #365341; white-space: pre-wrap; line-height: 1.45; }
+.details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.details > div { padding: 10px 12px; border: 1px solid #e0e6d5; border-radius: 12px; }
+.details dt { display: flex; align-items: center; gap: 5px; color: #48654a; font-size: .75rem; }
+.details dt svg { width: 15px; height: 15px; flex: none; }
+.details dd { margin-top: 3px; font-weight: 650; overflow-wrap: anywhere; }
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #ead9ac;
+  border-radius: 12px;
+  background: #faf0d9;
+  color: #684711;
+}
+
+.notice svg { margin-top: 2px; width: 16px; height: 16px; flex: none; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.actions button { min-height: 44px; border-radius: 999px; padding-inline: 16px; }
+.actions button[data-variant="default"] { background: #164833; color: #fff9ea; }
+.actions button[data-variant="default"]:hover { background: #24583f; }
+.actions button[data-variant="outline"] { border-color: #cbd9c3; background: transparent; color: #224933; }
+.actions button[data-variant="outline"]:hover { background: #eef3e5; }
+
+@media (max-width: 420px) {
+  .actions button { flex: 1 0 100%; }
+}

@@ -83,6 +83,27 @@ test("All thirteen barangays can queue separate staff registrations", async () =
   }
 });
 
+test("New staff requests require exactly eleven local Philippine mobile digits", async () => {
+  for (const contact of ["0912345678", "091234567890", "08123456789", "+639123456789", "09a23456789"]) {
+    const app = fixture();
+    const result = await app.post({ ...details, contact }, 400);
+    assert.match(result.error, /11-digit Philippine mobile number/);
+    assert.equal(app.records.size, 0);
+  }
+  const app = fixture();
+  await app.post({ ...details, contact: "09123456789" });
+  assert.equal((await app.get()).contact, "09123456789");
+  assert.equal(policy.staffMobileInput("09-123456789987"), "09123456789");
+});
+
+test("An identical pending request can still be retried with a previously accepted number", async () => {
+  const legacy = { ...details, position: "Secretary", contact: "+639123456789" };
+  const app = fixture({ request: { ...legacy, status: "pending" } });
+  await app.post(legacy);
+  assert.equal(app.records.size, 1);
+  assert.equal((await app.get()).contact, legacy.contact);
+});
+
 test("Retrying registration after a lost response does not duplicate or change a pending request", async () => {
   const app = fixture();
   await app.post();

@@ -8,7 +8,7 @@ import { multiFactor, TotpMultiFactorGenerator, sendEmailVerification, type Totp
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { staffRequest } from "@/lib/staff-client";
-import { STAFF_BARANGAYS, staffRole } from "@/lib/staff-access";
+import { STAFF_BARANGAYS, STAFF_MOBILE_HELP, STAFF_MOBILE_LENGTH, STAFF_MOBILE_PATTERN, staffMobileInput, staffRole } from "@/lib/staff-access";
 import { ConfirmStaffSession } from "@/components/auth/ConfirmStaffSession";
 import { StaffConfirmationRequired, withRecentStaffSignIn } from "@/lib/staff-action";
 type Account = { profile: Record<string, unknown>; problem: string | null; totpEnabled?: boolean; totpState?: "available" | "disabled" | "unavailable" };
@@ -125,7 +125,7 @@ export default function StaffAccountPage() {
           <label className="block text-sm font-medium">Full name<input className={field} value={name} onChange={e => setName(e.target.value)} required maxLength={120} /></label>
           <label className="block text-sm font-medium">Official position<OfficialPositionSelect className={field} value={position} onChange={e => setPosition(e.target.value)} disabled={busy} /></label>
           <label className="block text-sm font-medium">Barangay<select className={field} value={barangay} onChange={e => setBarangay(e.target.value)} required><option value="">Select barangay</option>{STAFF_BARANGAYS.map(value => <option key={value}>{value}</option>)}</select></label>
-          <label className="block text-sm font-medium">Contact number<input className={field} type="tel" value={contact} onChange={e => setContact(e.target.value)} required maxLength={40} /></label>
+          <label className="block text-sm font-medium">Contact number<input className={field} type="tel" inputMode="numeric" value={contact} onChange={e => setContact(staffMobileInput(e.target.value))} required maxLength={STAFF_MOBILE_LENGTH} pattern={STAFF_MOBILE_PATTERN} title={STAFF_MOBILE_HELP} autoComplete="tel-national" /></label>
           <button disabled={busy} className="rounded-xl bg-green-800 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Submitting…" : "Submit for MENRO approval"}</button>
         </form>}
         {approved && account?.totpEnabled !== true && <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><h2 className="font-semibold">Authenticator setup {account?.totpState === "unavailable" ? "could not be checked" : "is unavailable"}</h2><p>{account?.totpState === "unavailable" ? "Your account is loaded, but the project authenticator settings could not be read. Refresh account status to retry." : "The project owner must activate Identity Platform and enable TOTP in Firebase before accounts can enroll an authenticator. Opening a setup link does not enable protection."}</p><p>Lost access to an enrolled authenticator? Contact an authorized MENRO administrator for identity-verified recovery. If this is the only MENRO account, the Firebase project owner must assist.</p></div>}

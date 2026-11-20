@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { Bell, Send, HelpCircle, Users, CalendarIcon, AlertTriangle } from "lucide-react";
+import { Bell, Send, BellRing, Check, Smartphone, Users, CalendarIcon, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { Brand } from "@/components/layout/Brand";
 import { useRouter } from "next/navigation";
@@ -14,12 +14,14 @@ import { BALETE_BARANGAYS } from "@/lib/barangay-geofence";
 import { staffRequest } from "@/lib/staff-client";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { manilaDateTime } from "@/lib/scheduling-time";
+import styles from "./notification-dialog.module.css";
 
 export default function CreateNotificationPage() {
   const router = useRouter();
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [savedNotificationId, setSavedNotificationId] = useState<string | null>(null);
+  const [notificationSaved, setNotificationSaved] = useState(false);
+  const [receipt, setReceipt] = useState<"queued" | "in-app" | null>(null);
   const [notificationId] = useState(() => doc(collection(db, "notifications")).id);
   const [deliveryError, setDeliveryError] = useState("");
 
@@ -31,10 +33,26 @@ export default function CreateNotificationPage() {
     push: true,
     endDate: "",
   });
+  const dialogTitle = receipt === "queued" ? "Saved and queued" : receipt || notificationSaved ? "Notification saved" : "Review notification";
+  const dialogDescription = receipt === "queued"
+    ? "The announcement is in the app. Phone delivery has been queued."
+    : receipt === "in-app"
+      ? "Residents can find this announcement in their TrashTrack notification history."
+      : notificationSaved
+        ? "The announcement is in the app. You can retry phone delivery."
+        : "Check the message, audience, and delivery before sending.";
+  const deliveryStatus = receipt === "queued" ? "Phone delivery queued"
+    : notificationSaved && !receipt ? "Phone delivery pending"
+    : form.push ? "In-app and phone notification" : "In-app notification";
+  const locked = isSending || notificationSaved;
 
   const handleSendNotification = async () => {
     const user = auth.currentUser;
-    if (!user || !form.title.trim() || !form.message.trim()) return;
+    if (isSending || receipt || !form.title.trim() || !form.message.trim()) return;
+    if (!user) {
+      setDeliveryError("Sign in again before sending this notification.");
+      return;
+    }
     setIsSending(true);
     setDeliveryError("");
     try {
@@ -42,16 +60,18 @@ export default function CreateNotificationPage() {
         id: notificationId, title: form.title, message: form.message, recipients: form.recipients,
         type: form.category === "Collection Schedule" ? "schedule" : form.category === "System Alert" ? "alert" : "event", push: form.push, endDate: form.endDate,
       });
-      if (result.saved) setSavedNotificationId(notificationId);
-      if (form.push && !result.queued) throw new Error(result.deliveryError || "Phone delivery is pending. Retry this saved notification.");
-      alert(form.push ? "Notification saved and queued for phones." : "Notification saved in the app's notification history.");
-      router.push("/notifications");
+      if (!result.saved) throw new Error("The save could not be confirmed. Try again to check its status.");
+      setNotificationSaved(true);
+      if (form.push && !result.queued) {
+        setDeliveryError(result.deliveryError || "Phone delivery could not be queued. Try again.");
+        return;
+      }
+      setReceipt(result.queued ? "queued" : "in-app");
     } catch (error) {
       const message = error instanceof Error && error.name !== "TimeoutError" ? error.message : "Delivery could not be confirmed. Retry to check its status.";
-      setDeliveryError(`${savedNotificationId ? "Notification saved. " : ""}${message} Retrying uses the same notification ID.`);
+      setDeliveryError(message);
     } finally {
       setIsSending(false);
-      setShowConfirm(false);
     }
   };
 
@@ -80,7 +100,7 @@ export default function CreateNotificationPage() {
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Title <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <Input 
-                    disabled={isSending || savedNotificationId !== null}
+                    disabled={locked}
                     maxLength={100}
                     value={form.title} 
                     onChange={(e) => setForm({...form, title: e.target.value})}
@@ -95,7 +115,7 @@ export default function CreateNotificationPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Category <span className="text-red-500">*</span></label>
-                  <Select disabled={isSending || savedNotificationId !== null}
+                  <Select disabled={locked}
                     value={form.category === "Collection Schedule" ? "schedule" : form.category === "System Alert" ? "alert" : "event"}
                     onValueChange={(val) => {
                       const mapping: Record<string, string> = {
@@ -124,7 +144,7 @@ export default function CreateNotificationPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Recipients <span className="text-red-500">*</span></label>
-                  <Select value={form.recipients} disabled={isSending || savedNotificationId !== null}
+                  <Select value={form.recipients} disabled={locked}
                     onValueChange={value => { if (value) setForm({ ...form, recipients: value }); }}>
                     <SelectTrigger className="w-full bg-white border-slate-200 h-11">
                       <div className="flex items-center gap-2">
@@ -145,7 +165,7 @@ export default function CreateNotificationPage() {
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Message <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <textarea 
-                    disabled={isSending || savedNotificationId !== null}
+                    disabled={locked}
                     maxLength={500}
                     rows={5}
                     value={form.message}
@@ -161,7 +181,7 @@ export default function CreateNotificationPage() {
               <label className="block max-w-xs text-sm font-semibold">
                 End date (optional)
                 <Input type="date" className="mt-2" min={manilaDateTime().date} value={form.endDate}
-                  disabled={isSending || savedNotificationId !== null}
+                  disabled={locked}
                   onChange={event => setForm({ ...form, endDate: event.target.value })} />
                 <span className="mt-2 block text-xs font-normal text-muted-foreground">Editing closes after this date in Philippine time.</span>
               </label>
@@ -170,7 +190,7 @@ export default function CreateNotificationPage() {
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Delivery Options <span className="text-red-500">*</span></label>
                 <div className="flex items-start gap-3 p-4 border border-slate-200 rounded-xl bg-white w-max">
                   <input type="checkbox" aria-label="Send phone notification" checked={form.push}
-                    disabled={isSending || savedNotificationId !== null}
+                    disabled={locked}
                     onChange={event => setForm({ ...form, push: event.target.checked })}
                     className="w-5 h-5 shrink-0 mt-0.5 accent-[#2E7D32]" />
                   <div className="flex flex-col gap-0.5 pr-8">
@@ -191,10 +211,10 @@ export default function CreateNotificationPage() {
                   </Button>
                 </Link>
                 <Button disabled={isSending || !form.title.trim() || !form.message.trim()} onClick={() => setShowConfirm(true)} className="px-8 h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm">
-                  {savedNotificationId ? "Retry phone delivery" : "Review & send"} <Send className="w-4 h-4 ml-2" />
+                  {receipt ? "View receipt" : notificationSaved ? "Retry phone delivery" : "Review & send"} <Send className="w-4 h-4 ml-2" />
                 </Button>
               </div>
-              {deliveryError && <div role="alert" className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">{deliveryError}</div>}
+              {!showConfirm && deliveryError && <div role="alert" className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">{deliveryError}</div>}
 
             </div>
           </div>
@@ -204,61 +224,37 @@ export default function CreateNotificationPage() {
         </div>
       </div>
 
-      {/* Confirm Modal Overlay */}
       <Dialog open={showConfirm} onOpenChange={open => { if (!isSending) setShowConfirm(open); }}>
-          <DialogContent className="sm:max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 gap-0 bg-white">
-
-            <div className="p-8 flex flex-col items-center text-center">
-
-              <div className="w-16 h-16 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mb-6">
-                <HelpCircle className="w-8 h-8" />
-              </div>
-
-              <DialogTitle className="text-xl leading-normal font-bold text-slate-900 mb-2">Confirm Notification</DialogTitle>
-              <DialogDescription className="text-sm text-slate-500 mb-8 max-w-xs">
-                Are you sure you want to send this notification to residents in the selected barangay?
-              </DialogDescription>
-
-              <div className="w-full text-left space-y-3 mb-8">
-                <div className="flex">
-                  <span className="text-xs font-semibold text-slate-500 w-28 shrink-0">Title:</span>
-                  <span className="text-xs font-bold text-slate-800">{form.title}</span>
-                </div>
-                <div className="flex">
-                  <span className="text-xs font-semibold text-slate-500 w-28 shrink-0">Category:</span>
-                  <span className="text-xs font-bold text-slate-800">{form.category}</span>
-                </div>
-                <div className="flex">
-                  <span className="text-xs font-semibold text-slate-500 w-28 shrink-0">Target Barangay:</span>
-                  <span className="text-xs font-bold text-slate-800">{form.recipients}</span>
-                </div>
-              </div>
-
-              <div className="w-full bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-2 mb-8">
-                <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
-                <span className="text-[11px] font-semibold text-orange-700">This action cannot be undone.</span>
-              </div>
-
-              <div className="flex w-full gap-3">
-                <Button 
-                  onClick={() => setShowConfirm(false)}
-                  disabled={isSending}
-                  variant="outline" 
-                  className="flex-1 h-11 border-slate-200 text-slate-600 font-semibold rounded-xl"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleSendNotification} 
-                  disabled={isSending}
-                  className="w-full h-11 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-semibold rounded-xl shadow-sm flex-1"
-                >
-                  {isSending ? "Sending..." : "Send Notification"} {!isSending && <Send className="w-4 h-4 ml-2" />}
-                </Button>
-              </div>
-
+        <DialogContent showCloseButton={false} className={`gap-0 rounded-2xl p-0 sm:max-w-lg ${styles.dialog}`}>
+          <header className={styles.banner}>
+            <div className={styles.mark} aria-hidden="true">{notificationSaved ? <Check /> : <BellRing />}</div>
+            <DialogTitle className={styles.title}>{dialogTitle}</DialogTitle>
+            <DialogDescription className={styles.description}>{dialogDescription}</DialogDescription>
+            <span className="sr-only" role="status">{isSending ? "Sending notification" : notificationSaved ? dialogDescription : ""}</span>
+          </header>
+          <div className={styles.body}>
+            <div className={styles.preview}>
+              <p className={styles.category}>{form.category}</p>
+              <h3>{form.title.trim()}</h3>
+              <p className={styles.message}>{form.message.trim()}</p>
             </div>
-          </DialogContent>
+            <dl className={styles.details}>
+              <div><dt><Users aria-hidden="true" /> Audience</dt><dd>{form.recipients}</dd></div>
+              <div><dt><Smartphone aria-hidden="true" /> Delivery</dt><dd>{deliveryStatus}</dd></div>
+            </dl>
+            {deliveryError && <p className={styles.notice} role="alert"><AlertTriangle aria-hidden="true" />{deliveryError}</p>}
+            {!notificationSaved && !deliveryError && <p className={styles.notice}><AlertTriangle aria-hidden="true" />Residents may see this announcement as soon as it is saved.</p>}
+            <div className={styles.actions}>
+              {!receipt && <Button variant="outline" disabled={isSending} onClick={() => notificationSaved ? router.push("/notifications") : setShowConfirm(false)}>
+                {notificationSaved ? "Notification history" : "Back to editing"}
+              </Button>}
+              <Button disabled={isSending} onClick={receipt ? () => router.push("/notifications") : handleSendNotification}>
+                {receipt ? "View notification history" : isSending ? (notificationSaved ? "Retrying…" : "Sending…") : notificationSaved ? "Retry phone delivery" : "Send notification"}
+                {!receipt && !isSending && <Send aria-hidden="true" />}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
       </Dialog>
     </>
   );

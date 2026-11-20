@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword, setPersistence, browserSessionPersistence, sendEmailVerification, validatePassword, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { STAFF_BARANGAYS, requestFields } from "@/lib/staff-access";
+import { STAFF_BARANGAYS, STAFF_MOBILE_HELP, STAFF_MOBILE_LENGTH, STAFF_MOBILE_PATTERN, requestFields, staffMobileInput, validateStaffMobile } from "@/lib/staff-access";
 import { staffRequest } from "@/lib/staff-client";
 export default function SignupPage() {
   const [name, setName] = useState(""); const [email, setEmail] = useState("");
@@ -21,6 +21,7 @@ export default function SignupPage() {
     event.preventDefault(); setBusy(true); setError("");
     try {
       const details = requestFields({ name, position, contact, barangay });
+      validateStaffMobile(details.contact);
       let user = createdUser;
       if (!user) {
         if (password.length < 12) throw new Error("Use a password of at least 12 characters.");
@@ -51,7 +52,7 @@ export default function SignupPage() {
     <label className="block text-sm font-medium sm:col-span-2">Official email<input disabled={!!createdUser} className={inputClass} type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username" /></label>
     {!createdUser && <label className="block text-sm font-medium sm:col-span-2">Password<input className={inputClass} type={passwordVisible ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required minLength={12} maxLength={128} autoComplete="new-password" /><button type="button" aria-pressed={passwordVisible} aria-label={passwordVisible ? "Hide password" : "Show password"} onClick={() => setPasswordVisible(value => !value)} className="mt-2 min-h-10 text-sm font-semibold text-green-800">{passwordVisible ? "Hide password" : "Show password"}</button><span className="mt-1 block text-xs text-slate-500">Use at least 12 characters. A unique passphrase works well.</span></label>}
     <label className="block text-sm font-medium">Barangay<select className={inputClass} value={barangay} onChange={e => setBarangay(e.target.value)} required><option value="">Select your barangay</option>{STAFF_BARANGAYS.map(value => <option key={value}>{value}</option>)}</select></label>
-    <label className="block text-sm font-medium">Contact number<input className={inputClass} type="tel" value={contact} onChange={e => setContact(e.target.value)} required maxLength={40} autoComplete="tel" /></label>
+    <label className="block text-sm font-medium">Contact number<input className={inputClass} type="tel" inputMode="numeric" value={contact} onChange={e => setContact(staffMobileInput(e.target.value))} required maxLength={STAFF_MOBILE_LENGTH} pattern={STAFF_MOBILE_PATTERN} title={STAFF_MOBILE_HELP} autoComplete="tel-national" /></label>
     </fieldset>
     <button disabled={busy} className="tt-primary-link min-h-12 w-full border-0 disabled:opacity-50">{busy ? "Saving registration…" : requestSaved ? "Send verification email and continue" : createdUser ? "Finish staff registration" : "Register and request MENRO approval"}</button>
     <p className="text-sm text-slate-600">Already registered? <Link href="/login" className="font-semibold text-green-800">Sign in</Link></p>
