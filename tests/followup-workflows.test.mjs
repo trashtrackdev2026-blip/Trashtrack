@@ -72,6 +72,19 @@ test("Collection edits update linked open actions, preserve original planning da
   const report=app.records.get("reports/report1");assert.equal(report.actionDate,"2099-11-05");assert.equal(report.originalActionDate,"2099-11-04");assert.equal(report.statusRevision,5);assert.equal(report.status,"Endorsed");
   const saved=structuredClone([...app.records]);await app.invoke("collections",app.edit);assert.deepEqual([...app.records],saved);
 });
+test("A truck conflict during an edit saves neither the edit nor a resident notice", async () => {
+  const app = fixture();
+  app.records.set("collection_trucks/truck-a", { name: "Truck A", available: true });
+  app.records.set("schedules/assigned", { date: app.edit.date, barangay: "Sala", time: "07:00", endTime: "09:00", status: "Active", truckId: "truck-a" });
+  const before = structuredClone([...app.records]);
+  await app.invoke("collections", { ...app.edit, truckId: "truck-a", endTime: "10:00" }, 409);
+  assert.deepEqual([...app.records], before);
+  await app.invoke("collections", { ...app.edit, truckId: "truck-a", time: "09:00", endTime: "10:00" });
+  assert.equal(app.records.get("schedules/one").truckName, "Truck A");
+  await app.invoke("collections", { ...app.edit, changeId: "clear-truck", expectedRevision: 1, time: "09:00", truckId: "" });
+  assert.equal(app.records.get("schedules/one").truckId, "");
+});
+
 test("Completed collections reject edits, follow-ups and deletes even from direct requests",async()=>{
   for(const action of ["edit","followup","delete"]){const app=fixture();app.records.get("schedules/one").status="Completed";const saved=structuredClone([...app.records]);await app.invoke("collections",{...app.edit,action,expectedStatus:"Completed"},409);assert.deepEqual([...app.records],saved);}
 });

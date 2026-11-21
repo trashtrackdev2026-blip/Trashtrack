@@ -2,6 +2,7 @@ import { normalizeReportStatus } from "./report-workflow.ts";
 import { collectionStatus, COLLECTION_STATUSES } from "./schedule-policy.ts";
 import { REPORT_CATEGORIES, reportCategory } from "./report-categories.ts";
 import { reportDate } from "./menro-reports.ts";
+import { manilaDateTime } from "./scheduling-time.ts";
 
 type RecordData = Record<string, unknown>;
 export type AnalyticsPoint = { name: string; value: number };
@@ -22,15 +23,15 @@ export function analyticsReportDate(data: RecordData): Date | null {
 
 const monthKey = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit" }).format(date).replace(/\D/g, "");
 
-export function summarizeAnalytics(reports: RecordData[], events: RecordData[], resources: number, schedules: RecordData[], now = new Date()) {
+export function summarizeAnalytics(reports: RecordData[], events: RecordData[], resources: number, schedules: RecordData[], now = new Date(), trendMonths = 6) {
   const resolved = reports.filter(report => normalizeReportStatus(String(report.status)) === "Resolved");
   const resolvedReports = resolved.length;
   const rejectedReports = reports.filter(report => normalizeReportStatus(String(report.status)) === "Rejected").length;
   // Pending here means every unresolved concern, at every review/collection stage.
   const stats = { totalReports: reports.length, resolvedReports, rejectedReports, pendingReports: reports.length - resolvedReports - rejectedReports,
     totalEvents: events.length, totalResources: resources, eventParticipants: events.reduce((sum, event) => sum + (Number(event.participants) || 0), 0) };
-  const manila = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
-  const months = Array.from({ length: 6 }, (_, index) => new Date(Date.UTC(manila.getFullYear(), manila.getMonth() - 5 + index, 1, 4)));
+  const [year, month] = manilaDateTime(now.getTime()).date.split("-").map(Number);
+  const months = Array.from({ length: trendMonths }, (_, index) => new Date(Date.UTC(year, month - trendMonths + index, 1, 4)));
   const trendData = months.map(month => ({ name: month.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "Asia/Manila" }),
     value: reports.filter(report => { const date = analyticsReportDate(report);return date && date <= now && monthKey(date) === monthKey(month); }).length }));
   const categoryNames = REPORT_CATEGORIES;
@@ -40,7 +41,6 @@ export function summarizeAnalytics(reports: RecordData[], events: RecordData[], 
     const category = reportCategory(report.type || report.category);
     categoryData.find(item => item.name === category)!.value++;
   }
-  const percentages = categoryData.map(item => ({ ...item, value: reports.length ? Math.round(item.value / reports.length * 100) : 0 }));
   const eventData = ["Clean-Up Drives", "Tree Planting", "Seminars", "Other events"].map(name => ({ name, value: 0 }));
   for (const event of events) {
     const text = `${event.category || ""} ${event.title || ""}`.toLowerCase();
@@ -56,6 +56,6 @@ export function summarizeAnalytics(reports: RecordData[], events: RecordData[], 
     { name: "Barangay", value: resolved.filter(report => report.resolvedByRole === "Semi-Admin").length },
     { name: "MENRO", value: resolved.filter(report => report.resolvedByRole === "Admin").length },
   ];
-  return { stats, trendData, categoryData: percentages, eventData, collectionData, resolutionData,
+  return { stats, trendData, categoryData, eventData, collectionData, resolutionData,
     totalCollections: schedules.length, historicalCollections, undatedReports: reports.filter(report => !analyticsReportDate(report)).length };
 }

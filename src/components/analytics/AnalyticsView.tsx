@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeWithDeadline } from "@/lib/live-data";
 import { summarizeAnalytics, analyticsReportDate, CALAWIT_SERVICE_NOTE } from "@/lib/analytics-data";
-import { analyticsMonthLabel, analyticsMonthRange, filterAnalyticsMonth, analyticsRecordRows } from "@/lib/analytics-period";
+import { analyticsPeriodLabel, analyticsPeriodRange, filterAnalyticsPeriod, analyticsRecordRows } from "@/lib/analytics-period";
 import { manilaDateTime } from "@/lib/scheduling-time";
 import { REPORT_CATEGORIES, reportCategory } from "@/lib/report-categories";
 import { normalizeReportStatus } from "@/lib/report-workflow";
@@ -19,6 +19,7 @@ import { DataState } from "@/components/ui/data-state";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import type { BarangayStat } from "@/components/ui/Map";
 import type { AnalyticsPdfSection } from "@/lib/analytics-pdf";
+import { ReportInsights } from "@/components/analytics/ReportInsights";
 
 const MapComponent = dynamic(() => import("@/components/ui/Map"), { ssr:false, loading:() => <p className="p-4">Loading map…</p> });
 const Charts = dynamic(() => import("@/components/analytics/AnalyticsCharts"), { ssr:false });
@@ -39,7 +40,8 @@ export default function AnalyticsView() {
   const [selectedBarangay, setSelectedBarangay] = useState<BarangayName | "all-barangays">("all-barangays");
   const [selectedType, setSelectedType] = useState("all-types");
   const [selectedPeriod, setSelectedPeriod] = useState("all-dates");
-  const [selectedMonth,setSelectedMonth]=useState("");
+  const [reportPeriod, setReportPeriod] = useState("");
+
   const [recordPage,setRecordPage]=useState(1);
   const [expanded, setExpanded] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -47,14 +49,34 @@ export default function AnalyticsView() {
   const [now, setNow] = useState(() => new Date());
   const loading = Object.values(data).some(value => value === null);
   const dataError = Object.values(errors).filter(Boolean).join(" ") || null;
-  const periodReports=useMemo(()=>filterAnalyticsMonth(data.reports || [],selectedMonth),[data.reports,selectedMonth]);
-  const periodEvents=useMemo(()=>filterAnalyticsMonth(data.events || [],selectedMonth,"event"),[data.events,selectedMonth]);
-  const periodSchedules=useMemo(()=>filterAnalyticsMonth(data.schedules || [],selectedMonth,"schedule"),[data.schedules,selectedMonth]);
-  const periodResources=useMemo(()=>filterAnalyticsMonth(data.educational_resources || [],selectedMonth,"resource"),[data.educational_resources,selectedMonth]);
-  const periodLabel=analyticsMonthLabel(selectedMonth);
-  const summary=useMemo(()=>summarizeAnalytics(periodReports,periodEvents,periodResources.length,periodSchedules,selectedMonth ? new Date(analyticsMonthRange(selectedMonth).end.getTime()-1) : now),[periodReports,periodEvents,periodResources,periodSchedules,selectedMonth,now]);
-  const { stats, categoryData, eventData, collectionData } = summary;
-  const trendData=selectedMonth ? summary.trendData.slice(-1) : summary.trendData;
+  const periodReports = useMemo(() => filterAnalyticsPeriod(data.reports || [], reportPeriod), [data.reports, reportPeriod]);
+  const periodEvents = useMemo(() => filterAnalyticsPeriod(data.events || [], reportPeriod, "event"), [data.events, reportPeriod]);
+  const periodSchedules = useMemo(() => filterAnalyticsPeriod(data.schedules || [], reportPeriod, "schedule"), [data.schedules, reportPeriod]);
+  const periodResources = useMemo(() => filterAnalyticsPeriod(data.educational_resources || [], reportPeriod, "resource"), [data.educational_resources, reportPeriod]);
+  const periodLabel = analyticsPeriodLabel(reportPeriod);
+  const reportPeriodMode = !reportPeriod ? "all" : reportPeriod.length === 4 ? "year" : "month";
+  const trendMonths = reportPeriodMode === "year" ? 12 : reportPeriodMode === "month" ? 1 : 6;
+  const summary = useMemo(() => summarizeAnalytics(periodReports, periodEvents, periodResources.length, periodSchedules,
+    reportPeriod ? new Date(analyticsPeriodRange(reportPeriod).end.getTime() - 1) : now, trendMonths),
+  [periodReports, periodEvents, periodResources, periodSchedules, reportPeriod, now, trendMonths]);
+  const { stats, categoryData, eventData, collectionData, trendData } = summary;
+  const currentYear = manilaDateTime(now.getTime()).date.slice(0, 4);
+  const years = useMemo(() => {
+    const formatYear = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", year: "numeric" });
+    const observed = new Set([currentYear]);
+    for (const records of Object.values(data)) for (const record of records || []) {
+      const date = analyticsReportDate(record) || analyticsReportDate({ date: record.dateISO });
+      if (date) observed.add(formatYear.format(date));
+    }
+    return [...observed].filter(year => /^\d{4}$/.test(year) && Number(year) >= 1900).sort().reverse();
+  }, [currentYear, data]);
+  const changeReportPeriod = (period: string) => {
+    if (period === reportPeriod) return;
+    setReportPeriod(period);
+    setSelectedPeriod("all-dates");
+    setGisLoading(true);
+    setRecordPage(1);
+  };
   const recordRows=useMemo(()=>analyticsRecordRows(periodReports),[periodReports]);
   const safeRecordPage=Math.min(recordPage,Math.max(1,Math.ceil(recordRows.length/20)));
   const undatedCount=(data.reports || []).filter(report=>!analyticsReportDate(report)).length;
@@ -99,8 +121,8 @@ export default function AnalyticsView() {
   const tableTotal = tableRows.reduce((sum, row) => ({ total:sum.total + row.total,resolved:sum.resolved + row.resolved,pending:sum.pending + row.pending }), {total:0,resolved:0,pending:0});
   const sections: AnalyticsPdfSection[] = [
     {title:"Report summary - " + periodLabel,rows:[{name:"Total reports",value:stats.totalReports},{name:"Resolved",value:stats.resolvedReports},{name:"Rejected",value:stats.rejectedReports},{name:"Pending (all active stages)",value:stats.pendingReports}]},
-    {title:selectedMonth ? "Report submissions - " + periodLabel : "Waste concern trend - last six months",rows:trendData},
-    {title:"Report categories (%)",rows:categoryData}, {title:"Community events",rows:eventData},
+    {title:reportPeriod ? "Report submissions - " + periodLabel : "Waste concern trend - last six months",rows:trendData},
+    {title:"Report categories (counts)",rows:categoryData}, {title:"Community events",rows:eventData},
     {title:"Collection outcomes - " + periodLabel,rows:collectionData},
     {title:"Barangay totals - " + selectedType + ", " + selectedPeriod,rows:tableRows.flatMap(row => [{name:row.name + ": total",value:row.total},{name:row.name + ": resolved",value:row.resolved},{name:row.name + ": pending",value:row.pending}])},
     {title:"Recorded resolutions by office",rows:summary.resolutionData},
@@ -113,30 +135,43 @@ export default function AnalyticsView() {
       const documentSections=section === undefined ? sections : [sections[section]];
       const notes=["Selected period: " + periodLabel + ".",
         "Pending includes reports awaiting review or action. Rejected and resolved reports have their own counts.", CALAWIT_SERVICE_NOTE,
-        "Geographic filters apply only to barangay totals: " + selectedBarangay + ", " + selectedType + ", " + selectedPeriod + ". All sections use the selected month or all dates.",
+        "Geographic filters apply only to barangay totals: " + selectedBarangay + ", " + selectedType + ", " + selectedPeriod + ". All sections use the selected reporting period.",
         "Reports use submission date; events use event date; collections use collection date; learning resources use publication date. Report counts reflect current saved statuses.",
         ...(summary.historicalCollections ? [summary.historicalCollections + " historical collections use retired or unrecognized statuses and are excluded from the four outcome counts."] : []),
         ...(summary.undatedReports ? [summary.undatedReports + " reports have no valid submission date and are excluded from the monthly trend."] : []),
         ...(gisNotice ? [gisNotice] : []),
-        ...(selectedMonth && undatedCount ? [undatedCount+" undated reports are excluded from this month."] : [])];
+        ...(reportPeriod && undatedCount ? [undatedCount+" undated reports are excluded from this period."] : [])];
       if(print)await openPrintableAnalyticsPdf(documentSections,notes);
-      else await downloadAnalyticsPdf(documentSections,notes,(section===1?"Waste-Concern-Trend":section===4?"Collection-Analytics":"Analytics")+(selectedMonth?"-"+selectedMonth:"-All-Dates"));
+      else await downloadAnalyticsPdf(documentSections,notes,(section===1?"Waste-Concern-Trend":section===4?"Collection-Analytics":"Analytics")+(reportPeriod?"-"+reportPeriod:"-All-Dates"));
     } catch(error) {setExportError(error instanceof Error?error.message:"The PDF could not be generated. Please try again.");} finally {setExporting(false);}
   }
   function exportCsv() {
     const rows = [["Barangay","Total reports","Resolved","Pending"], ...tableRows.map(row => [row.name,row.total,row.resolved,row.pending]), ["Total",tableTotal.total,tableTotal.resolved,tableTotal.pending]];
     const csv = rows.map(row => row.map(value => '"' + String(value).replaceAll('"','""') + '"').join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], {type:"text/csv;charset=utf-8;"}));
-    const link = document.createElement("a");link.href=url;link.download=`TrashTrack-Barangay-Reports-${selectedMonth || "All-Dates"}.csv`;link.click();setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const link = document.createElement("a");link.href=url;link.download=`TrashTrack-Barangay-Reports-${reportPeriod || "All-Dates"}.csv`;link.click();setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   const metric = (value: number) => loading || dataError ? "—" : value;
   const pdfDisabled = loading || !!dataError || exporting;
   return <div className="mx-auto max-w-[1400px] space-y-6 pb-8">
     <DataState loading={loading} error={dataError} onRetry={() => {setData(emptyData);setErrors({});setGisLoading(true);setAttempt(value => value + 1);}} />
     <section className="tt-surface flex flex-wrap items-end gap-4 p-5" aria-label="Analytics reporting period">
-      <label className="min-w-44 text-sm font-semibold">Report period<select className={selectClass+" mt-2 block w-full"} value={selectedMonth?"month":"all"} onChange={event=>{setSelectedMonth(event.target.value==="all"?"":manilaDateTime().date.slice(0,7));setGisLoading(true);setRecordPage(1);}}><option value="all">All recorded dates</option><option value="month">Specific month</option></select></label>
-      {selectedMonth && <label className="text-sm font-semibold">Month and year<input aria-label="Month and year" type="month" min="1900-01" max="9999-12" value={selectedMonth} className={selectClass+" mt-2 block"} onChange={event=>{if(/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value) && Number(event.target.value.slice(0,4))>=1900){setSelectedMonth(event.target.value);setGisLoading(true);setRecordPage(1);}}}/></label>}
-      <p className="flex-1 text-sm" role="status"><strong className="block">{periodLabel}</strong>All summaries, charts and exported records use this period (Philippine time).{selectedMonth && undatedCount>0 && <small className="mt-1 block">{undatedCount} undated reports excluded.</small>}</p>
+      <label className="min-w-44 text-sm font-semibold">Report period
+        <select className={selectClass + " mt-2 block w-full"} value={reportPeriodMode} onChange={event => changeReportPeriod(event.target.value === "all" ? "" : event.target.value === "year" ? currentYear : manilaDateTime().date.slice(0, 7))}>
+          <option value="all">All recorded dates</option><option value="year">Specific year</option><option value="month">Specific month</option>
+        </select>
+      </label>
+      {reportPeriodMode === "year" && <label className="text-sm font-semibold">Year
+        <select className={selectClass + " mt-2 block"} value={reportPeriod} onChange={event => changeReportPeriod(event.target.value)}>
+          {years.map(year => <option key={year}>{year}</option>)}
+        </select>
+      </label>}
+      {reportPeriodMode === "month" && <label className="text-sm font-semibold">Month and year
+        <input type="month" min="1900-01" max="9999-12" value={reportPeriod} className={selectClass + " mt-2 block"} onChange={event => {
+          if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value) && Number(event.target.value.slice(0, 4)) >= 1900) changeReportPeriod(event.target.value);
+        }} />
+      </label>}
+      <p className="flex-1 text-sm" role="status"><strong className="block">{periodLabel}</strong>All summaries, charts and exported records use this period (Philippine time).{reportPeriod && undatedCount>0 && <small className="mt-1 block">{undatedCount} undated reports excluded.</small>}</p>
     </section>
     <div className="flex flex-wrap justify-end gap-3"><Button variant="outline" disabled={pdfDisabled || gisLoading} onClick={()=>void exportPdf(undefined,true)}><Printer/>Open printable PDF</Button><Button variant="outline" disabled={pdfDisabled || gisLoading} onClick={() => void exportPdf()}><Download />{exporting ? "Preparing PDF…" : "Download analytics PDF"}</Button><Button variant="outline" disabled={loading || gisLoading || !!dataError} onClick={exportCsv}>Export CSV</Button></div>
     {exportError && <p role="alert" className="text-sm text-red-700">{exportError}</p>}
@@ -159,6 +194,8 @@ export default function AnalyticsView() {
       <div className="min-w-0 space-y-3"><ReportTrendChart trendData={trendData} counts={stats} /><Button variant="outline" disabled={pdfDisabled} onClick={() => void exportPdf(1)}><Download />Download trend PDF</Button></div>
     </div>
     <section className="tt-surface overflow-hidden"><div className="border-b p-5"><h2>Waste Reports by Barangay</h2><p className="mt-1 text-xs text-muted-foreground">Uses the map filters above. Pending includes all unresolved stages.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["Barangay","Total Reports","Resolved","Pending"].map(label => <th key={label} className="p-4">{label}</th>)}</tr></thead><tbody>{tableRows.map(row => <tr key={row.name} className="border-t"><td className="p-4">{row.name}{row.name === "Calawit" && <small className="block text-muted-foreground">Relocated residents served in Makina</small>}</td><td className="p-4">{gisLoading ? "—" : row.total}</td><td className="p-4">{gisLoading ? "—" : row.resolved}</td><td className="p-4">{gisLoading ? "—" : row.pending}</td></tr>)}<tr className="border-t bg-muted/30 font-semibold"><td className="p-4">Total in this view</td><td className="p-4">{gisLoading ? "—" : tableTotal.total}</td><td className="p-4">{gisLoading ? "—" : tableTotal.resolved}</td><td className="p-4">{gisLoading ? "—" : tableTotal.pending}</td></tr></tbody></table></div></section>
+    {!loading && !dataError && <ReportInsights key={JSON.stringify([reportPeriod, stats.totalReports, stats.resolvedReports, stats.rejectedReports, trendData, categoryData])} period={reportPeriod} periodLabel={periodLabel}
+      totalReports={stats.totalReports} categories={categoryData} months={trendData} />}
     {!loading && !dataError && <Charts categoryData={categoryData} eventData={eventData} stats={stats} />}
     <section className="tt-surface p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2>Collection analytics</h2><p className="mt-1 text-xs text-muted-foreground">{summary.totalCollections} saved schedules · {periodLabel} · current saved outcomes</p></div><Button variant="outline" disabled={pdfDisabled} onClick={() => void exportPdf(4)}><Download />Download collection PDF</Button></div><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{collectionData.map(item => <div key={item.name} className="rounded-xl border p-4"><span className="text-xs text-muted-foreground">{item.name}</span><strong className="mt-1 block text-2xl">{metric(item.value)}</strong><div className="mt-3 h-2 overflow-hidden rounded bg-muted"><div className="h-full bg-green-700" style={{width:(summary.totalCollections ? item.value / summary.totalCollections * 100 : 0) + "%"}} /></div></div>)}</div>{summary.historicalCollections>0 && <p className="mt-4 text-xs text-muted-foreground">{summary.historicalCollections} historical schedules use retired or unrecognized statuses and are excluded from these four outcome counts.</p>}</section>
     <section className="tt-surface overflow-hidden" aria-label="Report records for selected period"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div><h2>Report records · {periodLabel}</h2><p className="mt-1 text-xs text-muted-foreground">{recordRows.length} submissions. The printable PDF includes every record in this period.</p></div><Button variant="outline" disabled={pdfDisabled} onClick={()=>void exportPdf(7,true)}><Printer/>Print report records</Button></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["Submitted (PH)","Reference","Barangay","Concern","Current status"].map(label=><th key={label} className="p-4">{label}</th>)}</tr></thead><tbody>{recordRows.slice((safeRecordPage-1)*20,safeRecordPage*20).map(row=><tr key={row.reference} className="border-t"><td className="p-4">{row.date}</td><td className="max-w-48 break-all p-4">{row.reference}</td><td className="p-4">{row.barangay}</td><td className="p-4">{row.type}</td><td className="p-4">{row.status}</td></tr>)}{!loading && !recordRows.length && <tr><td colSpan={5} className="tt-empty">No report submissions for this period.</td></tr>}</tbody></table></div><div className="flex items-center justify-between gap-3 border-t p-4"><Button variant="outline" disabled={safeRecordPage===1} onClick={()=>setRecordPage(safeRecordPage-1)}>Previous</Button><span className="text-sm">Page {safeRecordPage} of {Math.max(1,Math.ceil(recordRows.length/20))}</span><Button variant="outline" disabled={safeRecordPage*20>=recordRows.length} onClick={()=>setRecordPage(safeRecordPage+1)}>Next</Button></div></section>

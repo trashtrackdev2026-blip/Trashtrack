@@ -10,7 +10,7 @@ test("Analytics uses the resident's four report categories and counts legacy ali
  const reports=["Garbage Overflow","Illegal Dumping","Missed Collection","Other","Uncollected Waste","Blocked Drainage","Mixed Waste","Others"].map(type=>({type}));
  const before=structuredClone(reports),result=summarizeAnalytics(reports,[],0,[]);
  assert.deepEqual(result.categoryData.map(x=>x.name),REPORT_CATEGORIES);
- assert.deepEqual(result.categoryData.map(x=>x.value),[25,13,13,50]);
+ assert.deepEqual(result.categoryData.map(x=>x.value),[2,1,1,4]);
  assert.deepEqual(reports,before);
  assert.equal(reportCategory(" missed_collection "),"Missed Collection");
  assert.equal(reportCategory("Not illegal dumping"),"Other");

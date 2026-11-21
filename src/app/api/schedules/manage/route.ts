@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
 import { StaffAccessError, staffAccessProblem, staffRole } from "@/lib/staff-access";
-import { assertCollectionAvailable, assertCollectionEditable, collectionStatusUpdate } from "@/lib/schedule-policy";
+import { assertCollectionAvailable, assertCollectionEditable, collectionStatusUpdate, collectionTruckName } from "@/lib/schedule-policy";
 import { collectionOutcomeNotice } from "@/lib/collection-outcome-notice";
 import { queuePhoneNotification } from "@/lib/notification-delivery";
 import { assertFutureSchedule } from "@/lib/scheduling-time";
@@ -44,7 +44,11 @@ export async function POST(request: Request) {
         // Closing or documenting an old duplicate must remain possible. Only
         // reactivating a released date acquires a new reservation.
         if (["Failed", "Inactive"].includes(current.status) && !["Failed", "Inactive"].includes(update.status)) {
-          assertCollectionAvailable({ date: current.date, barangay: current.barangay }, schedules.docs.filter(doc => doc.id !== body.id).map(doc => doc.data()));
+          if (typeof current.truckId === "string" && current.truckId) {
+            const truck = await tx.get(db.collection("collection_trucks").doc(current.truckId));
+            collectionTruckName(truck.data());
+          }
+          assertCollectionAvailable({ date: current.date, barangay: current.barangay, time: current.time, truckId: current.truckId, endTime: current.endTime }, schedules.docs.filter(doc => doc.id !== body.id).map(doc => doc.data()));
         }
         tx.set(lock, { revision: Number(day.data()?.revision || 0) + 1 });
       }

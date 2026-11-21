@@ -4,7 +4,7 @@ import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/s
 import { StaffAccessError, staffAccessProblem, staffRole } from "@/lib/staff-access";
 import { communityPublication } from "@/lib/community-publication";
 import { queuePhoneNotification } from "@/lib/notification-delivery";
-import { assertCollectionAvailable } from "@/lib/schedule-policy";
+import { assertCollectionAvailable, collectionTruckName } from "@/lib/schedule-policy";
 import { CertificateError } from "@/lib/certificate-data";
 import { assertFutureSchedule } from "@/lib/scheduling-time";
 
@@ -33,13 +33,19 @@ export async function POST(request: Request) {
       // Retry an already committed publication even after its start has passed;
       // only new posts and publishing drafts are new scheduling actions.
       assertFutureSchedule("dateISO" in publication.post ? publication.post.dateISO : publication.post.date, "startTime" in publication.post ? publication.post.startTime : publication.post.time);
-      if (body.kind === "schedule" && "date" in publication.post) {
+      let truckName = "";
+      if ("day" in publication.post) {
+        if (publication.post.truckId) {
+          if (staffRole(actor.role) !== "admin") throw new StaffAccessError("MENRO manages collection truck assignments.");
+          const truck = await tx.get(db.collection("collection_trucks").doc(publication.post.truckId));
+          truckName = collectionTruckName(truck.data());
+        }
         const dayRef = db.collection("schedule_days").doc(publication.post.date);
         const [day, schedules] = await Promise.all([tx.get(dayRef), tx.get(db.collection("schedules").where("date", "==", publication.post.date))]);
         assertCollectionAvailable(publication.post, schedules.docs.map(doc => doc.data()));
         tx.set(dayRef, { revision: Number(day.data()?.revision || 0) + 1 });
       }
-      const post = { ...publication.post, createdBy: identity.uid, publicationHash: hash, createdAt: FieldValue.serverTimestamp() };
+      const post = { ...publication.post, ...(truckName ? { truckName } : {}), createdBy: identity.uid, publicationHash: hash, createdAt: FieldValue.serverTimestamp() };
       if (publishingDraft) tx.update(postRef,{...post,publishedAt:FieldValue.serverTimestamp()});
       else tx.create(postRef,post);
       tx.create(noticeRef, { ...publication.announcement, sourceId: body.id, push: true, pushStatus: "pending", isRead: false, createdBy: identity.uid,

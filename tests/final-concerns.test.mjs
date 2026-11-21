@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {analyticsMonthRange,analyticsMonthLabel,filterAnalyticsMonth,analyticsRecordRows} from "../src/lib/analytics-period.ts";
+import {analyticsMonthRange,analyticsMonthLabel,filterAnalyticsMonth,analyticsRecordRows,analyticsPeriodRange,filterAnalyticsPeriod} from "../src/lib/analytics-period.ts";
 import {summarizeAnalytics} from "../src/lib/analytics-data.ts";
 import {learningPublicationFields,LEARNING_CATEGORIES,LEARNING_TYPES} from "../src/lib/learning-publication.ts";
 import {collectionChangeMessage,collectionOutcomeNotice} from "../src/lib/collection-outcome-notice.ts";
@@ -22,6 +22,23 @@ test("Monthly lists and analytics exclude adjacent months and undated reports bu
   assert.equal(summary.stats.totalReports,2);assert.equal(summary.stats.resolvedReports,1);assert.equal(summary.stats.pendingReports,1);
   assert.equal(analyticsRecordRows(month).length,summary.stats.totalReports);assert.equal(filterAnalyticsMonth(reports,"").length,5);
 });
+test("Calendar year analytics and printable records use the same Manila dates and raw category counts", () => {
+  const records = [
+    { id: "previous", date: "2025-12-31 23:59" },
+    { id: "first", date: "2025-12-31T16:00:00Z", type: "Illegal Dumping" },
+    { id: "last", date: "2026-12-31 23:59", type: "Illegal Dumping" },
+    { id: "next", date: "2027-01-01 00:00" },
+    { id: "undated" },
+  ];
+  const period = "2026";
+  const reports = filterAnalyticsPeriod(records, period);
+  const cutoff = new Date(analyticsPeriodRange(period).end.getTime() - 1);
+  const summary = summarizeAnalytics(reports, [], 0, [], cutoff, 12);
+  assert.deepEqual(analyticsRecordRows(reports).map(row => row.reference), ["first", "last"]);
+  assert.deepEqual(summary.trendData.map(row => row.value), [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+  assert.equal(summary.categoryData.find(row => row.name === "Illegal Dumping").value, summary.stats.totalReports);
+});
+
 test("Event and collection month filters use scheduled dates rather than creation dates",()=>{
   const data=[{dateISO:"2026-08-15",date:"2026-08-15",timestamp:Date.parse("2026-07-01")},{dateISO:"2026-09-01",date:"2026-09-01",timestamp:Date.parse("2026-08-05")}];
   for(const kind of ["event","schedule"])assert.equal(filterAnalyticsMonth(data,"2026-08",kind)[0],data[0]);

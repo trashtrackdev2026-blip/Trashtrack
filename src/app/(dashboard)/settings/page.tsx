@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Shield, Key, LogOut, Loader2, ArrowUpRight } from "lucide-react";
+import { Shield, Key, LogOut, Loader2, ArrowUpRight, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -30,6 +30,18 @@ export default function Settings() {
   const hasAuthenticator=user?multiFactor(user).enrolledFactors.length>0:false;
   const [authenticatorState,setAuthenticatorState]=useState<"checking"|"available"|"disabled"|"unavailable">("checking");
   useEffect(()=>{if(!user)return;let stopped=false;void staffRequest<{totpState?:"available"|"disabled"|"unavailable"}>("/api/staff/account?setup=1").then(result=>{if(!stopped)setAuthenticatorState(result.totpState||"unavailable");}).catch(()=>{if(!stopped)setAuthenticatorState("unavailable");});return()=>{stopped=true;};},[user]);
+  const [staffCounts, setStaffCounts] = useState<{ uid: string; barangays?: { name: string; count: number }[] } | null>(null);
+  const [countsAttempt, setCountsAttempt] = useState(0);
+  useEffect(() => {
+    if (role !== "Admin" || !user) return;
+    let disposed = false;
+    void staffRequest<{ barangays: { name: string; count: number }[] }>("/api/staff/manage?counts=barangay", undefined, user.uid)
+      .then(({ barangays }) => { if (!disposed) setStaffCounts({ uid: user.uid, barangays }); })
+      .catch(() => { if (!disposed) setStaffCounts({ uid: user.uid }); });
+    return () => { disposed = true; };
+  }, [role, user, countsAttempt]);
+  const counts = staffCounts?.uid === user?.uid ? staffCounts?.barangays : undefined;
+  const countsError = !!staffCounts && staffCounts.uid === user?.uid && !staffCounts.barangays;
   const handleUpdateProfile = async () => {
     if (!user || profileLoadedUid !== user.uid || !profileName.trim() || profileLoading) return;
     setIsUpdatingProfile(true);setError("");setMessage("");
@@ -61,5 +73,19 @@ export default function Settings() {
       <Card id="change-password"><CardHeader><CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" aria-hidden="true" />Password recovery</CardTitle><CardDescription>Manage your password through your registered email.</CardDescription></CardHeader><CardContent className="space-y-4"><p className="text-sm text-muted-foreground">Use {user?.email || "your registered email"} on the recovery page. Your existing password stays unchanged until you complete the reset link.</p><Link href="/forgot-password" className="tt-primary-link">Open password recovery <ArrowUpRight className="h-4 w-4" /></Link></CardContent></Card></div>
       <Card className="tt-dark-panel"><CardHeader><CardTitle className="flex items-center gap-3"><Shield className="h-7 w-7" aria-hidden="true" />Account protection</CardTitle><CardDescription>Protect your sign-in with an authenticator. Project support and account enrollment are checked separately.</CardDescription></CardHeader><CardContent className="space-y-7"><div><div className="mb-5 flex items-center justify-between gap-3"><span className="text-sm">Authenticator</span><span className={"tt-status"+(hasAuthenticator?"":" tt-status-pending")}>{hasAuthenticator?"Configured":authenticatorState==="disabled"?"Project setup required":authenticatorState==="unavailable"?"Could not check":authenticatorState==="checking"?"Checking…":"Not configured"}</span></div><Link href="/staff-account" className="tt-text-link">{hasAuthenticator?"Manage authenticator":authenticatorState==="available"?"Set up authenticator":"View authenticator setup"}<ArrowUpRight aria-hidden="true" /></Link></div><div className="space-y-4 border-t pt-6"><h2>Session</h2><p className="text-sm text-muted-foreground">Sign out of TrashTrack on this device.</p><Button variant="outline" onClick={()=>void signOut()}><LogOut aria-hidden="true" />Sign out</Button></div></CardContent></Card>
     </div>
+    {role === "Admin" && <Card id="barangay-staff-access">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Users className="size-5" aria-hidden="true" />Barangay staff access</CardTitle>
+        <CardDescription>Approved, active Semi-Admin accounts across Balete.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {countsError ? <div className="flex flex-wrap items-center gap-3"><p role="alert" className="text-sm">Staff counts could not be loaded.</p><Button variant="outline" onClick={() => { setStaffCounts(null); setCountsAttempt(value => value + 1); }}>Retry</Button></div>
+          : !counts ? <p role="status" className="text-sm text-muted-foreground">Loading staff counts…</p>
+          : <><p className="mb-4 text-sm"><strong>{counts.reduce((total, row) => total + row.count, 0)}</strong> active Semi-Admins</p>
+            <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {counts.map(({ name, count }) => <li key={name} className="flex items-center justify-between gap-3 rounded-lg border bg-[#eef3e8] px-4 py-3 text-sm"><span>{name}</span><strong className="tabular-nums">{count}</strong></li>)}
+            </ul></>}
+      </CardContent>
+    </Card>}
   </div>;
 }

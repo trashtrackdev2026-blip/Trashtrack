@@ -2,6 +2,7 @@ import { collectionTimeLabel } from "./collection-calendar.ts";
 import { STAFF_BARANGAYS, StaffAccessError } from "./staff-access.ts";
 import { eventDate } from "./certificate-data.ts";
 import { eventFormFields } from "./event-form.ts";
+import { collectionTruckFields } from "./schedule-policy.ts";
 
 export function communityPublication(kind: unknown, body: Record<string, unknown>) {
   if (kind !== "schedule" && kind !== "event") throw new StaffAccessError("Choose a schedule or event.", 400);
@@ -13,7 +14,8 @@ export function communityPublication(kind: unknown, body: Record<string, unknown
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || !Number.isFinite(Date.parse(date + "T" + time + ":00+08:00"))) throw new StaffAccessError("Enter a valid collection date and time.", 400);
     eventDate({ dateISO: date });
     const day = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "Asia/Manila" }).format(new Date(date + "T12:00:00+08:00"));
-    return { post: { barangay, date, day, time, status: "Active", description: text("description", 2000) },
+    const truck = collectionTruckFields(body, time);
+    return { post: { barangay, date, day, time, status: "Active", description: text("description", 2000), ...(truck.truckId ? truck : {}) },
       announcement: { title: "Collection schedule · " + barangay, message: `Waste collection for ${barangay} is scheduled on ${date} at ${collectionTimeLabel(time)}. Check the full schedule in TrashTrack.`, type: "schedule", recipients: barangay } };
   }
   const fields = eventFormFields(body);

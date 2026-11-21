@@ -17,6 +17,14 @@ export function reportSubmission(body: Record<string, unknown>, profile: Record<
       || !Array.isArray(body.attachments) || body.attachments.length > 5) {
     throw new StaffAccessError("Enter a description and attach at least one photo. You can attach up to five photos or videos.", 400);
   }
+  let subject: string | undefined;
+  // Older resident builds do not send a subject.
+  if (body.type === "Other" && body.subject !== undefined) {
+    if (typeof body.subject !== "string" || !body.subject.trim() || body.subject.trim().length > 120) {
+      throw new StaffAccessError("Enter a subject of up to 120 characters for an Other report.", 400);
+    }
+    subject = body.subject.trim();
+  }
   const attachments: ReportAttachment[] = body.attachments.map(value => {
     if (!value || typeof value !== "object" || !["image", "video"].includes(value.type) || typeof value.url !== "string") {
       throw new StaffAccessError("Invalid report attachment.", 400);
@@ -35,6 +43,7 @@ export function reportSubmission(body: Record<string, unknown>, profile: Record<
   }
   return {
     type: body.type, description: body.description.trim(), location: pin.barangay,
+    ...(subject ? { subject } : {}),
     latitude: body.latitude as number, longitude: body.longitude as number,
     attachments, imageUrl: photo.url,
     status: "Pending", reporterName: String(profile.name || "Resident").slice(0, 120),

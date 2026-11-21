@@ -26,6 +26,7 @@ const pages: Record<string, PageInfo> = {
   "/feedback": { section: "System feedback", title: "A better TrashTrack, together.", subtitle: "Listen to your residents. Turn their experience into better service." },
 };
 const creationPages: Record<string, PageInfo> = {
+  "/schedules/trucks": { section: "Collections", title: "Collection trucks", subtitle: "Manage the vehicles available for collection schedules.", action: { href: "/schedules", label: "Back to schedules" } },
   "/schedules/create": { section: "Collections", title: "Plan a collection", subtitle: "Set the details, review, and share with your barangay." },
   "/events/create": { section: "Events", title: "Create a community event", subtitle: "Make room for your community to come together." },
   "/notifications/create": { section: "Announcements", title: "Create a notification", subtitle: "A clear message, delivered to the right community." },

@@ -70,6 +70,24 @@ function fixture(options = {}) {
   } };
 }
 
+test("Publishing reserves a truck across barangays while allowing independent trucks and adjacent slots", async () => {
+  const app = fixture();
+  app.records.set("collection_trucks/truck-a", { name: "Truck A", available: true });
+  app.records.set("collection_trucks/truck-b", { name: "Truck B", available: true });
+  await app.post({ ...schedule, truckId: "truck-a", endTime: "10:00" });
+  assert.equal(app.records.get("schedules/test-schedule").truckName, "Truck A");
+  const blocked = await app.post({ ...schedule, id: "overlap", barangay: "Looc", time: "09:00", truckId: "truck-a", endTime: "11:00" }, 409);
+  assert.match(blocked.error, /truck is already assigned/);
+  assert.equal(app.records.has("schedules/overlap"), false);
+  assert.equal(app.records.has("notifications/schedule_overlap"), false);
+  await app.post({ ...schedule, id: "other-truck", barangay: "Magapi", truckId: "truck-b", endTime: "10:00" });
+  await app.post({ ...schedule, id: "next-slot", barangay: "Looc", time: "10:00", truckId: "truck-a", endTime: "11:00" });
+  await app.post({ ...schedule, id: "bad-time", barangay: "Solis", truckId: "truck-b", endTime: "07:00" }, 400);
+  app.records.set("collection_trucks/truck-b", { name: "Truck B", available: false });
+  await app.post({ ...schedule, id: "unavailable", barangay: "Solis", truckId: "truck-b", endTime: "09:00" }, 409);
+  await app.post({ ...schedule, truckId: "truck-a", endTime: "10:00" });
+});
+
 test("Publishing saves the schedule and in-app notice together and queues only the chosen barangay phone topic", async () => {
   for (const barangay of policy.STAFF_BARANGAYS) {
     const app = fixture(); await app.post({ ...schedule, barangay, role: "Admin", recipients: "All Barangays" });

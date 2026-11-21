@@ -25,6 +25,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STAFF_BARANGAYS } from "@/lib/staff-access";
 import { collectionTimeLabel } from "@/lib/collection-calendar";
+import { normalizedEventTime } from "@/lib/event-form";
+import { reportDate } from "@/lib/menro-reports";
+import { manilaDateTime } from "@/lib/scheduling-time";
+import { useSchedulingClock } from "@/lib/use-scheduling-clock";
 import { Pencil } from "lucide-react";
 import { AttendanceQr } from "@/components/events/AttendanceQr";
 import { useAuth } from "@/context/AuthContext";
@@ -43,6 +47,7 @@ interface EventData {
   barangay: string;
   date: string;
   time: string;
+  startTime?: string;
   participants: number;
   status: string;
   img: string;
@@ -93,10 +98,24 @@ export default function EventsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [barangayFilter, setBarangayFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const eventClock = useSchedulingClock();
+  const today = manilaDateTime(eventClock).date;
   const filteredEvents = events.filter(event => (!search.trim() || [event.title,event.barangay,event.description || ""].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
     && (statusFilter === "all" || event.status.toLowerCase() === statusFilter)
     && (barangayFilter === "all" || event.barangay === barangayFilter)
-    && (dateFilter === "all" || (event.dateISO || event.date || "").slice(0,7) === new Date().toISOString().slice(0,7)));
+    && (dateFilter === "all" || (event.dateISO || event.date || "").slice(0, 7) === today.slice(0, 7)))
+    .map(event => {
+      const date = event.dateISO || event.date || "";
+      const time = normalizedEventTime(event.startTime || event.time);
+      const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(date);
+      const start = reportDate(dateOnly && time ? date + " " + time : date);
+      const status = event.status.toLowerCase();
+      const upcoming = status === "upcoming" && start !== null
+        && (dateOnly && !time ? date >= today : start.getTime() >= eventClock);
+      return { event, sortTime: start?.getTime() ?? 0, group: upcoming ? 0 : status === "draft" ? 2 : 1 };
+    })
+    .sort((a, b) => a.group - b.group || (a.group === 0 ? a.sortTime - b.sortTime : b.sortTime - a.sortTime) || a.event.id.localeCompare(b.event.id))
+    .map(item => item.event);
   // Derive activeEvent from the live events list so it always reflects real-time data
   const activeEventId = filteredEvents.some(event => event.id === selectedEventId) ? selectedEventId : (wideDetails ? filteredEvents[0]?.id || null : null);
   const loadingParticipants = activeEventId !== participantsEventId || !!participantsError;

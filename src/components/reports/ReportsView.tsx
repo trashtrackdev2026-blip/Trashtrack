@@ -54,7 +54,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
   const [barangayFilter, setBarangayFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const visibleReports = filterReportSummary(reports, summaryFilter, role).filter(report =>
-    (!search.trim() || [report.id, report.type, report.description, report.location, report.reporterName].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
+    (!search.trim() || [report.id, report.type, report.subject || "", report.description, report.location, report.reporterName].some(value => value.toLowerCase().includes(search.trim().toLowerCase())))
     && (barangayFilter === "all" || reportBarangayLabel(report.location) === barangayFilter) && (typeFilter === "all" || report.type === typeFilter));
   const activeReport = visibleReports.find(report => report.id === activeReportId);
   const allowedStatuses = activeReport
@@ -222,7 +222,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
             <div className="px-4 pb-2">
               {visibleReports.map(report => { const photo=report.photoReview?.status === "review" ? "" : report.imageUrl || report.attachments.find(item => item.type === "image")?.url;return <button key={report.id} type="button" disabled={isUpdating} className="tt-report-item" aria-pressed={activeReport?.id === report.id} onClick={() => openReport(report)}>
                 <span className="tt-report-thumbnail">{photo ? <Image src={photo} alt="Report evidence" fill sizes="93px" className="object-cover" /> : <FileText aria-hidden="true" />}</span>
-                <span className="tt-report-item-copy"><strong>{report.type}</strong><small>…{report.id.slice(-6)}{isReportArchived(report) ? " · Archived" : ""}</small><small>{report.location} · {report.date || "Date not recorded"}</small></span><span className={"tt-status " + (report.status.toLowerCase() === "pending" ? "tt-status-pending" : "")}>{REPORT_STATUS_LABELS[report.status as keyof typeof REPORT_STATUS_LABELS] || report.status}</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="tt-report-item-copy"><strong>{report.subject || report.type}</strong><small>…{report.id.slice(-6)}{isReportArchived(report) ? " · Archived" : ""}</small><small>{report.location} · {report.date || "Date not recorded"}</small></span><span className={"tt-status " + (report.status.toLowerCase() === "pending" ? "tt-status-pending" : "")}>{REPORT_STATUS_LABELS[report.status as keyof typeof REPORT_STATUS_LABELS] || report.status}</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               </button>;})}
               {!loading && visibleReports.length === 0 && <p className="tt-empty">{archiveSelected && !search && barangayFilter === "all" && typeFilter === "all" ? "No archived reports yet. Reports appear here automatically when resolved." : "No reports match this view."}</p>}
             </div>
@@ -286,6 +286,7 @@ export function ReportsView({ reports, loading, error, retry, role, userBarangay
                   <h4 className="tt-report-section-title">Description</h4>
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                     <span className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {activeReport.type === "Other" && activeReport.subject && <strong className="mb-2 block text-foreground">{activeReport.subject}</strong>}
                       {activeReport.description || "No description provided."}
                     </span>
                   </div>

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
 import { StaffAccessError, staffAccessProblem, staffRole } from "@/lib/staff-access";
-import { assertCollectionAvailable, assertCollectionEditable, collectionStatus } from "@/lib/schedule-policy";
+import { assertCollectionAvailable, assertCollectionEditable, collectionStatus, collectionTruckFields, collectionTruckName } from "@/lib/schedule-policy";
 import { communityPublication } from "@/lib/community-publication";
 import { assertFutureSchedule } from "@/lib/scheduling-time";
 import { normalizeReportStatus } from "@/lib/report-workflow";
@@ -18,12 +18,13 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null);
     if (!body || !["edit", "followup", "delete"].includes(body.action) || !/^[\w-]{1,128}$/.test(body.id || "")
       || !/^[\w-]{1,80}$/.test(body.changeId || "") || !Number.isInteger(body.expectedRevision) || body.expectedRevision < 0 || typeof body.expectedStatus !== "string") throw new StaffAccessError("Reopen a collection before changing it.", 400);
-    const fields = body.action === "delete" ? null : communityPublication("schedule", body).post;
-    if (fields && "time" in fields) assertFutureSchedule(fields.date, fields.time);
+    const publication = body.action === "delete" ? null : communityPublication("schedule", body).post;
+    const fields = publication && "day" in publication ? publication : null;
+    if (fields) assertFutureSchedule(fields.date, fields.time);
     if (typeof body.description === "string" && body.description.length > 2000) throw new StaffAccessError("Use collection notes up to 2,000 characters.", 400);
     const ref = db.collection("schedules").doc(body.id);
     const operation = db.collection("collection_actions").doc(body.id + "_" + body.changeId);
-    const changeHash = createHash("sha256").update(JSON.stringify({ action: body.action, id: body.id, expectedRevision: body.expectedRevision, expectedStatus: body.expectedStatus, fields })).digest("hex");
+    const changeHash = createHash("sha256").update(JSON.stringify({ action: body.action, id: body.id, expectedRevision: body.expectedRevision, expectedStatus: body.expectedStatus, fields, ...(body.truckId === "" ? { clearTruck: true } : {}) })).digest("hex");
     const result = await db.runTransaction(async tx => {
       const [actor, saved, prior] = await Promise.all([tx.get(db.collection("users").doc(identity.uid)), tx.get(ref), tx.get(operation)]);
       if (staffRole(actor.data()?.role) !== "admin" || staffAccessProblem(actor.data() || {}, identity as unknown as Record<string, unknown>)) throw new StaffAccessError("Your MENRO access changed. Sign in again.");
@@ -49,15 +50,26 @@ export async function POST(request: Request) {
       const openReports = linked.docs.filter(doc => normalizeReportStatus(String(doc.data().status)) !== "Resolved");
       if (openReports.length > 200) throw new StaffAccessError("This collection has too many linked actions for one update. Contact the project owner before changing it.", 409);
       if (fields && linked.docs.some(doc => ![doc.data().location, "All Barangays"].includes(fields.barangay))) throw new StaffAccessError("The selected barangay does not cover a linked report. Keep its barangay or choose All Barangays.", 409);
-      const same = fields && ["date", "day", "time", "barangay", "description"].every(key => String(current[key] || "") === String(fields[key as keyof typeof fields] || ""));
+      const truck = fields ? collectionTruckFields(
+        body.action === "edit" && body.truckId === undefined ? current : body, fields.time,
+      ) : { truckId: "", endTime: "" };
+      const same = fields && ["date", "day", "time", "barangay", "description"].every(key => String(current[key] || "") === String(fields[key as keyof typeof fields] || ""))
+        && String(current.truckId || "") === truck.truckId && String(current.endTime || "") === truck.endTime;
       if (body.action === "edit" && same) return { noticeIds: [] as string[], scheduleId: body.id as string, changed: false };
+      let truckName = "";
       if (fields) {
+        if (truck.truckId) {
+          const fleet = await tx.get(db.collection("collection_trucks").doc(truck.truckId));
+          const sameSlot = body.action === "edit" && current.truckId === truck.truckId
+            && current.date === fields.date && current.time === fields.time && current.endTime === truck.endTime;
+          truckName = collectionTruckName(fleet.data(), sameSlot);
+        }
         const targetDay = days.find(day => day.date === fields.date)!;
-        assertCollectionAvailable({ date: fields.date, barangay: fields.barangay }, targetDay.schedules.docs.filter(doc => body.action === "followup" || doc.id !== body.id).map(doc => doc.data()));
+        assertCollectionAvailable({ date: fields.date, barangay: fields.barangay, time: fields.time, ...truck }, targetDay.schedules.docs.filter(doc => body.action === "followup" || doc.id !== body.id).map(doc => doc.data()));
       }
       const scheduleId = body.action === "followup" ? "followup_" + createHash("sha256").update(body.id + "\0" + body.changeId).digest("hex").slice(0, 40) : body.id;
       const revision = body.expectedRevision + 1;
-      const after = fields ? { ...fields, status: body.action === "followup" ? "Active" : current.status } : null;
+      const after = fields ? { ...fields, ...truck, truckName, status: body.action === "followup" ? "Active" : current.status } : null;
       const noticeIds: string[] = [];
       const recipients = [...new Set([String(current.barangay), ...(fields ? [fields.barangay] : [])])];
       for (const [index, audience] of recipients.entries()) {
@@ -70,17 +82,17 @@ export async function POST(request: Request) {
       for (const day of days) tx.set(day.lock, { revision: day.revision + 1 });
       if (body.action === "delete") tx.delete(ref);
       else if (body.action === "followup") {
-        tx.create(db.collection("schedules").doc(scheduleId), { ...fields, followsScheduleId: body.id, statusRevision: 0, createdBy: identity.uid, createdAt: FieldValue.serverTimestamp() });
+        tx.create(db.collection("schedules").doc(scheduleId), { ...fields, ...truck, truckName, followsScheduleId: body.id, statusRevision: 0, createdBy: identity.uid, createdAt: FieldValue.serverTimestamp() });
         tx.update(ref, { followupScheduleId: scheduleId, statusRevision: revision, updatedBy: identity.uid, updatedAt: FieldValue.serverTimestamp() });
       } else {
-        const details = { date: fields!.date, day: fields!.day, time: fields!.time, barangay: fields!.barangay, description: fields!.description };
+        const details = { date: fields!.date, day: fields!.day, time: fields!.time, barangay: fields!.barangay, description: fields!.description, ...truck, truckName };
         tx.update(ref, { ...details, statusRevision: revision, updatedBy: identity.uid, updatedAt: FieldValue.serverTimestamp() });
       }
       if (fields) for (const report of openReports) {
         const old = report.data();
         tx.update(report.ref, { scheduleId, actionDate: fields.date, actionTime: fields.time, originalActionDate: old.originalActionDate || old.actionDate || current.date || "", originalActionTime: old.originalActionTime || old.actionTime || current.time || "", scheduleRevision: body.action === "followup" ? 0 : revision, statusRevision: Number(old.statusRevision || 0) + 1, rescheduledAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), updatedBy: identity.uid });
       }
-      const audit = { action: "schedule." + body.action, target: body.id, actor: identity.uid, scheduleId, before: { date: current.date || "", time: current.time || "", barangay: current.barangay, status: current.status, description: current.description || "" }, after, linkedReports: openReports.map(report => report.id), at: FieldValue.serverTimestamp() };
+      const audit = { action: "schedule." + body.action, target: body.id, actor: identity.uid, scheduleId, before: { date: current.date || "", time: current.time || "", barangay: current.barangay, status: current.status, description: current.description || "", truckId: current.truckId || "", truckName: current.truckName || "", endTime: current.endTime || "" }, after, linkedReports: openReports.map(report => report.id), at: FieldValue.serverTimestamp() };
       tx.create(db.collection("audit_logs").doc(), audit);
       tx.create(operation, { ...audit, changeHash, noticeIds });
       return { noticeIds, scheduleId, changed: true };

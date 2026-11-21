@@ -1,7 +1,7 @@
 import { normalizeReportStatus } from "./report-workflow.ts";
 
 export type MenroStage = "ready" | "submitted" | "review" | "collection" | "resolved";
-export type MenroReport = { id: string; type: string; description: string; location: string; status: string; date: string; reporterName: string; reviewedByName?: string; verifiedByName?: string; forwardedByName?: string; resolvedByRole?: string };
+export type MenroReport = { id: string; type: string; description: string; subject?: string; location: string; status: string; date: string; reporterName: string; reviewedByName?: string; verifiedByName?: string; forwardedByName?: string; resolvedByRole?: string };
 export type MenroFilters = { stage: MenroStage; search: string; status: string; barangay: string; days: number; assignedBarangay?: string | null; now?: Date };
 
 export const MENRO_STAGES: { id: MenroStage; label: string; description: string }[] = [
@@ -48,7 +48,7 @@ export function filterMenroReports<T extends MenroReport>(reports: T[], filters:
     if (menroStage(report.status) !== filters.stage) return false;
     if (filters.status !== "all" && menroStage(report.status) !== filters.status) return false;
     if (filters.barangay !== "all" && report.location !== filters.barangay) return false;
-    if (term && ![report.id, report.type, report.description, report.location, report.reporterName,
+    if (term && ![report.id, report.type, report.subject || "", report.description, report.location, report.reporterName,
       report.reviewedByName, report.verifiedByName, report.forwardedByName].some(value => value?.toLowerCase().includes(term))) return false;
     if (cutoff !== null) {
       const date = reportDate(report.date)?.getTime();

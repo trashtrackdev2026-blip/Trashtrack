@@ -13,6 +13,7 @@ export interface CommunityReport {
   userId: string;
   type: string;
   description: string;
+  subject?: string;
   location: string;
   latitude?: number;
   longitude?: number;
@@ -67,6 +68,7 @@ export function useReports() {
             const data = doc.data();
             return {
               id: doc.id, userId: data.userId || "", type: data.type || "Unknown",
+              subject: typeof data.subject === "string" ? data.subject : undefined,
               description: data.description || "", location: data.location || "",
               latitude: data.latitude, longitude: data.longitude, imageUrl: data.imageUrl || "",
               attachments: Array.isArray(data.attachments) ? data.attachments.filter((item: { url?: unknown; type?: unknown }) =>

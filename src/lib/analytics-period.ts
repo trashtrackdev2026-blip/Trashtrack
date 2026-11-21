@@ -14,9 +14,24 @@ export function analyticsMonthRange(month:string) {
 export function analyticsMonthLabel(month:string) {
   return month ? analyticsMonthRange(month).start.toLocaleDateString("en-US",{timeZone:"Asia/Manila",month:"long",year:"numeric"}) : "All recorded dates";
 }
+export function analyticsPeriodRange(period: string) {
+  if (!/^\d{4}$/.test(period)) return analyticsMonthRange(period);
+  const year = Number(period);
+  if (year < 1900) throw new Error("Choose a valid report year.");
+  return {
+    start: analyticsMonthRange(period + "-01").start,
+    end: new Date(Date.UTC(year + 1, 0, 1) - 8 * 60 * 60 * 1000),
+  };
+}
+export function analyticsPeriodLabel(period: string) {
+  return /^\d{4}$/.test(period) ? period : analyticsMonthLabel(period);
+}
 export function filterAnalyticsMonth<T extends Data>(records:T[],month:string,kind:"report"|"event"|"schedule"|"resource"="report"):T[] {
-  if(!month)return records;
-  const {start,end}=analyticsMonthRange(month);
+  return filterAnalyticsPeriod(records, month, kind);
+}
+export function filterAnalyticsPeriod<T extends Data>(records:T[],period:string,kind:"report"|"event"|"schedule"|"resource"="report"):T[] {
+  if(!period)return records;
+  const {start,end}=analyticsPeriodRange(period);
   return records.filter(item=>{
     const date=kind==="event" ? reportDate(String(item.dateISO || item.date || "")) : kind==="schedule" ? reportDate(String(item.date || "")) : analyticsReportDate(item);
     return date!==null && date>=start && date<end;

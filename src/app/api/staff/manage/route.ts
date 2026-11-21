@@ -2,14 +2,24 @@ import { randomUUID } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
-import { StaffAccessError, validStaffBarangay, staffAccessProblem, staffAssignmentFields, staffRole, requestFields } from "@/lib/staff-access";
+import { StaffAccessError, validStaffBarangay, staffAccessProblem, staffAssignmentFields, staffRole, requestFields, STAFF_BARANGAYS } from "@/lib/staff-access";
 
 export async function GET(request: Request) {
   try {
     const { app, db } = await authenticatedStaff(request, true);
     await requireStaffSecurity();
     const auth = getAuth(app);
-    const email = new URL(request.url).searchParams.get("email");
+    const params = new URL(request.url).searchParams;
+    if (params.get("counts") === "barangay") {
+      const snapshot = await db.collection("users").where("role", "in", ["Semi-Admin", "semi-admin"]).select("barangay", "accessStatus").get();
+      const counts = new Map<string, number>(STAFF_BARANGAYS.map(name => [name, 0]));
+      for (const doc of snapshot.docs) {
+        const { barangay, accessStatus } = doc.data();
+        if (accessStatus === "active" && validStaffBarangay(barangay)) counts.set(barangay, (counts.get(barangay) || 0) + 1);
+      }
+      return Response.json({ barangays: [...counts].map(([name, count]) => ({ name, count })) }, { headers: { "Cache-Control": "no-store" } });
+    }
+    const email = params.get("email");
     if (email !== null) {
       if (!email.trim() || email.length > 254) throw new StaffAccessError("Enter the registered official's email.", 400);
       const account = await auth.getUserByEmail(email.trim()).catch(error => {

@@ -41,6 +41,16 @@ test("photo and video evidence is validated together and legacy imageUrl still p
   assert.throws(() => reportSubmission({ ...body, description: "  " }, profile, boundaries, "demo"));
 });
 
+test("Other report subjects are trimmed and validated while old clients can omit the new field", () => {
+  const other = { ...body, type: "Other" };
+  assert.equal(reportSubmission(other, profile, boundaries, "demo").subject, undefined);
+  assert.equal(reportSubmission({ ...other, subject: "  Waste near the footpath  " }, profile, boundaries, "demo").subject, "Waste near the footpath");
+  assert.equal(reportSubmission({ ...body, subject: "Unrelated" }, profile, boundaries, "demo").subject, undefined);
+  for (const subject of ["", " ", 1, "a".repeat(121)]) {
+    assert.throws(() => reportSubmission({ ...other, subject }, profile, boundaries, "demo"), /Enter a subject/);
+  }
+});
+
 test("scanner identifies general subjects and keeps tentative objects without a confidence cutoff", () => {
   const result = { item: "Plastic bottle", type: "Recyclable", confidence: 95, steps: ["Empty and rinse", "Place in the recycling bin"] };
   assert.match(classificationText(JSON.stringify(result)), /TYPE: Recyclable/);
