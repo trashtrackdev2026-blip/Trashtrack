@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Truck } from "lucide-react";
 import { staffRequest } from "@/lib/staff-client";
 
-export type CollectionTruck = { id: string; name: string; available: boolean };
+import type { CollectionTruck } from "@/lib/collection-trucks";
 
 export function useCollectionTrucks() {
   const [result, setResult] = useState<{ trucks: CollectionTruck[]; error: string } | null>(null);
@@ -45,7 +45,7 @@ export function TruckAssignmentFields({
         <select className={field} value={truckId} onChange={event => onTruckChange(event.target.value)}>
           <option value="">Leave unassigned</option>
           {truckId && !available.some(truck => truck.id === truckId) && <option value={truckId}>{truckName || "Current assignment"}</option>}
-          {available.map(truck => <option key={truck.id} value={truck.id}>{truck.name}</option>)}
+          {available.map(truck => <option key={truck.id} value={truck.id}>{truck.name}{truck.plateNumber ? ` · ${truck.plateNumber}` : ""}</option>)}
         </select>
       </label>
       {truckId && <label className="text-sm font-medium">Truck end time

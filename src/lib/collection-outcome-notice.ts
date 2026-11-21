@@ -1,6 +1,16 @@
 import { STAFF_BARANGAYS, StaffAccessError } from "./staff-access.ts";
 import { collectionTimeLabel } from "./collection-calendar.ts";
 import type { CollectionStatus } from "./schedule-policy.ts";
+import { TRUCK_DETAIL_LIMITS } from "./collection-trucks.ts";
+
+export function collectionTruckNotice(name: string, truck: Record<string, unknown> | undefined) {
+  const format = (value: unknown, max: number) => typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : "";
+  const truckName = format(name, TRUCK_DETAIL_LIMITS.name);
+  if (!truckName) return "";
+  const plate = format(truck?.plateNumber, TRUCK_DETAIL_LIMITS.plateNumber);
+  const vehicle = format(truck?.vehicleType, TRUCK_DETAIL_LIMITS.vehicleType) || format(truck?.makeModel, TRUCK_DETAIL_LIMITS.makeModel);
+  return [`Truck: ${truckName}`, plate ? `Plate ${plate}` : "", vehicle].filter(Boolean).join(" · ");
+}
 
 export function collectionOutcomeNotice(current: Record<string, unknown>, status: CollectionStatus, notes: string) {
   const recipients = String(current.barangay || "").trim();
@@ -17,10 +27,11 @@ export function collectionOutcomeNotice(current: Record<string, unknown>, status
 }
 
 /** Use the same resident-facing clock for creation, edits, cancellation and follow-ups. */
-export function collectionChangeMessage(action:string, current:Record<string,unknown>, next:Record<string,unknown>|null) {
+export function collectionChangeMessage(action:string, current:Record<string,unknown>, next:Record<string,unknown>|null, truckNotice = "") {
   const old=`${current.barangay}, ${current.date || current.day} at ${collectionTimeLabel(String(current.time || ""))}`;
-  const prefix=action==="delete" ? `Collection cancelled: ${old}.`
+  const schedule=action==="delete" ? `Collection cancelled: ${old}.`
     : `${action==="followup"?"Follow-up collection":"Collection schedule updated"}: ${next!.barangay}, ${next!.date} at ${collectionTimeLabel(String(next!.time))}. Previous schedule: ${old}.`;
+  const prefix = truckNotice ? truckNotice + "\n" + schedule : schedule;
   const notes=String(current.statusNotes || "").trim();
   const label=notes ? ` Previous outcome: ${current.status}. Outcome notes: ` : "";
   const suffix=" Open TrashTrack for details.";

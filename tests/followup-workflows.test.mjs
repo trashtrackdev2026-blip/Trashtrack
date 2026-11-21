@@ -5,6 +5,7 @@ import fs from "node:fs";
 import {createRequire} from "node:module";
 import * as access from "../src/lib/staff-access.ts";
 import * as schedule from "../src/lib/schedule-policy.ts";
+import * as trucks from "../src/lib/collection-trucks.ts";
 import * as publication from "../src/lib/community-publication.ts";
 import * as clock from "../src/lib/scheduling-time.ts";
 import * as workflow from "../src/lib/report-workflow.ts";
@@ -15,7 +16,7 @@ import {learningCover} from "../src/lib/learning-resource.ts";
 import {matchesFirestorePolicy} from "../src/lib/security-policy.ts";
 const require=createRequire(import.meta.url),ts=require("typescript");
 const compile=file=>ts.transpileModule(fs.readFileSync(new URL("../src/app/api/"+file+"/route.ts",import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-const compiled={collections:compile("schedules/change"),feedback:compile("feedback")};
+const compiled={collections:compile("schedules/change"),feedback:compile("feedback"),trucks:compile("schedules/trucks")};
 
 function fixture({role="Admin",currentRole=role,pushFails=false,suspended=false}={}) {
   const profile={role,barangay:role==="Admin"?"":"Poblacion",accessStatus:"active",name:"Test Person"};
@@ -55,7 +56,7 @@ function fixture({role="Admin",currentRole=role,pushFails=false,suspended=false}
   const account={db,identity,profile};
   const modules={"firebase-admin/firestore":{FieldValue:{serverTimestamp:()=>"timestamp"}},"@/lib/staff-auth":{
     authenticatedAccount:async()=>account,authenticatedStaff:async(request,master)=>checkStaff(request,account,master),requireApprovedStaff:checkStaff,requireStaffSecurity:async()=>{},staffApiError:error=>Response.json({error:error.message},{status:error instanceof access.StaffAccessError?error.status:500})},
-    "@/lib/staff-access":access,"@/lib/schedule-policy":schedule,"@/lib/community-publication":publication,"@/lib/scheduling-time":clock,"@/lib/report-workflow":workflow,"@/lib/system-feedback":feedback,"@/lib/collection-outcome-notice":collectionNotice,"@/lib/notification-delivery":{queuePhoneNotification:async()=>{if(pushFails)throw Error("Provider unavailable");}}};
+    "@/lib/staff-access":access,"@/lib/schedule-policy":schedule,"@/lib/collection-trucks":trucks,"@/lib/community-publication":publication,"@/lib/scheduling-time":clock,"@/lib/report-workflow":workflow,"@/lib/system-feedback":feedback,"@/lib/collection-outcome-notice":collectionNotice,"@/lib/notification-delivery":{queuePhoneNotification:async()=>{if(pushFails)throw Error("Provider unavailable");}}};
   const routes={};for(const [name,source] of Object.entries(compiled)){routes[name]={};new Function("require","exports",source)(name=>modules[name]||require(name),routes[name]);}
   async function invoke(kind,body,expected=200,url="") {
     const result=await routes[kind][body?"POST":"GET"](new Request("http://localhost/api/"+kind+url,{...(body?{method:"POST",body:JSON.stringify(body)}:{})}));
@@ -72,15 +73,59 @@ test("Collection edits update linked open actions, preserve original planning da
   const report=app.records.get("reports/report1");assert.equal(report.actionDate,"2099-11-05");assert.equal(report.originalActionDate,"2099-11-04");assert.equal(report.statusRevision,5);assert.equal(report.status,"Endorsed");
   const saved=structuredClone([...app.records]);await app.invoke("collections",app.edit);assert.deepEqual([...app.records],saved);
 });
+test("MENRO can register and edit truck details, including older trucks linked to a schedule", async () => {
+  const app = fixture();
+  const legacyId = "a".repeat(32);
+  app.records.set("collection_trucks/" + legacyId, { name: "Legacy Truck", available: true });
+  app.records.get("schedules/one").truckId = legacyId;
+
+  await app.invoke("trucks", { action: "add", name: " Truck 02 ", plateNumber: "xyz 1234", vehicleType: "Dump truck",
+    makeModel: "Isuzu N-Series", capacityKg: 3000, notes: "Narrow-road routes", available: false });
+  const { trucks: roster } = await app.invoke("trucks", null);
+  const registered = roster.find(truck => truck.name === "Truck 02");
+  assert.ok(registered);
+  assert.deepEqual(registered, { id: registered.id, name: "Truck 02", plateNumber: "XYZ 1234", vehicleType: "Dump truck",
+    makeModel: "Isuzu N-Series", capacityKg: 3000, notes: "Narrow-road routes", available: false, detailsRevision: 0 });
+  assert.equal(roster.find(truck => truck.id === legacyId).detailsRevision, 0);
+
+  // An availability change while a form is open should not be overwritten by its save.
+  await app.invoke("trucks", { action: "availability", id: legacyId, available: false });
+  await app.invoke("trucks", { action: "edit", id: legacyId, expectedRevision: 0, name: "Truck 01", plateNumber: "ABC-1234", capacityKg: 2400 });
+  const saved = app.records.get("collection_trucks/" + legacyId);
+  assert.equal(saved.name, "Truck 01");
+  assert.equal(saved.available, false);
+  assert.equal(saved.detailsRevision, 1);
+  assert.equal(app.records.get("schedules/one").truckId, legacyId);
+
+  await app.invoke("trucks", { action: "edit", id: legacyId, expectedRevision: 0, name: "Another name" }, 409);
+  assert.equal(app.records.get("collection_trucks/" + legacyId).name, "Truck 01");
+  await app.invoke("trucks", { action: "add", name: "Legacy Truck" });
+});
+
+test("Fleet writes reject duplicate plates and names, invalid details and non-MENRO staff", async () => {
+  const app = fixture();
+  await app.invoke("trucks", { action: "add", name: "Truck 01", plateNumber: "ABC 1234" });
+  const before = structuredClone([...app.records]);
+  await app.invoke("trucks", { action: "add", name: "truck 01" }, 409);
+  await app.invoke("trucks", { action: "add", name: "Truck 02", plateNumber: "abc-1234" }, 409);
+  await app.invoke("trucks", { action: "add", name: "Truck 02", capacityKg: 1.5 }, 400);
+  assert.deepEqual([...app.records], before);
+  const barangay = fixture({ role: "Semi-Admin" });
+  await barangay.invoke("trucks", null, 403);
+  await barangay.invoke("trucks", { action: "add", name: "Truck 02" }, 403);
+});
+
 test("A truck conflict during an edit saves neither the edit nor a resident notice", async () => {
   const app = fixture();
-  app.records.set("collection_trucks/truck-a", { name: "Truck A", available: true });
+  app.records.set("collection_trucks/truck-a", { name: "Truck A", plateNumber: "ABC 4321", available: true });
   app.records.set("schedules/assigned", { date: app.edit.date, barangay: "Sala", time: "07:00", endTime: "09:00", status: "Active", truckId: "truck-a" });
   const before = structuredClone([...app.records]);
   await app.invoke("collections", { ...app.edit, truckId: "truck-a", endTime: "10:00" }, 409);
   assert.deepEqual([...app.records], before);
   await app.invoke("collections", { ...app.edit, truckId: "truck-a", time: "09:00", endTime: "10:00" });
   assert.equal(app.records.get("schedules/one").truckName, "Truck A");
+  const published = [...app.records].find(([path]) => path.startsWith("notifications/"))[1];
+  assert.match(published.message, /^Truck: Truck A · Plate ABC 4321/);
   await app.invoke("collections", { ...app.edit, changeId: "clear-truck", expectedRevision: 1, time: "09:00", truckId: "" });
   assert.equal(app.records.get("schedules/one").truckId, "");
 });

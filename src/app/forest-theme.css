@@ -25,7 +25,12 @@
 .tt-sidebar-brand { margin-bottom: 39px; }
 .tt-nav-link { color: #e1ecdb; font-size: 14px; padding: 13px 13px; min-height: 47px; }
 .tt-nav-link:hover { background: #7a9f6240; color: #fffef4; }
-.tt-nav-link[aria-current=page] { background: #658c4b85; color: #fffef2; }
+.tt-nav-link[aria-current=page], .tt-collections-toggle[data-active] { background: #658c4b85; color: #fffef2; }
+.tt-collections-toggle[data-active] { font-weight: 600; }
+.tt-sidebar ul.tt-collections-links { margin: 4px 0 0 19px; padding-inline-start: 8px; gap: 3px; border-inline-start: 1px solid #e1ecdb3b; }
+.tt-sidebar ul.tt-collections-links[hidden] { display: none; }
+.tt-sidebar.is-collapsed ul.tt-collections-links { margin-inline-start: 0; padding-inline-start: 0; border-inline-start: 0; }
+.tt-collections-toggle > svg:last-child:not(:first-child) { width: 15px; height: 15px; }
 .tt-nav-link[aria-current=page]:before { display: none; }
 .tt-nav-label { color: #b4cbb5; font-size: 10px; }
 .tt-sidebar .tt-icon-control { color: #d7e7cf; }

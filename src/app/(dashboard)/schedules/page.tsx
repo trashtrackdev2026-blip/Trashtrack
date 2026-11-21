@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, CalendarDays, ChevronLeft, ChevronRight, Eye, Trash2, Pencil, LockKeyhole, Truck } from "lucide-react";
+import { Search, CalendarDays, ChevronLeft, ChevronRight, Eye, Trash2, Pencil, LockKeyhole } from "lucide-react";
 import { DeleteConfirmation } from "@/components/ui/DeleteConfirmation";
 import { EditCollectionDialog } from "@/components/schedules/EditCollectionDialog";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,6 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DetailPanel, useWideWorkspace } from "@/components/layout/DetailPanel";
-import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { collection, doc } from "firebase/firestore";
 import { subscribeWithDeadline } from "@/lib/live-data";
@@ -99,7 +98,6 @@ export default function SchedulesPage() {
   const confirmDelete = (schedule: CollectionSchedule) => { setDeleteTarget(schedule);setDeleteIntent(crypto.randomUUID());setDeleteError(""); };
   const metricValue = (number: number) => loading || dataError ? "—" : number;
   return <div>
-    <div className="mb-4 flex justify-end"><Link href="/schedules/trucks" className="tt-primary-link"><Truck aria-hidden="true" />Manage trucks</Link></div>
     <DataState loading={loading} error={dataError} onRetry={retryData} />
     {statusMessage && <p role="status" className="mb-4 rounded-xl bg-green-50 p-4 text-sm text-green-900">{statusMessage}</p>}
     <section className="tt-metric-strip" aria-label="Collection summary">

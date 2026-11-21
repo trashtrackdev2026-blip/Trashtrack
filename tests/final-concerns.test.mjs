@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {analyticsMonthRange,analyticsMonthLabel,filterAnalyticsMonth,analyticsRecordRows,analyticsPeriodRange,filterAnalyticsPeriod} from "../src/lib/analytics-period.ts";
 import {summarizeAnalytics} from "../src/lib/analytics-data.ts";
 import {learningPublicationFields,LEARNING_CATEGORIES,LEARNING_TYPES} from "../src/lib/learning-publication.ts";
-import {collectionChangeMessage,collectionOutcomeNotice} from "../src/lib/collection-outcome-notice.ts";
+import {collectionChangeMessage,collectionOutcomeNotice,collectionTruckNotice} from "../src/lib/collection-outcome-notice.ts";
 import {communityPublication} from "../src/lib/community-publication.ts";
 import {buildPhonePush} from "../src/lib/phone-push.ts";
 
@@ -67,6 +67,17 @@ test("Every collection lifecycle phone message uses AM/PM and edited notices inc
   for(const action of ["edit","followup","delete"]){const message=collectionChangeMessage(action,current,next);assert.match(message,/8:00 PM/);if(action!=="delete")assert.match(message,/7:00 AM/);assert.ok(message.includes(current.statusNotes));assert.ok(message.length<=500);buildPhonePush("one",{title:"Collection update",message,recipients:"Poblacion"},["Poblacion"]);}
   const created=communityPublication("schedule",{barangay:"Poblacion",date:"2099-11-04",time:"00:00"});assert.match(created.announcement.message,/12:00 AM/);
 });
+test("A truck on a follow-up stays visible even when the prior outcome notes are long", () => {
+  const truck = collectionTruckNotice("Truck A", { plateNumber: "ABC 4321", makeModel: "Isuzu N-Series", notes: "Internal" });
+  const current = { barangay: "Sala", date: "2026-11-02", time: "13:00", status: "Failed", statusNotes: "Road closed. ".repeat(100) };
+  const message = collectionChangeMessage("followup", current, { barangay: "Sala", date: "2026-11-03", time: "08:30" }, truck);
+  assert.match(message, /^Truck: Truck A · Plate ABC 4321 · Isuzu N-Series/);
+  assert.match(message, /8:30 AM/);
+  assert.doesNotMatch(message, /Internal/);
+  assert.ok(message.length <= 500);
+  assert.equal(buildPhonePush("followup", { message, title: "Follow-up collection", recipients: "Sala" }, ["Sala"]).notification.body, message);
+});
+
 test("Outcome notes remain complete for the resident inbox while the actual FCM body is bounded and informative",()=>{
   const notes="Road remains blocked. ".repeat(85),notice=collectionOutcomeNotice({barangay:"Sala",date:"2026-11-02",time:"13:00"},"Unfinished",notes);
   assert.equal(notice.outcomeNotes,notes);assert.equal(notice.outcomeStatus,"Unfinished");assert.match(notice.message,/Outcome notes: Road remains blocked/);assert.match(notice.message,/1:00 PM/);assert.ok(notice.message.length<=500);

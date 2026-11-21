@@ -12,7 +12,7 @@ import { announcementExpired, notificationPublication, phoneDeliveryDue } from "
 import { eventFormFields, normalizedEventTime } from "../src/lib/event-form.ts";
 import { notificationEdit } from "../src/lib/notification-edit.ts";
 import * as clock from "../src/lib/scheduling-time.ts";
-import { collectionOutcomeNotice } from "../src/lib/collection-outcome-notice.ts";
+import { collectionOutcomeNotice, collectionTruckNotice } from "../src/lib/collection-outcome-notice.ts";
 const require = createRequire(import.meta.url), ts = require("typescript");
 const compile = path => ts.transpileModule(fs.readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const routeCode = compile("../src/app/api/community/publish/route.ts");
@@ -51,7 +51,7 @@ function fixture(options = {}) {
     } }) }, "./barangay-geofence": { BALETE_BARANGAYS: policy.STAFF_BARANGAYS }, "./phone-push": { buildPhonePush }, "./staff-access": policy,
     "@/lib/staff-auth": staffAuth, "@/lib/staff-access": policy, "@/lib/schedule-policy": schedules, "@/lib/community-publication": { communityPublication }, "@/lib/certificate-data": certificates,
     "@/lib/notification-publication": { announcementExpired, notificationPublication }, "@/lib/event-form": {eventFormFields,normalizedEventTime}, "@/lib/notification-edit": {notificationEdit},
-    "@/lib/scheduling-time":clock,"@/lib/collection-outcome-notice":{collectionOutcomeNotice} };
+    "@/lib/scheduling-time":clock,"@/lib/collection-outcome-notice":{collectionOutcomeNotice,collectionTruckNotice} };
   const delivery = {}; new Function("require","exports",deliveryCode)(name => modules[name] || require(name), delivery);
   modules["@/lib/notification-delivery"] = delivery;
   const route = {}; new Function("require","exports",routeCode)(name => modules[name] || require(name), route);
@@ -72,10 +72,15 @@ function fixture(options = {}) {
 
 test("Publishing reserves a truck across barangays while allowing independent trucks and adjacent slots", async () => {
   const app = fixture();
-  app.records.set("collection_trucks/truck-a", { name: "Truck A", available: true });
+  app.records.set("collection_trucks/truck-a", { name: "Truck A", plateNumber: "ABC 4321", vehicleType: "Compactor", notes: "Internal fleet notes", capacityKg: 3000, available: true });
   app.records.set("collection_trucks/truck-b", { name: "Truck B", available: true });
   await app.post({ ...schedule, truckId: "truck-a", endTime: "10:00" });
   assert.equal(app.records.get("schedules/test-schedule").truckName, "Truck A");
+  const notice = app.records.get("notifications/schedule_test-schedule");
+  assert.ok(notice.message.startsWith("Truck: Truck A · Plate ABC 4321 · Compactor\n"));
+  assert.doesNotMatch(notice.message, /Internal fleet notes|3000/);
+  assert.equal(app.pushes[0].notification.body, notice.message);
+  assert.equal(app.pushes[0].data.message, notice.message);
   const blocked = await app.post({ ...schedule, id: "overlap", barangay: "Looc", time: "09:00", truckId: "truck-a", endTime: "11:00" }, 409);
   assert.match(blocked.error, /truck is already assigned/);
   assert.equal(app.records.has("schedules/overlap"), false);

@@ -1,4 +1,4 @@
-import { collectionChangeMessage } from "@/lib/collection-outcome-notice";
+import { collectionChangeMessage, collectionTruckNotice } from "@/lib/collection-outcome-notice";
 import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/staff-auth";
@@ -57,12 +57,15 @@ export async function POST(request: Request) {
         && String(current.truckId || "") === truck.truckId && String(current.endTime || "") === truck.endTime;
       if (body.action === "edit" && same) return { noticeIds: [] as string[], scheduleId: body.id as string, changed: false };
       let truckName = "";
+      let truckNotice = "";
       if (fields) {
         if (truck.truckId) {
           const fleet = await tx.get(db.collection("collection_trucks").doc(truck.truckId));
           const sameSlot = body.action === "edit" && current.truckId === truck.truckId
             && current.date === fields.date && current.time === fields.time && current.endTime === truck.endTime;
-          truckName = collectionTruckName(fleet.data(), sameSlot);
+          const vehicle = fleet.data();
+          truckName = collectionTruckName(vehicle, sameSlot);
+          truckNotice = collectionTruckNotice(truckName, vehicle);
         }
         const targetDay = days.find(day => day.date === fields.date)!;
         assertCollectionAvailable({ date: fields.date, barangay: fields.barangay, time: fields.time, ...truck }, targetDay.schedules.docs.filter(doc => body.action === "followup" || doc.id !== body.id).map(doc => doc.data()));
@@ -76,7 +79,7 @@ export async function POST(request: Request) {
         const noticeId = "schedule_change_" + body.id + "_" + body.changeId + "_" + index;
         noticeIds.push(noticeId);
         const title = body.action === "delete" ? "Collection cancelled" : body.action === "followup" ? "Follow-up collection" : "Collection schedule updated";
-        const message = collectionChangeMessage(body.action, current, fields);
+        const message = collectionChangeMessage(body.action, current, fields, truckNotice);
         tx.create(db.collection("notifications").doc(noticeId), { title, message, outcomeNotes:String(current.statusNotes || "").trim(), outcomeStatus:String(current.status || ""), type: "schedule", recipients: audience, sourceId: scheduleId, changeHash, push: true, pushStatus: "pending", isRead: false, createdBy: identity.uid, createdAt: FieldValue.serverTimestamp(), timestamp: FieldValue.serverTimestamp() });
       }
       for (const day of days) tx.set(day.lock, { revision: day.revision + 1 });
