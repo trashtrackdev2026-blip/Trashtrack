@@ -3,7 +3,7 @@ import { authenticatedStaff, requireStaffSecurity, staffApiError } from "@/lib/s
 import { limitAiRequests } from "@/lib/ai-access";
 import { StaffAccessError } from "@/lib/staff-access";
 import { filterAnalyticsPeriod, analyticsPeriodLabel, analyticsPeriodRange } from "@/lib/analytics-period";
-import { summarizeAnalytics } from "@/lib/analytics-data";
+import { summarizeAnalytics, type ReportInsightEvidence } from "@/lib/analytics-data";
 import { manilaDateTime } from "@/lib/scheduling-time";
 
 export const runtime = "nodejs";
@@ -28,11 +28,13 @@ export async function POST(request: Request) {
     await limitAiRequests(account, "analytics");
     const snapshot = await account.db.collection("reports").select("type", "category", "status", "date", "createdAt", "timestamp").get();
     const reports = filterAnalyticsPeriod(snapshot.docs.map(doc => doc.data()), period);
-    if (!reports.length) return Response.json({ text: "" });
     const now = new Date();
     const cutoff = period ? new Date(analyticsPeriodRange(period).end.getTime() - 1) : now;
     const { stats, trendData, categoryData } = summarizeAnalytics(reports, [], 0, [], cutoff, !period ? 6 : period.length === 4 ? 12 : 1);
     const { totalReports, pendingReports, resolvedReports, rejectedReports } = stats;
+    const evidence: ReportInsightEvidence = { totalReports, categories: categoryData, months: trendData };
+    const reply = (text: string) => Response.json({ text, evidence }, { headers: { "Cache-Control": "no-store" } });
+    if (!totalReports) return reply("");
     const categories = categoryData.map(({ name, value }) => ({ name, reports: value }));
     const currentMonth = manilaDateTime(now.getTime()).date.slice(0, 7);
     const [year, lastMonth] = manilaDateTime(cutoff.getTime()).date.split("-").map(Number);
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
       });
       const text = response.text?.trim();
       if (!text || text.length > 1200) throw new Error("Unexpected AI response");
-      return Response.json({ text }, { headers: { "Cache-Control": "no-store" } });
+      return reply(text);
     } catch {
       return Response.json({ error: "AI interpretation is temporarily unavailable. Try again later." }, { status: 502 });
     }

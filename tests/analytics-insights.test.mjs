@@ -61,7 +61,8 @@ test("MENRO analytics sends only scoped counts to Gemini", async () => {
     assert.equal((await post("2025-13")).status, 400);
     const response = await post("2025");
     assert.equal(response.status, 200);
-    assert.equal((await response.json()).text, "Two concerns were reported in the selected year.");
+    const { text, evidence } = await response.json();
+    assert.equal(text, "Two concerns were reported in the selected year.");
     assert.equal(calls.length, 1);
     assert.doesNotMatch(calls[0], /private|subject|location|description|imageUrl/);
     const context = JSON.parse(calls[0]);
@@ -70,6 +71,10 @@ test("MENRO analytics sends only scoped counts to Gemini", async () => {
     assert.equal(context.months.length, 12);
     assert.deepEqual(context.months.map(month => month.reports), [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     assert.equal(context.categories.find(category => category.name === "Missed Collection").reports, 0);
+    assert.equal(evidence.totalReports, context.totalReports);
+    assert.deepEqual(evidence.categories.map(({ name, value }) => ({ name, reports: value })), context.categories);
+    assert.deepEqual(evidence.months.map(({ name, value }) => ({ name, reports: value })),
+      context.months.map(({ name, reports }) => ({ name, reports })));
   } finally {
     if (previousKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = previousKey;

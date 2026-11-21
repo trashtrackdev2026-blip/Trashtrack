@@ -6,6 +6,11 @@ import { manilaDateTime } from "./scheduling-time.ts";
 
 type RecordData = Record<string, unknown>;
 export type AnalyticsPoint = { name: string; value: number };
+export type ReportInsightEvidence = {
+  totalReports: number;
+  categories: (AnalyticsPoint & { color: string })[];
+  months: AnalyticsPoint[];
+};
 export const CALAWIT_SERVICE_NOTE = "Calawit relocation service note: Makina is the service location identified for relocated Calawit residents. Confirm current arrangements with MENRO. Waste report counts describe recorded concerns and do not indicate volcanic risk or residential safety.";
 
 export function analyticsReportDate(data: RecordData): Date | null {
